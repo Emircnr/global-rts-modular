@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Global RTS — Üs Kur · Üret · Saldır</title>
 
-  <!-- Map & UI libs -->
+  <!-- Leaflet (jsDelivr) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-
+  <!-- Tailwind (CDN) — geliştirme için uygundur -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
 
@@ -95,7 +95,7 @@
   </main>
 
   <footer class="glass w-full text-center text-xs py-2 opacity-70">
-    Leaflet üzerinde modüler RTS • Kutu seçim • Duvar inşası
+    Leaflet üzerinde tek dosya JS ile RTS • Kutu seçim • Duvar inşası
   </footer>
 </div>
 
@@ -107,14 +107,15 @@
       <li><b>Sol tık sürükle</b>: Kutu ile çoklu seçim. Tek tık: tek seçim.</li>
       <li><b>Sağ tık</b>: Hareket. “Saldırı Yürüyüşü” açıkken yol üstündeki düşmanlara otomatik angaje olur.</li>
       <li><b>Durdur</b>: Seçili birimler mevcut hedefi bırakır.</li>
-      <li><b>Duvar Çiz</b>: Butona bas → haritada nokta nokta çiz. <b>Sağ tık</b> ile bitir. Kara/deniz birimleri duvara çarparsa durur.</li>
-      <li><b>Üretim</b> seçili bina panelinden yapılır. Kaynaklar: 🌾 yiyecek (değirmen), 🛢️ petrol (rafineri), ⛏️ demir (maden), 💰 para (pasif+liman bonusu).</li>
-      <li>Hız: 1x–100x. Davranış: Agresif / Tut (varsayılan <b>Tut</b> → birimler sen komut vermeden hareket etmez).</li>
+      <li><b>Duvar Çiz</b>: Butona bas → haritada nokta nokta çizin. <b>Sağ tık</b> ile bitirin.</li>
+      <li>Kaynaklar: 🌾 (değirmen), 🛢️ (rafineri), ⛏️ (maden), 💰 para (pasif+liman bonusu).</li>
+      <li>Hız: 1x–100x. Davranış: Agresif / Tut.</li>
     </ul>
     <div class="mt-4 text-right"><button class="btn bg-white/10" onclick="document.getElementById('helpModal').classList.remove('show')">Kapat</button></div>
   </div>
 </div>
 
-<script type="module" src="./src/main.js"></script>
+<!-- DİKKAT: Modül değil, normal JS -->
+<script src="./script.js"></script>
 </body>
 </html>
