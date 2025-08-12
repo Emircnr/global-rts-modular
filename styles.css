@@ -28,7 +28,7 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-famil
 .base::after{content:"🏰"} .mill::after{content:"🌾"} .refinery::after{content:"🛢️"} .mine::after{content:"⛏️"}
 .port::after{content:"⚓"} .factory::after{content:"🏭"} .barracks::after{content:"🎖️"} .rocketlab::after{content:"🛰️"} .airbase::after{content:"🛫"} .sam::after{content:"🎯"}
 
-/* selection */
+/* selection ring */
 .sel{outline:3px solid rgba(255,255,255,.7); outline-offset:2px; animation:pulse 1.2s ease-in-out infinite}
 @keyframes pulse{0%{outline-color:rgba(255,255,255,.7)}50%{outline-color:rgba(255,255,255,.2)}100%{outline-color:rgba(255,255,255,.7)}}
 
@@ -38,7 +38,7 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-famil
 .buildbar{position:absolute;top:-6px;left:50%;width:44px;height:4px;background:rgba(255,255,255,.1);border-radius:999px;overflow:hidden;transform:translateX(-50%)}
 .buildfill{height:100%;background:linear-gradient(90deg,#f59e0b,#fde047)}
 
-/* beams & walls */
+/* attack beam & walls */
 .beam{stroke:#fef08a;stroke-width:2;stroke-linecap:round;filter:drop-shadow(0 0 6px rgba(250,204,21,.9));opacity:.95;pointer-events:none}
 .wall-seg{filter:drop-shadow(0 0 4px rgba(148,163,184,.4))}
 
