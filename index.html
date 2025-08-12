@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Global RTS — Üs Kur · Üret · Saldır</title>
+
+  <!-- Map & UI libs -->
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body class="bg-[var(--bg)] text-[var(--text)]">
+<div id="app">
+  <!-- TOP HUD -->
+  <header class="glass z-[5000] sticky top-0 w-full">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap gap-3 items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="text-xl font-extrabold tracking-wide">GLOBAL <span class="text-emerald-400">RTS</span></div>
+        <div class="hidden md:flex items-center gap-2 text-sm opacity-80">
+          <span class="tag bg-emerald-500/10 border-emerald-400/30">Uydu Harita</span>
+          <span class="tag bg-sky-500/10 border-sky-400/30">Kutu Seçim</span>
+          <span class="tag bg-yellow-500/10 border-yellow-400/30">Duvar İnşası</span>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-3 items-center">
+        <div class="glass rounded-xl px-3 py-2 flex items-center gap-5 text-sm">
+          <div class="flex items-center gap-1"><span class="opacity-70">💰 Para:</span> <span id="money" class="font-bold">0</span></div>
+          <div class="flex items-center gap-1"><span class="opacity-70">🌾 Yiyecek:</span> <span id="food" class="font-bold">0</span></div>
+          <div class="flex items-center gap-1"><span class="opacity-70">🛢️ Petrol:</span> <span id="oil" class="font-bold">0</span></div>
+          <div class="flex items-center gap-1"><span class="opacity-70">⛏️ Demir:</span> <span id="iron" class="font-bold">0</span></div>
+        </div>
+        <div class="glass rounded-xl px-3 py-2 text-xs flex items-center gap-2">
+          <span>⏩ Hız:</span>
+          <input id="speedRange" type="range" min="1" max="100" value="1" class="w-32"/>
+          <span id="speedLbl" class="font-bold">1x</span>
+          <div class="hidden md:flex items-center gap-1 ml-2">
+            <button class="btn bg-white/10" data-speed="1">1x</button>
+            <button class="btn bg-white/10" data-speed="2">2x</button>
+            <button class="btn bg-white/10" data-speed="5">5x</button>
+            <button class="btn bg-white/10" data-speed="10">10x</button>
+            <button class="btn bg-white/10" data-speed="50">50x</button>
+            <button class="btn bg-white/10" data-speed="100">100x</button>
+          </div>
+        </div>
+        <div class="glass rounded-xl px-3 py-2 text-xs flex items-center gap-2">
+          <span>🎯 Davranış:</span>
+          <button id="stanceBtn" class="btn bg-yellow-500/20">Tut</button>
+        </div>
+        <button id="newGame" class="btn bg-emerald-500/20 border-emerald-400/30">↻ Yeni Oyun</button>
+        <button id="helpBtn" class="btn bg-sky-500/20 border-sky-400/30">❔ Yardım</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAP + overlays -->
+  <main class="relative">
+    <div id="map"></div>
+    <div id="selectOverlay"></div>
+
+    <!-- LEFT: Build/Produce -->
+    <div class="glass rounded-2xl p-3 absolute left-3 top-3 z-[5000] w-[300px]">
+      <div class="text-sm font-bold uppercase tracking-wide mb-2 opacity-70">İnşa Et</div>
+      <div class="grid grid-cols-2 gap-2 mb-3 text-sm" id="buildButtons"></div>
+
+      <div class="text-sm font-bold uppercase tracking-wide mb-2 opacity-70">Üret (Seçili Bina)</div>
+      <div id="prodPanel" class="grid grid-cols-1 gap-2 text-sm"><div class="opacity-60">Bir bina seçin…</div></div>
+      <div class="mt-3 text-xs opacity-70 leading-relaxed">
+        İpucu: <b>Sol sürükle</b> ile kutu seçimi; <b>sağ tık</b> hareket / saldırı-yürüyüş (moda bağlı).
+      </div>
+    </div>
+
+    <!-- RIGHT: Queue & Log -->
+    <div class="glass rounded-2xl p-3 absolute right-3 top-3 z-[5000] w-[320px]">
+      <div class="text-sm font-bold uppercase tracking-wide mb-2 opacity-70">Kepçe Görev Kuyruğu</div>
+      <ul id="queue" class="space-y-1 text-sm"></ul>
+      <div class="mt-3 text-sm font-bold uppercase tracking-wide mb-2 opacity-70">Savaş Günlüğü</div>
+      <div id="log" class="text-xs max-h-56 overflow-auto leading-relaxed pr-1"></div>
+    </div>
+
+    <!-- BOTTOM: Commands -->
+    <div class="glass rounded-xl px-3 py-2 text-sm absolute right-3 bottom-3 z-[5000] flex items-center gap-2">
+      <span class="opacity-80">Komutlar:</span>
+      <button id="cmdStop" class="btn bg-white/10">⏹️ Durdur</button>
+      <button id="cmdAttackMove" class="btn bg-white/10">⚔️ Saldırı Yürüyüşü: Kapalı</button>
+    </div>
+
+    <!-- BOTTOM CENTER hint -->
+    <div id="hint" class="glass rounded-xl px-3 py-2 text-sm absolute left-1/2 -translate-x-1/2 bottom-3 z-[5000]">Hazır.</div>
+  </main>
+
+  <footer class="glass w-full text-center text-xs py-2 opacity-70">
+    Leaflet üzerinde modüler RTS • Kutu seçim • Duvar inşası
+  </footer>
+</div>
+
+<!-- HELP MODAL -->
+<div id="helpModal" class="modal">
+  <div class="glass rounded-2xl p-6 max-w-xl text-sm">
+    <div class="text-lg font-bold mb-2">Nasıl Oynanır?</div>
+    <ul class="list-disc pl-5 space-y-2">
+      <li><b>Sol tık sürükle</b>: Kutu ile çoklu seçim. Tek tık: tek seçim.</li>
+      <li><b>Sağ tık</b>: Hareket. “Saldırı Yürüyüşü” açıkken yol üstündeki düşmanlara otomatik angaje olur.</li>
+      <li><b>Durdur</b>: Seçili birimler mevcut hedefi bırakır.</li>
+      <li><b>Duvar Çiz</b>: Butona bas → haritada nokta nokta çiz. <b>Sağ tık</b> ile bitir. Kara/deniz birimleri duvara çarparsa durur.</li>
+      <li><b>Üretim</b> seçili bina panelinden yapılır. Kaynaklar: 🌾 yiyecek (değirmen), 🛢️ petrol (rafineri), ⛏️ demir (maden), 💰 para (pasif+liman bonusu).</li>
+      <li>Hız: 1x–100x. Davranış: Agresif / Tut (varsayılan <b>Tut</b> → birimler sen komut vermeden hareket etmez).</li>
+    </ul>
+    <div class="mt-4 text-right"><button class="btn bg-white/10" onclick="document.getElementById('helpModal').classList.remove('show')">Kapat</button></div>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

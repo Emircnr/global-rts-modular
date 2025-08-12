@@ -1,0 +1,56 @@
+:root{
+  --bg:#0b1220; --panel:#111A2B; --panel2:#0F1626; --accent:#34d399; --accent2:#60a5fa; --danger:#ef4444; --warning:#f59e0b; --text:#E6EDF6;
+}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Fira Sans","Droid Sans","Helvetica Neue",Arial}
+#app{height:100%;display:grid;grid-template-rows:auto 1fr auto}
+#map{height:100%;width:100%}
+
+/* glass & ui */
+.glass{backdrop-filter: blur(10px); background: linear-gradient(180deg, rgba(17,26,43,.8), rgba(11,18,32,.8)); border:1px solid rgba(255,255,255,.06); box-shadow: 0 10px 30px rgba(0,0,0,.35)}
+.btn{display:inline-flex; align-items:center; gap:.5rem; padding:.5rem .8rem; border-radius:.75rem; border:1px solid rgba(255,255,255,.06); transition:.2s transform,.2s background,.2s border}
+.btn:hover{transform:translateY(-1px); border-color:rgba(255,255,255,.12)}
+.btn:active{transform:translateY(0)}
+.btn[disabled]{opacity:.45; pointer-events:none}
+.tag{font-size:.75rem; padding:.15rem .5rem; border-radius:.4rem; border:1px solid rgba(255,255,255,.1)}
+
+/* markers */
+.unit,.building{position:relative;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;border-radius:999px;border:2px solid rgba(0,0,0,.3); box-shadow:0 8px 20px rgba(0,0,0,.35)}
+.unit{width:22px;height:22px;font-size:12px}
+.building{width:28px;height:28px;font-size:14px}
+.player{background: radial-gradient(circle at 30% 30%, #10b981 10%, #059669 80%)}
+.ai{background: radial-gradient(circle at 30% 30%, #60a5fa 10%, #2563eb 80%)}
+.neutral{background:#6b7280}
+
+/* icons */
+.kepce::after{content:"⛏️"} .soldier::after{content:"🪖"} .apc::after{content:"🚙"}
+.tank::after{content:"🛡️"} .t90::after{content:"🛡️"} .himars::after{content:"🚀"}
+.ship::after{content:"🚢"} .f16::after{content:"✈️"} .tb2::after{content:"🛩️"} .apache::after{content:"🚁"}
+.base::after{content:"🏰"} .mill::after{content:"🌾"} .refinery::after{content:"🛢️"} .mine::after{content:"⛏️"}
+.port::after{content:"⚓"} .factory::after{content:"🏭"} .barracks::after{content:"🎖️"} .rocketlab::after{content:"🛰️"} .airbase::after{content:"🛫"} .sam::after{content:"🎯"}
+
+/* selection */
+.sel{outline:3px solid rgba(255,255,255,.7); outline-offset:2px; animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%{outline-color:rgba(255,255,255,.7)}50%{outline-color:rgba(255,255,255,.2)}100%{outline-color:rgba(255,255,255,.7)}}
+
+/* bars */
+.hpbar{position:absolute;bottom:-4px;left:50%;width:44px;height:3px;background:rgba(255,255,255,.15);border-radius:999px;overflow:hidden;transform:translateX(-50%)}
+.hpfill{height:100%;background:linear-gradient(90deg,#22c55e,#16a34a)}
+.buildbar{position:absolute;top:-6px;left:50%;width:44px;height:4px;background:rgba(255,255,255,.1);border-radius:999px;overflow:hidden;transform:translateX(-50%)}
+.buildfill{height:100%;background:linear-gradient(90deg,#f59e0b,#fde047)}
+
+/* beams & walls */
+.beam{stroke:#fef08a;stroke-width:2;stroke-linecap:round;filter:drop-shadow(0 0 6px rgba(250,204,21,.9));opacity:.95;pointer-events:none}
+.wall-seg{filter:drop-shadow(0 0 4px rgba(148,163,184,.4))}
+
+/* modal */
+.modal{position:fixed;inset:0;display:none;place-items:center;background:rgba(0,0,0,.5);z-index:9999}
+.modal.show{display:grid}
+
+/* leaflet tweaks */
+.leaflet-container{background:#0b1220}
+.leaflet-bar a{background:var(--panel);color:#fff;border:none}
+.leaflet-bar a:hover{background:#1b2741}
+
+/* selection box overlay */
+#selectOverlay{position:absolute;inset:0;pointer-events:none;z-index:6000}
+.selbox{position:absolute;border:1px dashed rgba(255,255,255,.7);background:rgba(96,165,250,.15);border-radius:.25rem}
