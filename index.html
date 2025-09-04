@@ -1,121 +1,398 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Global RTS — Üs Kur · Üret · Saldır</title>
-
-  <!-- Leaflet (jsDelivr) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-
-  <!-- Tailwind (CDN) — geliştirme için uygundur -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WordVault — Kelime Arşivin</title>
+  <!-- 
+  FIRESTORE GÜVENLİK KURALLARI (öneri)
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+      match /words/{wordId} {
+        allow read, write: if request.auth != null
+                           && (request.resource.data.owner == request.auth.uid || resource.data.owner == request.auth.uid);
+      }
+    }
+  }
+  -->
+  <!-- Tailwind (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="./styles.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial'] },
+          colors: {
+            bg: '#0b1220',
+            card: '#0f172a',
+            card2:'#111a2e',
+            border:'#1a2748',
+            acc:'#60a5fa',
+            good:'#22c55e',
+            warn:'#f59e0b',
+            bad:'#ef4444'
+          },
+          boxShadow: {
+            soft: '0 10px 30px rgba(0,0,0,0.25)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* ince cam efekti */
+    .glass { background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)); backdrop-filter: blur(6px); }
+    .chip { border: 1px solid rgba(255,255,255,.1); padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+  </style>
 </head>
-<body class="bg-[var(--bg)] text-[var(--text)]">
-<div id="app">
-  <!-- TOP HUD -->
-  <header class="glass z-[5000] sticky top-0 w-full">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap gap-3 items-center justify-between">
+<body class="min-h-screen bg-bg text-white">
+  <header class="sticky top-0 z-20 bg-gradient-to-b from-[#0e172a] to-[#0b1220] border-b border-border">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center gap-4 justify-between">
       <div class="flex items-center gap-3">
-        <div class="text-xl font-extrabold tracking-wide">GLOBAL <span class="text-emerald-400">RTS</span></div>
-        <div class="hidden md:flex items-center gap-2 text-sm opacity-80">
-          <span class="tag bg-emerald-500/10 border-emerald-400/30">Uydu Harita</span>
-          <span class="tag bg-sky-500/10 border-sky-400/30">Kutu Seçim</span>
-          <span class="tag bg-yellow-500/10 border-yellow-400/30">Duvar İnşası</span>
+        <div class="w-9 h-9 rounded-2xl bg-acc/20 grid place-items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z"/></svg>
         </div>
+        <h1 class="text-xl font-semibold tracking-wide">WordVault — Kelime Arşivin</h1>
       </div>
-      <div class="flex flex-wrap gap-3 items-center">
-        <div class="glass rounded-xl px-3 py-2 flex items-center gap-5 text-sm">
-          <div class="flex items-center gap-1"><span class="opacity-70">💰 Para:</span> <span id="money" class="font-bold">0</span></div>
-          <div class="flex items-center gap-1"><span class="opacity-70">🌾 Yiyecek:</span> <span id="food" class="font-bold">0</span></div>
-          <div class="flex items-center gap-1"><span class="opacity-70">🛢️ Petrol:</span> <span id="oil" class="font-bold">0</span></div>
-          <div class="flex items-center gap-1"><span class="opacity-70">⛏️ Demir:</span> <span id="iron" class="font-bold">0</span></div>
-        </div>
-        <div class="glass rounded-xl px-3 py-2 text-xs flex items-center gap-2">
-          <span>⏩ Hız:</span>
-          <input id="speedRange" type="range" min="1" max="100" value="1" class="w-32"/>
-          <span id="speedLbl" class="font-bold">1x</span>
-          <div class="hidden md:flex items-center gap-1 ml-2">
-            <button class="btn bg-white/10" data-speed="1">1x</button>
-            <button class="btn bg-white/10" data-speed="2">2x</button>
-            <button class="btn bg-white/10" data-speed="5">5x</button>
-            <button class="btn bg-white/10" data-speed="10">10x</button>
-            <button class="btn bg-white/10" data-speed="50">50x</button>
-            <button class="btn bg-white/10" data-speed="100">100x</button>
-          </div>
-        </div>
-        <div class="glass rounded-xl px-3 py-2 text-xs flex items-center gap-2">
-          <span>🎯 Davranış:</span>
-          <button id="stanceBtn" class="btn bg-yellow-500/20">Tut</button>
-        </div>
-        <button id="newGame" class="btn bg-emerald-500/20 border-emerald-400/30">↻ Yeni Oyun</button>
-        <button id="helpBtn" class="btn bg-sky-500/20 border-sky-400/30">❔ Yardım</button>
+      <div class="flex items-center gap-3 text-sm text-gray-300">
+        <span id="stat-total" class="chip">Toplam: 0</span>
+        <span id="stat-known" class="chip">Bilinen: 0</span>
+        <span id="stat-unknown" class="chip">Bilinmeyen: 0</span>
+        <button id="btn-export" class="chip hover:bg-white/10">Dışa Aktar (JSON)</button>
       </div>
     </div>
   </header>
 
-  <!-- MAP + overlays -->
-  <main class="relative">
-    <div id="map"></div>
-    <div id="selectOverlay"></div>
+  <main class="max-w-6xl mx-auto px-4 py-6 grid lg:grid-cols-2 gap-6">
+    <!-- Form -->
+    <section class="glass rounded-2xl shadow-soft border border-border p-5">
+      <h2 class="text-lg font-semibold mb-3">Kelime Ekle / Düzenle</h2>
+      <div class="grid gap-3">
+        <label class="text-sm text-gray-300">Kelime</label>
+        <input id="inp-word" class="w-full rounded-xl bg-card2 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="ör. anyway" />
 
-    <!-- LEFT: Build/Produce -->
-    <div class="glass rounded-2xl p-3 absolute left-3 top-3 z-[5000] w-[300px]">
-      <div class="text-sm font-bold uppercase tracking-wide mb-2 opacity-70">İnşa Et</div>
-      <div class="grid grid-cols-2 gap-2 mb-3 text-sm" id="buildButtons"></div>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="text-sm text-gray-300">Anlam(lar) <span class="text-gray-400">(satır satır)</span></label>
+            <textarea id="inp-meanings" rows="6" class="w-full rounded-xl bg-card2 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="neyse&#10;her hâlükârda"></textarea>
+          </div>
+          <div>
+            <label class="text-sm text-gray-300">Cümle(ler) <span class="text-gray-400">(satır satır)</span></label>
+            <textarea id="inp-sentences" rows="6" class="w-full rounded-xl bg-card2 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="It was raining, but we went out anyway.&#10;Anyway, let's focus on the main problem."></textarea>
+          </div>
+        </div>
 
-      <div class="text-sm font-bold uppercase tracking-wide mb-2 opacity-70">Üret (Seçili Bina)</div>
-      <div id="prodPanel" class="grid grid-cols-1 gap-2 text-sm"><div class="opacity-60">Bir bina seçin…</div></div>
-      <div class="mt-3 text-xs opacity-70 leading-relaxed">
-        İpucu: <b>Sol sürükle</b> ile kutu seçimi; <b>sağ tık</b> hareket / saldırı-yürüyüş (moda bağlı).
+        <div class="flex flex-wrap gap-3 items-center">
+          <label class="text-sm text-gray-300">Durum:</label>
+          <select id="sel-status" class="rounded-xl bg-card2 border border-border px-3 py-2 outline-none">
+            <option value="none">Seçilmedi</option>
+            <option value="known">Bilinen</option>
+            <option value="unknown">Bilinmeyen</option>
+          </select>
+          <div class="flex-1"></div>
+          <button id="btn-save" class="px-4 py-2 rounded-xl bg-acc text-black font-medium hover:opacity-90">Kaydet</button>
+          <button id="btn-clear" class="px-4 py-2 rounded-xl border border-border hover:bg-white/5">Temizle</button>
+          <button id="btn-delete" class="px-4 py-2 rounded-xl bg-bad/80 hover:bg-bad disabled:opacity-40" disabled>Sil</button>
+        </div>
+        <p class="text-sm text-gray-400">Not: Aynı kelimeyi girersen güncellenir. Belge kimliği kelimenin <em>küçük harfli</em> hâlidir.</p>
       </div>
-    </div>
+    </section>
 
-    <!-- RIGHT: Queue & Log -->
-    <div class="glass rounded-2xl p-3 absolute right-3 top-3 z-[5000] w-[320px]">
-      <div class="text-sm font-bold uppercase tracking-wide mb-2 opacity-70">Kepçe Görev Kuyruğu</div>
-      <ul id="queue" class="space-y-1 text-sm"></ul>
-      <div class="mt-3 text-sm font-bold uppercase tracking-wide mb-2 opacity-70">Savaş Günlüğü</div>
-      <div id="log" class="text-xs max-h-56 overflow-auto leading-relaxed pr-1"></div>
-    </div>
+    <!-- Arama & Listeler -->
+    <section class="glass rounded-2xl shadow-soft border border-border p-5">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="relative flex-1">
+          <input id="inp-search" class="w-full rounded-xl bg-card2 border border-border pl-10 pr-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="Kelime ara (en az 1 harf)..." />
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="2" d="m21 21-4.35-4.35M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"/></svg>
+        </div>
+        <div class="chip">
+          <select id="sel-filter" class="bg-transparent outline-none">
+            <option value="all">Hepsi</option>
+            <option value="known">Bilinen</option>
+            <option value="unknown">Bilinmeyen</option>
+          </select>
+        </div>
+      </div>
 
-    <!-- BOTTOM: Commands -->
-    <div class="glass rounded-xl px-3 py-2 text-sm absolute right-3 bottom-3 z-[5000] flex items-center gap-2">
-      <span class="opacity-80">Komutlar:</span>
-      <button id="cmdStop" class="btn bg-white/10">⏹️ Durdur</button>
-      <button id="cmdAttackMove" class="btn bg-white/10">⚔️ Saldırı Yürüyüşü: Kapalı</button>
-    </div>
-
-    <!-- BOTTOM CENTER hint -->
-    <div id="hint" class="glass rounded-xl px-3 py-2 text-sm absolute left-1/2 -translate-x-1/2 bottom-3 z-[5000]">Hazır.</div>
+      <div id="results" class="grid gap-3 max-h-[60vh] overflow-auto pr-1"></div>
+    </section>
   </main>
 
-  <footer class="glass w-full text-center text-xs py-2 opacity-70">
-    Leaflet üzerinde tek dosya JS ile RTS • Kutu seçim • Duvar inşası
+  <footer class="max-w-6xl mx-auto px-4 pb-10 text-xs text-gray-400">
+    <div class="flex items-center justify-between">
+      <span>Offline destekli • Firestore’a kaydeder • GitHub Pages uyumlu</span>
+      <a class="underline hover:text-white" href="https://firebase.google.com/docs/web/learn-more#modular-version" target="_blank" rel="noreferrer">Firebase Web (modular) docs</a>
+    </div>
   </footer>
-</div>
 
-<!-- HELP MODAL -->
-<div id="helpModal" class="modal">
-  <div class="glass rounded-2xl p-6 max-w-xl text-sm">
-    <div class="text-lg font-bold mb-2">Nasıl Oynanır?</div>
-    <ul class="list-disc pl-5 space-y-2">
-      <li><b>Sol tık sürükle</b>: Kutu ile çoklu seçim. Tek tık: tek seçim.</li>
-      <li><b>Sağ tık</b>: Hareket. “Saldırı Yürüyüşü” açıkken yol üstündeki düşmanlara otomatik angaje olur.</li>
-      <li><b>Durdur</b>: Seçili birimler mevcut hedefi bırakır.</li>
-      <li><b>Duvar Çiz</b>: Butona bas → haritada nokta nokta çizin. <b>Sağ tık</b> ile bitirin.</li>
-      <li>Kaynaklar: 🌾 (değirmen), 🛢️ (rafineri), ⛏️ (maden), 💰 para (pasif+liman bonusu).</li>
-      <li>Hız: 1x–100x. Davranış: Agresif / Tut.</li>
-    </ul>
-    <div class="mt-4 text-right"><button class="btn bg-white/10" onclick="document.getElementById('helpModal').classList.remove('show')">Kapat</button></div>
-  </div>
-</div>
+  <!-- App -->
+  <script type="module">
+    /**********************
+     * Firebase Imports   *
+     **********************/
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { 
+      getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot,
+      collection, query, where, getDocs, serverTimestamp,
+      enableIndexedDbPersistence, updateDoc 
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { 
+      getAuth, signInAnonymously, onAuthStateChanged 
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-<!-- DİKKAT: Modül değil, normal JS -->
-<script src="./script.js"></script>
+    /**********************
+     * Firebase Config    *
+     **********************/
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY", // ➜ Firebase Console’dan alın
+      authDomain: "warmapg-77acb.firebaseapp.com",
+      projectId: "warmapg-77acb",
+      storageBucket: "warmapg-77acb.appspot.com",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // ➜ Console
+      appId: "YOUR_APP_ID", // ➜ Console
+      measurementId: "G-476894022"
+    };
+
+    // Başlat
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // Offline cache (IndexedDB)
+    enableIndexedDbPersistence(db).catch((err) => {
+      console.warn("IndexedDB persistence kapatılamadı:", err.message);
+    });
+
+    // Anonim giriş (GitHub Pages için pratik)
+    signInAnonymously(auth).catch((e) => console.error("Anon giriş hatası:", e));
+
+    /**********************
+     * UI Elements        *
+     **********************/
+    const elWord = document.getElementById('inp-word');
+    const elMean = document.getElementById('inp-meanings');
+    const elSent = document.getElementById('inp-sentences');
+    const elStatus = document.getElementById('sel-status');
+    const btnSave = document.getElementById('btn-save');
+    const btnClear = document.getElementById('btn-clear');
+    const btnDelete = document.getElementById('btn-delete');
+
+    const elSearch = document.getElementById('inp-search');
+    const elFilter = document.getElementById('sel-filter');
+    const elResults = document.getElementById('results');
+
+    const statTotal = document.getElementById('stat-total');
+    const statKnown = document.getElementById('stat-known');
+    const statUnknown = document.getElementById('stat-unknown');
+    const btnExport = document.getElementById('btn-export');
+
+    /**********************
+     * State              *
+     **********************/
+    let UID = null;
+    /** wordsCache: Map<id, {word, meanings[], sentences[], status, owner, createdAt, updatedAt}> */
+    const wordsCache = new Map();
+    let unsubscribe = null;
+
+    const toLines = (v) => (v || "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const fromLines = (arr=[]) => arr.join("\n");
+    const toId = (w) => (w || "").trim().toLowerCase();
+
+    function clearForm() {
+      elWord.value = "";
+      elMean.value = "";
+      elSent.value = "";
+      elStatus.value = "none";
+      btnDelete.disabled = true;
+    }
+
+    function fillFormFromDoc(d) {
+      elWord.value = d.word || "";
+      elMean.value = fromLines(d.meanings || []);
+      elSent.value = fromLines(d.sentences || []);
+      elStatus.value = d.status || "none";
+      btnDelete.disabled = false;
+      elWord.focus();
+    }
+
+    function statsRender() {
+      const all = [...wordsCache.values()];
+      const known = all.filter(x => x.status === 'known').length;
+      const unknown = all.filter(x => x.status === 'unknown').length;
+      statTotal.textContent = `Toplam: ${all.length}`;
+      statKnown.textContent = `Bilinen: ${known}`;
+      statUnknown.textContent = `Bilinmeyen: ${unknown}`;
+    }
+
+    function renderResults() {
+      const q = elSearch.value.trim().toLowerCase();
+      const filter = elFilter.value; // all/known/unknown
+      const list = [...wordsCache.values()].filter(d => {
+        if (filter !== 'all' && d.status !== filter) return false;
+        if (!q) return true;
+        const hay = [
+          d.word?.toLowerCase(),
+          ...(d.meanings || []).map(x => x.toLowerCase()),
+          ...(d.sentences || []).map(x => x.toLowerCase()),
+        ].join(" ");
+        return hay.includes(q);
+      }).sort((a,b)=>a.word.localeCompare(b.word,'tr'));
+
+      elResults.innerHTML = "";
+      if (!list.length) {
+        elResults.innerHTML = `<div class="text-sm text-gray-400">Sonuç yok.</div>`;
+        return;
+      }
+
+      for (const d of list) {
+        const badge = d.status === 'known' ? 
+          `<span class="chip bg-good/10 text-good">Bilinen</span>` :
+          d.status === 'unknown' ? `<span class="chip bg-bad/10 text-bad">Bilinmeyen</span>` :
+          `<span class="chip">Durum yok</span>`;
+
+        const meanings = (d.meanings||[]).map(m=>`<span class="chip">${escapeHtml(m)}</span>`).join(" ");
+        const sentences = (d.sentences||[]).map((s,i)=>`<li class="leading-relaxed">${escapeHtml(s)}</li>`).join("");
+
+        const card = document.createElement('div');
+        card.className = "rounded-2xl border border-border bg-card p-4";
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h3 class="text-lg font-semibold">${escapeHtml(d.word || "")}</h3>
+              <div class="mt-1 flex flex-wrap gap-2">${badge}</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button data-id="${d.id}" class="btn-edit px-3 py-1.5 rounded-lg border border-border hover:bg-white/5 text-sm">Düzenle</button>
+              <button data-id="${d.id}" class="btn-toggle px-3 py-1.5 rounded-lg bg-acc text-black text-sm">Durum Değiştir</button>
+            </div>
+          </div>
+          <div class="mt-3 flex flex-wrap gap-2">${meanings || '<span class="text-gray-400 text-sm">Anlam yok</span>'}</div>
+          <div class="mt-3">
+            <ol class="list-decimal list-inside space-y-1">${sentences || '<li class="text-gray-400 text-sm list-none">Cümle yok</li>'}</ol>
+          </div>
+        `;
+        elResults.appendChild(card);
+      }
+
+      // Wire buttons
+      elResults.querySelectorAll('.btn-edit').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const id = btn.getAttribute('data-id');
+          const d = wordsCache.get(id);
+          if (d) fillFormFromDoc(d);
+        });
+      });
+      elResults.querySelectorAll('.btn-toggle').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const id = btn.getAttribute('data-id');
+          const d = wordsCache.get(id);
+          if (!d) return;
+          const next = d.status === 'known' ? 'unknown' : d.status === 'unknown' ? 'none' : 'known';
+          await updateStatus(id, next);
+        });
+      });
+    }
+
+    function escapeHtml(s="") {
+      return s.replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    }
+
+    /**********************
+     * Firestore helpers  *
+     **********************/
+    async function saveWord() {
+      const word = elWord.value.trim();
+      if (!word) { alert("Kelime boş olamaz."); return; }
+      const id = toId(word);
+      const meanings = toLines(elMean.value);
+      const sentences = toLines(elSent.value);
+      const status = elStatus.value;
+
+      const ref = doc(db, 'words', id);
+      const snap = await getDoc(ref);
+      const payload = {
+        id,
+        word,
+        wordLower: id,
+        meanings,
+        sentences,
+        status,
+        owner: UID,
+        updatedAt: serverTimestamp(),
+        ...(snap.exists() ? {} : { createdAt: serverTimestamp() })
+      };
+      await setDoc(ref, payload, { merge: true });
+      btnDelete.disabled = false;
+    }
+
+    async function deleteWord() {
+      const word = elWord.value.trim();
+      if (!word) return;
+      const id = toId(word);
+      if (!confirm(`"${word}" silinsin mi?`)) return;
+      await deleteDoc(doc(db, 'words', id));
+      clearForm();
+    }
+
+    async function updateStatus(id, status) {
+      await updateDoc(doc(db,'words',id), { status, updatedAt: serverTimestamp() });
+    }
+
+    function listenWords() {
+      if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+      const qRef = query(collection(db, 'words'), where('owner', '==', UID));
+      unsubscribe = onSnapshot(qRef, (snap)=>{
+        wordsCache.clear();
+        snap.forEach(docSnap=>{
+          const d = docSnap.data();
+          wordsCache.set(d.id, d);
+        });
+        statsRender();
+        renderResults();
+      });
+    }
+
+    /**********************
+     * Export JSON        *
+     **********************/
+    function exportJson() {
+      const arr = [...wordsCache.values()].sort((a,b)=>a.word.localeCompare(b.word,'tr'));
+      const blob = new Blob([JSON.stringify(arr, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'wordvault_export.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    /**********************
+     * Events             *
+     **********************/
+    btnSave.addEventListener('click', saveWord);
+    btnClear.addEventListener('click', clearForm);
+    btnDelete.addEventListener('click', deleteWord);
+    btnExport.addEventListener('click', exportJson);
+
+    elSearch.addEventListener('input', renderResults);
+    elFilter.addEventListener('change', renderResults);
+
+    // Enter tuşu ile hızlı kaydet
+    elWord.addEventListener('keydown', (e)=>{ if (e.key === 'Enter' && (e.ctrlKey||e.metaKey)) btnSave.click(); });
+
+    // Auth hazır olunca verileri dinle
+    onAuthStateChanged(auth, (user)=>{
+      if (user) {
+        UID = user.uid;
+        listenWords();
+      } else {
+        UID = null;
+      }
+    });
+
+  </script>
 </body>
 </html>
