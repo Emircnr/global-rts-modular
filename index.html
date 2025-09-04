@@ -1,418 +1,452 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WordVault — Vocabulary Manager</title>
-  <!--
-    ✅ Firestore security rules (recommended)
-    rules_version = '2';
-    service cloud.firestore {
-      match /databases/{database}/documents {
-        match /users/{uid}/words/{wordId} {
-          allow read, write: if request.auth != null && request.auth.uid == uid;
-        }
-      }
-    }
-  -->
-  <!-- Tailwind (CDN) -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','Segoe UI','Roboto','Helvetica','Arial'] },
-          colors: {
-            bg: '#0b1220', card: '#0f172a', card2: '#111a2e', border: '#1a2748',
-            acc: '#8b5cf6', good: '#22c55e', warn: '#f59e0b', bad: '#ef4444'
-          },
-          boxShadow: { soft: '0 12px 40px rgba(0,0,0,.25)' }
-        }
-      }
-    }
-  </script>
-  <style>
-    .glass { background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03)); backdrop-filter: blur(8px); }
-    .chip  { border:1px solid rgba(255,255,255,.12); padding:4px 10px; border-radius:999px; font-size:12px; }
-    .btn   { transition: transform .06s ease; }
-    .btn:active { transform: translateY(1px); }
-    .status-dot{ width:10px; height:10px; border-radius:999px; display:inline-block; }
-    .toast-wrap{ position:fixed; right:16px; bottom:16px; display:flex; flex-direction:column; gap:8px; z-index:50; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WordVault — Elegant Vocabulary Trainer</title>
+<style>
+  :root{
+    --bg:#0b1220; --bg-soft:#0e1830; --card:#0f172a; --card-2:#101b33; --text:#edf2ff;
+    --muted:#a6b1d4; --border:#1a2748; --brand:#8b5cf6; --good:#22c55e; --bad:#ef4444; --warn:#f59e0b;
+    --shadow:0 16px 50px rgba(0,0,0,.35);
+  }
+  .theme-light{
+    --bg:#f7f9fd; --bg-soft:#eef3ff; --card:#ffffff; --card-2:#ffffff; --text:#0b1220;
+    --muted:#5b678b; --border:#dfe5f2;
+    --shadow:0 16px 40px rgba(12,22,48,.12);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;font:14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:var(--bg); color:var(--text)}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+  /* header */
+  .top{position:sticky;top:0;z-index:50;border-bottom:1px solid var(--border);
+       background:linear-gradient(0deg, rgba(255,255,255,0), rgba(255,255,255,.02)) , var(--bg); backdrop-filter:saturate(1.2) blur(8px)}
+  .row{display:flex;align-items:center;gap:12px;padding:14px 0}
+  .brand{display:flex;align-items:center;gap:10px}
+  .logo{width:38px;height:38px;border-radius:14px;background:color-mix(in oklab, var(--brand) 25%, transparent); display:grid;place-items:center}
+  .logo svg{width:20px;height:20px;fill:var(--brand)}
+  .h1{font-weight:700;font-size:16px;letter-spacing:.2px}
+  .muted{color:var(--muted)}
+  /* search */
+  .search{position:relative;flex:1;max-width:560px}
+  .search input{width:100%;background:var(--card-2);border:1px solid var(--border);color:var(--text);
+    border-radius:12px;padding:10px 36px 10px 38px;outline:none}
+  .search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:.7}
+  /* chips & buttons */
+  .chip{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:12px;background:color-mix(in oklab, var(--card) 85%, transparent)}
+  .btn{cursor:pointer;transition:.12s transform,.2s opacity}
+  .btn:active{transform:translateY(1px)}
+  .btn-ghost{border:1px solid var(--border);background:var(--card)}
+  .btn-primary{background:var(--brand);color:#fff;border:none}
+  .btn-danger{background:color-mix(in oklab, var(--bad) 90%, #fff); color:#fff;border:none}
+  .btn-ok{background:color-mix(in oklab, var(--good) 90%, #fff); color:#fff;border:none}
+  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+  .stat{display:flex;align-items:center;gap:8px}
+  .dot{width:10px;height:10px;border-radius:999px;background:#ef4444}
+  /* tabs */
+  .tabs{display:flex;gap:8px;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .tab{padding:8px 12px;background:var(--card);border-right:1px solid var(--border)}
+  .tab:last-child{border-right:0}
+  .tab.active{background:color-mix(in oklab, var(--brand) 12%, var(--card)); color:var(--text)}
+  /* layout */
+  .grid{display:grid;gap:18px;margin:18px 0}
+  @media (min-width:980px){ .grid{grid-template-columns:260px 1fr} }
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow)}
+  .panel .hd{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;justify-content:space-between}
+  .panel .bd{padding:16px}
+  /* sidebar */
+  .letters{display:flex;flex-wrap:wrap;gap:6px}
+  .letters .chip{padding:5px 8px}
+  .filters{display:flex;gap:8px;flex-wrap:wrap}
+  /* list */
+  .list{max-height:66vh;overflow:auto}
+  .item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 10px;border-bottom:1px solid color-mix(in oklab, var(--border) 70%, transparent);cursor:pointer}
+  .item:hover{background:color-mix(in oklab, var(--card) 85%, transparent)}
+  .badge{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
+  .badge.ok{color:var(--good);border-color:color-mix(in oklab, var(--good) 55%, var(--border))}
+  .badge.bad{color:var(--bad);border-color:color-mix(in oklab, var(--bad) 55%, var(--border))}
+  /* details */
+  .d-title{font-size:22px;font-weight:800}
+  .tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .tag{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:12px;background:color-mix(in oklab, var(--card) 85%, transparent)}
+  .sent li{margin:.2rem 0}
+  /* form */
+  .field{display:grid;gap:6px;margin:8px 0}
+  .inp, .sel, .ta{width:100%;background:var(--card-2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:10px;outline:none}
+  .ta{min-height:120px;resize:vertical}
+  /* test */
+  .test-word{font-size:32px;font-weight:800}
+  /* toast */
+  .toasts{position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:999}
+  .toast{padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:color-mix(in oklab, var(--card) 85%, transparent)}
+  .toast.good{border-color:color-mix(in oklab, var(--good) 55%, var(--border)); background:color-mix(in oklab, var(--good) 20%, var(--card))}
+  .toast.bad{border-color:color-mix(in oklab, var(--bad) 55%, var(--border)); background:color-mix(in oklab, var(--bad) 20%, var(--card))}
+  .toast.warn{border-color:color-mix(in oklab, var(--warn) 55%, var(--border)); background:color-mix(in oklab, var(--warn) 20%, var(--card))}
+  .right{margin-left:auto}
+  .row-wrap{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+</style>
 </head>
-<body class="min-h-screen bg-bg text-white">
-  <!-- Header -->
-  <header class="sticky top-0 z-20 bg-gradient-to-b from-[#0d1630] to-[#0b1220] border-b border-border">
-    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-2xl bg-acc/20 grid place-items-center">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z"/></svg>
+<body>
+  <header class="top">
+    <div class="wrap row">
+      <div class="brand">
+        <div class="logo">
+          <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z"/></svg>
         </div>
-        <h1 class="text-xl font-semibold tracking-wide">WordVault — Vocabulary Manager</h1>
+        <div>
+          <div class="h1">WordVault</div>
+          <div class="muted" style="font-size:12px">Elegant vocabulary trainer</div>
+        </div>
       </div>
-      <div class="flex items-center gap-3 text-sm text-gray-300">
-        <span id="stat-total"   class="chip">Total: 0</span>
-        <span id="stat-known"   class="chip">Known: 0</span>
-        <span id="stat-unknown" class="chip">Unknown: 0</span>
-        <div class="chip flex items-center gap-2">
-          <span class="opacity-70">Auth</span>
-          <span id="dot-auth" class="status-dot bg-red-500"></span>
-        </div>
-        <button id="btn-export" class="chip hover:bg-white/10">Export JSON</button>
+
+      <div class="search">
+        <input id="q" placeholder="Search word / meaning / sentence…" />
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="m21 21-4.35-4.35M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"/></svg>
+      </div>
+
+      <div class="row-wrap">
+        <span class="chip stat">Total <b id="st-total">0</b></span>
+        <span class="chip stat">Known <b id="st-known">0</b></span>
+        <span class="chip stat">Unknown <b id="st-unknown">0</b></span>
+        <span class="chip stat">Auth <span id="dot" class="dot"></span></span>
+        <button id="btn-theme" class="chip btn">🌓</button>
+        <button id="btn-export" class="chip btn">Export</button>
+        <button id="btn-import" class="chip btn">Import</button>
+      </div>
+    </div>
+
+    <div class="wrap" style="padding-bottom:12px; display:flex; gap:10px; align-items:center; justify-content:space-between">
+      <div class="tabs" role="tablist">
+        <button class="tab btn" data-tab="library" aria-selected="true">Library</button>
+        <button class="tab btn" data-tab="editor">Add/Edit</button>
+        <button class="tab btn" data-tab="test">Test</button>
+      </div>
+      <div class="filters">
+        <button class="chip btn" data-filter="all">All</button>
+        <button class="chip btn" data-filter="known">Known</button>
+        <button class="chip btn" data-filter="unknown">Unknown</button>
+        <span class="muted" style="font-size:12px">Filter by letter:</span>
+        <span id="letters" class="letters"></span>
       </div>
     </div>
   </header>
 
-  <main class="max-w-6xl mx-auto px-4 py-6 grid lg:grid-cols-2 gap-6">
-    <!-- Form panel -->
-    <section class="glass rounded-2xl shadow-soft border border-border p-5">
-      <h2 class="text-lg font-semibold mb-4">Add / Edit Word</h2>
-      <div class="grid gap-3">
-        <label class="text-sm text-gray-300">Word</label>
-        <input id="inp-word" class="w-full rounded-xl bg-card2 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="e.g., anyway" />
-
-        <div class="grid md:grid-cols-2 gap-4">
-          <div>
-            <label class="text-sm text-gray-300">Meaning(s) <span class="text-gray-400">(one per line)</span></label>
-            <textarea id="inp-meanings" rows="7" class="w-full rounded-xl bg-card2 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="anyhow\nno matter what"></textarea>
-          </div>
-          <div>
-            <label class="text-sm text-gray-300">Sentence(s) <span class="text-gray-400">(one per line)</span></label>
-            <textarea id="inp-sentences" rows="7" class="w-full rounded-xl bg-card2 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="It was raining, but we went out anyway.\nAnyway, let's focus on the main problem."></textarea>
+  <main class="wrap grid">
+    <!-- Sidebar (letters live in header); left card shows details -->
+    <section class="panel" id="card-details">
+      <div class="hd"><strong>Details</strong>
+        <div class="row-wrap">
+          <button id="btn-edit-from-detail" class="btn btn-outline">Edit</button>
+          <div class="row-wrap">
+            <button class="btn btn-ok" id="btn-set-known">Mark Known</button>
+            <button class="btn btn-danger" id="btn-set-unknown">Mark Unknown</button>
           </div>
         </div>
+      </div>
+      <div class="bd">
+        <div id="detail-empty" class="muted">Select a word from the list.</div>
+        <div id="detail" style="display:none">
+          <div class="d-title" id="d-word">—</div>
+          <div class="tags" id="d-badges"></div>
+          <h4 style="margin:14px 0 6px">Meanings</h4>
+          <div class="tags" id="d-meanings"></div>
+          <h4 style="margin:14px 0 6px">Sentences</h4>
+          <ol class="sent" id="d-sentences"></ol>
+        </div>
+      </div>
+    </section>
 
-        <div class="flex flex-wrap items-center gap-3">
-          <label class="text-sm text-gray-300">Status:</label>
-          <select id="sel-status" class="rounded-xl bg-card2 border border-border px-3 py-2 outline-none">
+    <!-- Right: Library list / Editor / Test -->
+    <section class="panel" id="card-right">
+      <div class="hd">
+        <strong id="right-title">Library</strong>
+        <div class="row-wrap">
+          <button id="btn-random-detail" class="btn btn-outline">Random</button>
+          <button id="btn-new" class="btn btn-primary">+ New</button>
+        </div>
+      </div>
+      <div class="bd" id="view-library">
+        <div id="list" class="list"></div>
+      </div>
+
+      <div class="bd" id="view-editor" style="display:none">
+        <div class="field">
+          <label>Word</label>
+          <input id="w-word" class="inp" placeholder="e.g., anyway" />
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="w-status" class="sel">
             <option value="none">None</option>
             <option value="known">Known</option>
             <option value="unknown">Unknown</option>
           </select>
-          <div class="flex-1"></div>
-          <button id="btn-save" class="btn px-4 py-2 rounded-xl bg-acc text-black font-medium hover:opacity-90">Save</button>
-          <button id="btn-clear" class="btn px-4 py-2 rounded-xl border border-border hover:bg-white/5">Clear</button>
-          <button id="btn-delete" class="btn px-4 py-2 rounded-xl bg-bad/80 hover:bg-bad disabled:opacity-40" disabled>Delete</button>
         </div>
-        <p class="text-xs text-gray-400">Note: Re-entering the same word updates it. Document ID is the <em>lowercase</em> form of the word.</p>
-      </div>
-    </section>
-
-    <!-- Search & Lists -->
-    <section class="glass rounded-2xl shadow-soft border border-border p-5">
-      <div class="flex items-center gap-3 mb-4">
-        <div class="relative flex-1">
-          <input id="inp-search" class="w-full rounded-xl bg-card2 border border-border pl-10 pr-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="Search word / meaning / sentence..." />
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="2" d="m21 21-4.35-4.35M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"/></svg>
+        <div class="field">
+          <label>Meaning(s) <span class="muted">(one per line)</span></label>
+          <textarea id="w-meanings" class="ta" placeholder="anyhow&#10;no matter what"></textarea>
         </div>
-        <nav class="flex rounded-xl overflow-hidden border border-border">
-          <button data-tab="all"     class="tab px-3 py-2 bg-card2 hover:bg-white/5 text-sm">All</button>
-          <button data-tab="known"   class="tab px-3 py-2 bg-card2 hover:bg-white/5 text-sm">Known</button>
-          <button data-tab="unknown" class="tab px-3 py-2 bg-card2 hover:bg-white/5 text-sm">Unknown</button>
-        </nav>
+        <div class="field">
+          <label>Sentence(s) <span class="muted">(one per line)</span></label>
+          <textarea id="w-sentences" class="ta" placeholder="It was raining, but we went out anyway.&#10;Anyway, let's focus on the main problem."></textarea>
+        </div>
+        <div class="row" style="gap:10px">
+          <button id="btn-save" class="btn btn-primary">Save</button>
+          <button id="btn-clear" class="btn btn-outline">Clear</button>
+          <button id="btn-delete" class="btn btn-danger right" disabled>Delete</button>
+        </div>
+        <p class="muted" style="font-size:12px;margin-top:8px">Re-entering the same word updates it. Document ID is a lowercase slug of the word.</p>
       </div>
 
-      <div id="results" class="grid gap-3 max-h-[62vh] overflow-auto pr-1"></div>
+      <div class="bd" id="view-test" style="display:none">
+        <div class="row" style="justify-content:space-between">
+          <strong>Quick Test</strong>
+          <label class="row" style="gap:8px"><input id="unknown-first" type="checkbox" /> <span class="muted">Unknown first</span></label>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:14px;padding:18px;background:var(--card-2);margin-top:12px">
+          <div class="test-word" id="t-word">—</div>
+          <div class="tags" id="t-meanings" style="margin-top:10px"></div>
+          <div class="muted" id="t-sentences" style="margin-top:8px"></div>
+          <div class="row" style="gap:10px;margin-top:16px;flex-wrap:wrap">
+            <button id="t-show" class="btn btn-outline">Show Meaning</button>
+            <button id="t-next" class="btn btn-primary">Next Random</button>
+            <button id="t-unknown" class="btn btn-danger">Mark Unknown</button>
+            <button id="t-known" class="btn btn-ok">Mark Known</button>
+          </div>
+          <div class="muted" style="font-size:12px;margin-top:10px">Tip: Press <b>N</b> for next.</div>
+        </div>
+      </div>
     </section>
   </main>
 
-  <footer class="max-w-6xl mx-auto px-4 pb-10 text-xs text-gray-400">
-    <div class="flex items-center justify-between gap-4">
-      <span>Offline capable • Saves to Firestore • GitHub Pages ready</span>
-      <a class="underline hover:text-white" href="https://firebase.google.com/docs/web/setup" target="_blank" rel="noreferrer">Firebase Web (modular)</a>
-    </div>
-  </footer>
+  <div class="toasts" id="toasts"></div>
 
-  <!-- Toasts -->
-  <div id="toasts" class="toast-wrap"></div>
-
-  <!-- App -->
+  <!-- Firebase + App -->
   <script type="module">
-    /**********************
-     * Firebase (modular) *
-     **********************/
+    /********* Firebase (modular) *********/
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
     import {
-      getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot,
-      collection, query, where, enableIndexedDbPersistence, updateDoc,
-      serverTimestamp
+      initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+      collection, doc, setDoc, getDoc, deleteDoc, onSnapshot,
+      query, orderBy, updateDoc, serverTimestamp
     } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
     import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
-    // 👉 FILL THESE with your Console values
+    // ✅ Your Firebase project (from your message)
     const firebaseConfig = {
-      apiKey: 'YOUR_API_KEY',                 // <-- required
-      authDomain: 'warmapg-77acb.firebaseapp.com',
-      projectId: 'warmapg-77acb',
-      storageBucket: 'warmapg-77acb.appspot.com',
-      messagingSenderId: 'YOUR_MESSAGING_SENDER_ID', // <-- required
-      appId: 'YOUR_APP_ID',                   // <-- required
-      measurementId: 'G-476894022'
+      apiKey: "AIzaSyCINihMNGs-qRYIIBLzXyeaLnM_Lhp-iwg",
+      authDomain: "warmapg-77acb.firebaseapp.com",
+      databaseURL: "https://warmapg-77acb-default-rtdb.firebaseio.com",
+      projectId: "warmapg-77acb",
+      storageBucket: "warmapg-77acb.firebasestorage.app",
+      messagingSenderId: "895613631339",
+      appId: "1:895613631339:web:9441b6185ad1a14ee02a2e",
+      measurementId: "G-3MYC7P9PZC"
     };
 
-    // Sanity check to help you if Save doesn't work
-    if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('YOUR_')) {
-      console.warn('⚠️ Missing Firebase apiKey. Fill firebaseConfig first.');
-    }
+    const app = initializeApp(firebaseConfig);
+    const db  = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
+    const auth = getAuth(app);
 
-    const app   = initializeApp(firebaseConfig);
-    const db    = getFirestore(app);
-    const auth  = getAuth(app);
+    // Anon sign-in
+    signInAnonymously(auth).catch(e => toast('Auth error: '+e.message, 'bad'));
 
-    // Offline persistence (IndexedDB); if multiple tabs, it may throw — that's fine.
-    enableIndexedDbPersistence(db).catch(err => console.warn('IndexedDB persistence error:', err.code || err.message));
-
-    // Anon sign-in (works nicely on GitHub Pages)
-    signInAnonymously(auth).catch(e => toast('Auth error: ' + e.message, 'bad'));
-
-    /**********************
-     * Elements & State   *
-     **********************/
-    const $ = (sel, el=document) => el.querySelector(sel);
-    const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
-
-    const elWord = $('#inp-word');
-    const elMean = $('#inp-meanings');
-    const elSent = $('#inp-sentences');
-    const elStatus = $('#sel-status');
-    const btnSave = $('#btn-save');
-    const btnClear = $('#btn-clear');
-    const btnDelete = $('#btn-delete');
-
-    const elSearch = $('#inp-search');
-    const elResults = $('#results');
-    const dotAuth = $('#dot-auth');
-    const btnExport = $('#btn-export');
-    const statTotal = $('#stat-total');
-    const statKnown = $('#stat-known');
-    const statUnknown = $('#stat-unknown');
-
-    let UID = null;
-    let unsubscribe = null;
-    /** Map<id, doc> */
-    const wordsCache = new Map();
-    let activeTab = 'all'; // all | known | unknown
-
-    const toLines   = v => (v||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    /********* Helpers *********/
+    const $  = (s,el=document)=>el.querySelector(s);
+    const $$ = (s,el=document)=>Array.from(el.querySelectorAll(s));
+    const slug = s => (s||'').toLowerCase().trim()
+                    .replace(/[^a-z0-9\-_' ]/g,'')
+                    .replace(/\s+/g,'-').slice(0,128) || 'untitled';
+    const toLines = v => (v||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
     const fromLines = a => (a||[]).join('\n');
-    const slug = s => (s||'').toLowerCase().trim().replace(/[^a-z0-9\-_' ]/g,'').replace(/\s+/g,'-').slice(0,128) || 'untitled';
+    const esc = s => (s||'').replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[c]));
 
-    function clearForm(){
-      elWord.value = '';
-      elMean.value = '';
-      elSent.value = '';
-      elStatus.value = 'none';
-      btnDelete.disabled = true;
-      elWord.focus();
+    let UID=null, unsub=null, selectedId=null, filterStatus='all', filterInitial='', wordsCache=new Map();
+    const stats = ()=>{ const arr=[...wordsCache.values()];
+      $('#st-total').textContent=arr.length;
+      $('#st-known').textContent=arr.filter(x=>x.status==='known').length;
+      $('#st-unknown').textContent=arr.filter(x=>x.status==='unknown').length;
+    };
+
+    function wordsCol(){ return collection(db,'users',UID,'words'); }
+    const wordRef = id => doc(db,'users',UID,'words',id);
+
+    /********* Theme *********/
+    function setTheme(mode){
+      document.documentElement.classList.toggle('theme-light', mode==='light');
+      localStorage.theme = mode;
     }
+    setTheme(localStorage.theme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
+    $('#btn-theme').addEventListener('click', ()=> setTheme(document.documentElement.classList.contains('theme-light') ? 'dark' : 'light'));
 
-    function fillForm(d){
-      elWord.value = d.word || '';
-      elMean.value = fromLines(d.meanings);
-      elSent.value = fromLines(d.sentences);
-      elStatus.value = d.status || 'none';
-      btnDelete.disabled = false;
-      elWord.focus();
+    /********* Letters *********/
+    const lettersEl = $('#letters');
+    (function renderLetters(){
+      const frag = document.createDocumentFragment();
+      const mk = (t,v)=>{ const b=document.createElement('button'); b.className='chip btn'; b.textContent=t;
+        b.onclick=()=>{ filterInitial=v; renderList(); }; return b; };
+      frag.appendChild(mk('All',''));
+      for(let i=65;i<=90;i++){ const ch=String.fromCharCode(i); frag.appendChild(mk(ch, ch.toLowerCase())); }
+      lettersEl.appendChild(frag);
+    })();
+
+    /********* Tabs *********/
+    const views = { library:$('#view-library'), editor:$('#view-editor'), test:$('#view-test') };
+    const rightTitle = $('#right-title');
+    function switchTab(name){
+      Object.entries(views).forEach(([k,el])=> el.style.display = (k===name)?'block':'none');
+      $$('.tab').forEach(b=> b.classList.toggle('active', b.dataset.tab===name));
+      rightTitle.textContent = name==='library' ? 'Library' : (name==='editor'?'Add/Edit':'Test');
+      if (name==='test') nextTest(false);
     }
+    $$('.tab').forEach(b=> b.addEventListener('click', ()=> switchTab(b.dataset.tab)));
+    switchTab('library');
 
-    function statsRender(){
-      const all = [...wordsCache.values()];
-      const known = all.filter(x=>x.status==='known').length;
-      const unknown = all.filter(x=>x.status==='unknown').length;
-      statTotal.textContent = `Total: ${all.length}`;
-      statKnown.textContent = `Known: ${known}`;
-      statUnknown.textContent = `Unknown: ${unknown}`;
-    }
+    /********* Filters *********/
+    $('[data-filter="all"]').onclick     = ()=>{ filterStatus='all'; renderList(); };
+    $('[data-filter="known"]').onclick   = ()=>{ filterStatus='known'; renderList(); };
+    $('[data-filter="unknown"]').onclick = ()=>{ filterStatus='unknown'; renderList(); };
 
-    function render(){
-      const q = (elSearch.value||'').toLowerCase().trim();
-      const list = [...wordsCache.values()].filter(d=>{
-        if (activeTab!=='all' && d.status!==activeTab) return false;
-        if (!q) return true;
-        const hay = [d.word, ...(d.meanings||[]), ...(d.sentences||[])].join(' \n ').toLowerCase();
-        return hay.includes(q);
-      }).sort((a,b)=>a.word.localeCompare(b.word,'en'));
+    $('#q').addEventListener('input', renderList);
 
-      elResults.innerHTML = '';
-      if (!list.length){
-        elResults.innerHTML = '<div class="text-sm text-gray-400">No results.</div>';
-        return;
-      }
-
-      for (const d of list){
-        const badge = d.status==='known' ? '<span class="chip bg-good/10 text-good">Known</span>' :
-                      d.status==='unknown' ? '<span class="chip bg-bad/10 text-bad">Unknown</span>' :
-                      '<span class="chip">No status</span>';
-        const meanings = (d.meanings||[]).map(m=>`<span class=\"chip\">${escapeHtml(m)}</span>`).join(' ');
-        const sentences = (d.sentences||[]).map(s=>`<li class=\"leading-relaxed\">${escapeHtml(s)}</li>`).join('');
-
-        const card = document.createElement('div');
-        card.className = 'rounded-2xl border border-border bg-card p-4';
-        card.innerHTML = `
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <h3 class="text-lg font-semibold">${escapeHtml(d.word||'')}</h3>
-              <div class="mt-1 flex flex-wrap gap-2">${badge}</div>
-            </div>
-            <div class="flex items-center gap-2">
-              <button data-id="${d.id}" class="btn-edit px-3 py-1.5 rounded-lg border border-border hover:bg-white/5 text-sm">Edit</button>
-              <div class="relative inline-block text-left">
-                <button class="btn px-3 py-1.5 rounded-lg bg-acc text-black text-sm">Set Status ▾</button>
-                <div class="menu hidden absolute right-0 mt-2 w-36 rounded-xl border border-border bg-card shadow-soft">
-                  <button data-act="known"   data-id="${d.id}" class="block w-full text-left px-3 py-2 hover:bg-white/5">Known</button>
-                  <button data-act="unknown" data-id="${d.id}" class="block w-full text-left px-3 py-2 hover:bg-white/5">Unknown</button>
-                  <button data-act="none"    data-id="${d.id}" class="block w-full text-left px-3 py-2 hover:bg-white/5">None</button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="mt-3 flex flex-wrap gap-2">${meanings || '<span class="text-gray-400 text-sm">No meanings</span>'}</div>
-          <div class="mt-3">
-            <ol class="list-decimal list-inside space-y-1">${sentences || '<li class="text-gray-400 text-sm list-none">No sentences</li>'}</ol>
-          </div>
-        `;
-        elResults.appendChild(card);
-      }
-
-      // Edit handlers
-      $$('#results .btn-edit').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
-          const id = btn.getAttribute('data-id');
-          const d = wordsCache.get(id);
-          if (d) fillForm(d);
-        });
+    /********* List + Detail *********/
+    function renderList(){
+      const q=($('#q').value||'').toLowerCase().trim();
+      let arr=[...wordsCache.values()];
+      if (filterStatus!=='all') arr=arr.filter(x=>x.status===filterStatus);
+      if (filterInitial) arr=arr.filter(x=> (x.word||'').toLowerCase().startsWith(filterInitial));
+      if (q) arr=arr.filter(x=> [x.word,...(x.meanings||[]),...(x.sentences||[])].join('\n').toLowerCase().includes(q));
+      arr.sort((a,b)=>a.word.localeCompare(b.word,'en'));
+      const list=$('#list'); list.innerHTML='';
+      if(!arr.length){ list.innerHTML='<div class="muted">No results.</div>'; $('#detail').style.display='none'; $('#detail-empty').style.display='block'; return; }
+      arr.forEach(d=>{
+        const row=document.createElement('div'); row.className='item';
+        const badge = d.status==='known' ? '<span class="badge ok">Known</span>' : d.status==='unknown' ? '<span class="badge bad">Unknown</span>' : '<span class="badge">—</span>';
+        row.innerHTML = `<div><strong>${esc(d.word)}</strong></div><div>${badge}</div>`;
+        row.onclick=()=> showDetail(d.id);
+        list.appendChild(row);
       });
-      // Status dropdown
-      $$('#results .menu').forEach(menu=>{
-        const trigger = menu.previousElementSibling;
-        trigger.addEventListener('click', (e)=>{
-          e.stopPropagation();
-          closeAllMenus();
-          menu.classList.toggle('hidden');
-        });
-        menu.querySelectorAll('button').forEach(item=>{
-          item.addEventListener('click', async ()=>{
-            const id = item.getAttribute('data-id');
-            const next = item.getAttribute('data-act');
-            await updateStatus(id, next);
-            menu.classList.add('hidden');
-          });
-        });
-      });
+      if (selectedId && wordsCache.has(selectedId)) showDetail(selectedId); else showDetail(arr[0].id);
     }
 
-    function closeAllMenus(){ $$('#results .menu').forEach(m=>m.classList.add('hidden')); }
-    document.addEventListener('click', closeAllMenus);
+    function showDetail(id){
+      selectedId=id; const d=wordsCache.get(id); if(!d) return;
+      $('#detail-empty').style.display='none'; $('#detail').style.display='block';
+      $('#d-word').textContent=d.word||'';
+      $('#d-badges').innerHTML = d.status==='known' ? '<span class="tag" style="border-color: color-mix(in oklab, var(--good) 55%, var(--border)); color: var(--good)">Known</span>'
+        : d.status==='unknown' ? '<span class="tag" style="border-color: color-mix(in oklab, var(--bad) 55%, var(--border)); color: var(--bad)">Unknown</span>'
+        : '<span class="tag">No status</span>';
+      $('#d-meanings').innerHTML=(d.meanings||[]).map(m=>`<span class="tag">${esc(m)}</span>`).join('');
+      $('#d-sentences').innerHTML=(d.sentences||[]).map(s=>`<li>${esc(s)}</li>`).join('');
+    }
 
-    function escapeHtml(s=''){ return s.replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[c])); }
+    $('#btn-random-detail').onclick = ()=>{ const ids=[...wordsCache.keys()]; if(!ids.length) return; const id=ids[Math.floor(Math.random()*ids.length)]; showDetail(id); };
+    $('#btn-edit-from-detail').onclick = ()=>{ const d=selectedId?wordsCache.get(selectedId):null; if(d){ fillForm(d); switchTab('editor'); } };
+    $('#btn-set-known').onclick   = ()=> selectedId && setStatus(selectedId,'known');
+    $('#btn-set-unknown').onclick = ()=> selectedId && setStatus(selectedId,'unknown');
+    $('#btn-new').onclick = ()=>{ clearForm(); switchTab('editor'); };
 
-    /**********************
-     * Firestore helpers  *
-     **********************/
-    function wordsCol(){ return collection(db, 'users', UID, 'words'); }
-    function wordRef(id){ return doc(db, 'users', UID, 'words', id); }
+    /********* Editor *********/
+    function fillForm(d){ $('#w-word').value=d.word||''; $('#w-status').value=d.status||'none'; $('#w-meanings').value=fromLines(d.meanings); $('#w-sentences').value=fromLines(d.sentences); $('#btn-delete').disabled=false; }
+    function clearForm(){ $('#w-word').value=''; $('#w-status').value='none'; $('#w-meanings').value=''; $('#w-sentences').value=''; $('#btn-delete').disabled=true; $('#w-word').focus(); }
 
     async function saveWord(){
-      if (!UID) return toast('Not signed in yet. Please wait a second and try again.', 'warn');
-      const word = (elWord.value||'').trim();
-      if (!word) return toast('Word is required.', 'bad');
-      const id = slug(word);
-      const meanings = toLines(elMean.value);
-      const sentences = toLines(elSent.value);
-      const status = elStatus.value;
-
-      const ref = wordRef(id);
-      const snap = await getDoc(ref);
-      const payload = {
-        id, word, wordLower: word.toLowerCase(),
-        meanings, sentences, status,
-        createdAt: snap.exists() ? (snap.data().createdAt||serverTimestamp()) : serverTimestamp(),
+      if (!UID) return toast('Not signed in yet. Try in a second.', 'warn');
+      const word=($('#w-word').value||'').trim(); if(!word) return toast('Word is required.', 'bad');
+      const id=slug(word);
+      const payload={
+        id, word, wordLower:word.toLowerCase(),
+        status: $('#w-status').value,
+        meanings: toLines($('#w-meanings').value),
+        sentences: toLines($('#w-sentences').value),
         updatedAt: serverTimestamp()
       };
-      await setDoc(ref, payload, { merge: true });
-      toast('Saved ✔', 'good');
-      btnDelete.disabled = false;
+      const snap=await getDoc(wordRef(id));
+      if(!snap.exists()) payload.createdAt=serverTimestamp();
+      await setDoc(wordRef(id), payload, { merge:true });
+      toast('Saved ✔','good'); selectedId=id; switchTab('library');
     }
-
-    async function removeWord(){
-      const word = (elWord.value||'').trim();
-      if (!word) return;
-      const id = slug(word);
-      if (!confirm(`Delete "${word}"?`)) return;
-      await deleteDoc(wordRef(id));
-      toast('Deleted', 'bad');
-      clearForm();
+    async function deleteWord(){
+      const w=($('#w-word').value||'').trim(); if(!w) return;
+      if(!confirm(`Delete "${w}"?`)) return;
+      await deleteDoc(wordRef(slug(w))); toast('Deleted','bad'); clearForm();
     }
+    async function setStatus(id,status){ await updateDoc(wordRef(id), { status, updatedAt:serverTimestamp() }); toast('Status updated','good'); }
 
-    async function updateStatus(id, status){
-      await updateDoc(wordRef(id), { status, updatedAt: serverTimestamp() });
-      toast('Status updated', 'good');
-    }
+    $('#btn-save').onclick = saveWord;
+    $('#btn-clear').onclick = clearForm;
+    $('#btn-delete').onclick = deleteWord;
 
-    function listen(){
-      if (unsubscribe) { unsubscribe(); unsubscribe = null; }
-      const qRef = query(wordsCol(), where('wordLower', '>=', '')); // all docs for this user
-      unsubscribe = onSnapshot(qRef, snap => {
-        wordsCache.clear();
-        snap.forEach(docSnap => wordsCache.set(docSnap.id, docSnap.data()));
-        statsRender();
-        render();
-      });
-    }
-
-    /**********************
-     * Export JSON        *
-     **********************/
-    function exportJson(){
-      const arr = [...wordsCache.values()].sort((a,b)=>a.word.localeCompare(b.word,'en'));
-      const blob = new Blob([JSON.stringify(arr, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'wordvault_export.json';
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
-    }
-
-    /**********************
-     * Events             *
-     **********************/
-    btnSave.addEventListener('click', saveWord);
-    btnClear.addEventListener('click', clearForm);
-    btnDelete.addEventListener('click', removeWord);
-    btnExport.addEventListener('click', exportJson);
-
-    elSearch.addEventListener('input', render);
-    $$('.tab').forEach(btn=>{
-      btn.addEventListener('click', ()=>{ activeTab = btn.getAttribute('data-tab'); render(); });
-    });
-    elWord.addEventListener('keydown', (e)=>{ if (e.key==='Enter' && (e.ctrlKey||e.metaKey)) saveWord(); });
-
-    onAuthStateChanged(auth, user => {
-      if (user) {
-        UID = user.uid;
-        dotAuth.classList.remove('bg-red-500');
-        dotAuth.classList.add('bg-good');
-        listen();
-      } else {
-        UID = null;
-        dotAuth.classList.remove('bg-good');
-        dotAuth.classList.add('bg-red-500');
+    /********* Test *********/
+    let current=null;
+    function pickRandom(){
+      let arr=[...wordsCache.values()];
+      if ($('#unknown-first').checked){
+        const u=arr.filter(x=>x.status==='unknown');
+        if (u.length) arr=u;
       }
+      if (!arr.length) return null;
+      return arr[Math.floor(Math.random()*arr.length)];
+    }
+    function renderTest(show=false){
+      current = pickRandom();
+      if(!current){ $('#t-word').textContent='—'; $('#t-meanings').innerHTML=''; $('#t-sentences').textContent='Add some words first.'; return; }
+      $('#t-word').textContent=current.word||'';
+      if (show){
+        $('#t-meanings').innerHTML=(current.meanings||[]).map(m=>`<span class="tag">${esc(m)}</span>`).join('');
+        $('#t-sentences').innerHTML=(current.sentences||[]).map(s=>`<div>${esc(s)}</div>`).join('');
+      } else {
+        $('#t-meanings').innerHTML='<span class="muted">•••</span>';
+        $('#t-sentences').innerHTML='';
+      }
+    }
+    function nextTest(show=false){ renderTest(show); }
+    $('#t-show').onclick = ()=> renderTest(true);
+    $('#t-next').onclick = ()=> renderTest(false);
+    $('#t-unknown').onclick = async ()=>{ if(!current) return; await setStatus(current.id,'unknown'); renderTest(false); };
+    $('#t-known').onclick   = async ()=>{ if(!current) return; await setStatus(current.id,'known');   renderTest(false); };
+    document.addEventListener('keydown',(e)=>{ if(e.key.toLowerCase()==='n' && views.test.style.display!=='none'){ e.preventDefault(); renderTest(false);} });
+
+    /********* Import / Export *********/
+    $('#btn-export').onclick = ()=>{
+      const arr=[...wordsCache.values()].sort((a,b)=>a.word.localeCompare(b.word,'en'));
+      const blob=new Blob([JSON.stringify(arr,null,2)], {type:'application/json'});
+      const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='wordvault_export.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    };
+    $('#btn-import').onclick = ()=>{
+      const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json';
+      inp.onchange=async ()=>{ const f=inp.files[0]; if(!f) return; const text=await f.text(); let arr=[]; try{arr=JSON.parse(text);}catch{ return toast('Invalid JSON','bad'); }
+        for(const d of arr){ if(!d.word) continue; const id=slug(d.word);
+          await setDoc(wordRef(id), { id, word:d.word, wordLower:(d.word||'').toLowerCase(), meanings:d.meanings||[], sentences:d.sentences||[], status:d.status||'none', updatedAt:serverTimestamp() }, { merge:true });
+        }
+        toast('Imported','good');
+      };
+      inp.click();
+    };
+
+    /********* Live sync *********/
+    function listen(){
+      if (unsub){ unsub(); unsub=null; }
+      const qRef=query(wordsCol(), orderBy('wordLower'));
+      unsub = onSnapshot(qRef, snap=>{
+        wordsCache.clear();
+        snap.forEach(s=> wordsCache.set(s.id, s.data()));
+        stats(); renderList();
+      }, err=> toast(err.message||'Snapshot error','bad'));
+    }
+
+    onAuthStateChanged(auth, user=>{
+      if (user){ UID=user.uid; $('#dot').style.background= 'var(--good)'; listen(); nextTest(false); }
+      else { UID=null; $('#dot').style.background= 'var(--bad)'; }
     });
 
-    /**********************
-     * Toast helper       *
-     **********************/
+    /********* Toast *********/
     function toast(msg, type='info'){
-      const box = document.createElement('div');
-      box.className = `px-3 py-2 rounded-xl border shadow-soft ${
-        type==='good' ? 'bg-green-500/15 border-green-500/40' :
-        type==='bad'  ? 'bg-red-500/15 border-red-500/40' :
-        type==='warn' ? 'bg-yellow-500/15 border-yellow-500/40' : 'bg-white/10 border-white/20'
-      }`;
-      box.textContent = msg;
-      $('#toasts').appendChild(box);
-      setTimeout(()=> box.remove(), 2200);
+      const box=document.createElement('div'); box.className='toast'+(type==='good'?' good':type==='bad'?' bad':type==='warn'?' warn':'');
+      box.textContent=msg; $('#toasts').appendChild(box); setTimeout(()=>box.remove(), 2400);
     }
   </script>
 </body>
