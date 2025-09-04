@@ -1,20 +1,19 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WordVault — Kelime Arşivin</title>
-  <!-- 
-  FIRESTORE GÜVENLİK KURALLARI (öneri)
-  rules_version = '2';
-  service cloud.firestore {
-    match /databases/{database}/documents {
-      match /words/{wordId} {
-        allow read, write: if request.auth != null
-                           && (request.resource.data.owner == request.auth.uid || resource.data.owner == request.auth.uid);
+  <title>WordVault — Vocabulary Manager</title>
+  <!--
+    ✅ Firestore security rules (recommended)
+    rules_version = '2';
+    service cloud.firestore {
+      match /databases/{database}/documents {
+        match /users/{uid}/words/{wordId} {
+          allow read, write: if request.auth != null && request.auth.uid == uid;
+        }
       }
     }
-  }
   -->
   <!-- Tailwind (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -22,350 +21,355 @@
     tailwind.config = {
       theme: {
         extend: {
-          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial'] },
+          fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','Segoe UI','Roboto','Helvetica','Arial'] },
           colors: {
-            bg: '#0b1220',
-            card: '#0f172a',
-            card2:'#111a2e',
-            border:'#1a2748',
-            acc:'#60a5fa',
-            good:'#22c55e',
-            warn:'#f59e0b',
-            bad:'#ef4444'
+            bg: '#0b1220', card: '#0f172a', card2: '#111a2e', border: '#1a2748',
+            acc: '#8b5cf6', good: '#22c55e', warn: '#f59e0b', bad: '#ef4444'
           },
-          boxShadow: {
-            soft: '0 10px 30px rgba(0,0,0,0.25)',
-          }
+          boxShadow: { soft: '0 12px 40px rgba(0,0,0,.25)' }
         }
       }
     }
   </script>
   <style>
-    /* ince cam efekti */
-    .glass { background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)); backdrop-filter: blur(6px); }
-    .chip { border: 1px solid rgba(255,255,255,.1); padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+    .glass { background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03)); backdrop-filter: blur(8px); }
+    .chip  { border:1px solid rgba(255,255,255,.12); padding:4px 10px; border-radius:999px; font-size:12px; }
+    .btn   { transition: transform .06s ease; }
+    .btn:active { transform: translateY(1px); }
+    .status-dot{ width:10px; height:10px; border-radius:999px; display:inline-block; }
+    .toast-wrap{ position:fixed; right:16px; bottom:16px; display:flex; flex-direction:column; gap:8px; z-index:50; }
   </style>
 </head>
 <body class="min-h-screen bg-bg text-white">
-  <header class="sticky top-0 z-20 bg-gradient-to-b from-[#0e172a] to-[#0b1220] border-b border-border">
-    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center gap-4 justify-between">
+  <!-- Header -->
+  <header class="sticky top-0 z-20 bg-gradient-to-b from-[#0d1630] to-[#0b1220] border-b border-border">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-2xl bg-acc/20 grid place-items-center">
+        <div class="w-10 h-10 rounded-2xl bg-acc/20 grid place-items-center">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z"/></svg>
         </div>
-        <h1 class="text-xl font-semibold tracking-wide">WordVault — Kelime Arşivin</h1>
+        <h1 class="text-xl font-semibold tracking-wide">WordVault — Vocabulary Manager</h1>
       </div>
       <div class="flex items-center gap-3 text-sm text-gray-300">
-        <span id="stat-total" class="chip">Toplam: 0</span>
-        <span id="stat-known" class="chip">Bilinen: 0</span>
-        <span id="stat-unknown" class="chip">Bilinmeyen: 0</span>
-        <button id="btn-export" class="chip hover:bg-white/10">Dışa Aktar (JSON)</button>
+        <span id="stat-total"   class="chip">Total: 0</span>
+        <span id="stat-known"   class="chip">Known: 0</span>
+        <span id="stat-unknown" class="chip">Unknown: 0</span>
+        <div class="chip flex items-center gap-2">
+          <span class="opacity-70">Auth</span>
+          <span id="dot-auth" class="status-dot bg-red-500"></span>
+        </div>
+        <button id="btn-export" class="chip hover:bg-white/10">Export JSON</button>
       </div>
     </div>
   </header>
 
   <main class="max-w-6xl mx-auto px-4 py-6 grid lg:grid-cols-2 gap-6">
-    <!-- Form -->
+    <!-- Form panel -->
     <section class="glass rounded-2xl shadow-soft border border-border p-5">
-      <h2 class="text-lg font-semibold mb-3">Kelime Ekle / Düzenle</h2>
+      <h2 class="text-lg font-semibold mb-4">Add / Edit Word</h2>
       <div class="grid gap-3">
-        <label class="text-sm text-gray-300">Kelime</label>
-        <input id="inp-word" class="w-full rounded-xl bg-card2 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="ör. anyway" />
+        <label class="text-sm text-gray-300">Word</label>
+        <input id="inp-word" class="w-full rounded-xl bg-card2 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="e.g., anyway" />
 
         <div class="grid md:grid-cols-2 gap-4">
           <div>
-            <label class="text-sm text-gray-300">Anlam(lar) <span class="text-gray-400">(satır satır)</span></label>
-            <textarea id="inp-meanings" rows="6" class="w-full rounded-xl bg-card2 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="neyse&#10;her hâlükârda"></textarea>
+            <label class="text-sm text-gray-300">Meaning(s) <span class="text-gray-400">(one per line)</span></label>
+            <textarea id="inp-meanings" rows="7" class="w-full rounded-xl bg-card2 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="anyhow\nno matter what"></textarea>
           </div>
           <div>
-            <label class="text-sm text-gray-300">Cümle(ler) <span class="text-gray-400">(satır satır)</span></label>
-            <textarea id="inp-sentences" rows="6" class="w-full rounded-xl bg-card2 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="It was raining, but we went out anyway.&#10;Anyway, let's focus on the main problem."></textarea>
+            <label class="text-sm text-gray-300">Sentence(s) <span class="text-gray-400">(one per line)</span></label>
+            <textarea id="inp-sentences" rows="7" class="w-full rounded-xl bg-card2 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="It was raining, but we went out anyway.\nAnyway, let's focus on the main problem."></textarea>
           </div>
         </div>
 
-        <div class="flex flex-wrap gap-3 items-center">
-          <label class="text-sm text-gray-300">Durum:</label>
+        <div class="flex flex-wrap items-center gap-3">
+          <label class="text-sm text-gray-300">Status:</label>
           <select id="sel-status" class="rounded-xl bg-card2 border border-border px-3 py-2 outline-none">
-            <option value="none">Seçilmedi</option>
-            <option value="known">Bilinen</option>
-            <option value="unknown">Bilinmeyen</option>
+            <option value="none">None</option>
+            <option value="known">Known</option>
+            <option value="unknown">Unknown</option>
           </select>
           <div class="flex-1"></div>
-          <button id="btn-save" class="px-4 py-2 rounded-xl bg-acc text-black font-medium hover:opacity-90">Kaydet</button>
-          <button id="btn-clear" class="px-4 py-2 rounded-xl border border-border hover:bg-white/5">Temizle</button>
-          <button id="btn-delete" class="px-4 py-2 rounded-xl bg-bad/80 hover:bg-bad disabled:opacity-40" disabled>Sil</button>
+          <button id="btn-save" class="btn px-4 py-2 rounded-xl bg-acc text-black font-medium hover:opacity-90">Save</button>
+          <button id="btn-clear" class="btn px-4 py-2 rounded-xl border border-border hover:bg-white/5">Clear</button>
+          <button id="btn-delete" class="btn px-4 py-2 rounded-xl bg-bad/80 hover:bg-bad disabled:opacity-40" disabled>Delete</button>
         </div>
-        <p class="text-sm text-gray-400">Not: Aynı kelimeyi girersen güncellenir. Belge kimliği kelimenin <em>küçük harfli</em> hâlidir.</p>
+        <p class="text-xs text-gray-400">Note: Re-entering the same word updates it. Document ID is the <em>lowercase</em> form of the word.</p>
       </div>
     </section>
 
-    <!-- Arama & Listeler -->
+    <!-- Search & Lists -->
     <section class="glass rounded-2xl shadow-soft border border-border p-5">
       <div class="flex items-center gap-3 mb-4">
         <div class="relative flex-1">
-          <input id="inp-search" class="w-full rounded-xl bg-card2 border border-border pl-10 pr-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="Kelime ara (en az 1 harf)..." />
+          <input id="inp-search" class="w-full rounded-xl bg-card2 border border-border pl-10 pr-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="Search word / meaning / sentence..." />
           <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="2" d="m21 21-4.35-4.35M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"/></svg>
         </div>
-        <div class="chip">
-          <select id="sel-filter" class="bg-transparent outline-none">
-            <option value="all">Hepsi</option>
-            <option value="known">Bilinen</option>
-            <option value="unknown">Bilinmeyen</option>
-          </select>
-        </div>
+        <nav class="flex rounded-xl overflow-hidden border border-border">
+          <button data-tab="all"     class="tab px-3 py-2 bg-card2 hover:bg-white/5 text-sm">All</button>
+          <button data-tab="known"   class="tab px-3 py-2 bg-card2 hover:bg-white/5 text-sm">Known</button>
+          <button data-tab="unknown" class="tab px-3 py-2 bg-card2 hover:bg-white/5 text-sm">Unknown</button>
+        </nav>
       </div>
 
-      <div id="results" class="grid gap-3 max-h-[60vh] overflow-auto pr-1"></div>
+      <div id="results" class="grid gap-3 max-h-[62vh] overflow-auto pr-1"></div>
     </section>
   </main>
 
   <footer class="max-w-6xl mx-auto px-4 pb-10 text-xs text-gray-400">
-    <div class="flex items-center justify-between">
-      <span>Offline destekli • Firestore’a kaydeder • GitHub Pages uyumlu</span>
-      <a class="underline hover:text-white" href="https://firebase.google.com/docs/web/learn-more#modular-version" target="_blank" rel="noreferrer">Firebase Web (modular) docs</a>
+    <div class="flex items-center justify-between gap-4">
+      <span>Offline capable • Saves to Firestore • GitHub Pages ready</span>
+      <a class="underline hover:text-white" href="https://firebase.google.com/docs/web/setup" target="_blank" rel="noreferrer">Firebase Web (modular)</a>
     </div>
   </footer>
+
+  <!-- Toasts -->
+  <div id="toasts" class="toast-wrap"></div>
 
   <!-- App -->
   <script type="module">
     /**********************
-     * Firebase Imports   *
+     * Firebase (modular) *
      **********************/
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { 
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import {
       getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot,
-      collection, query, where, getDocs, serverTimestamp,
-      enableIndexedDbPersistence, updateDoc 
-    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    import { 
-      getAuth, signInAnonymously, onAuthStateChanged 
-    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+      collection, query, where, enableIndexedDbPersistence, updateDoc,
+      serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
-    /**********************
-     * Firebase Config    *
-     **********************/
+    // 👉 FILL THESE with your Console values
     const firebaseConfig = {
-      apiKey: "YOUR_API_KEY", // ➜ Firebase Console’dan alın
-      authDomain: "warmapg-77acb.firebaseapp.com",
-      projectId: "warmapg-77acb",
-      storageBucket: "warmapg-77acb.appspot.com",
-      messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // ➜ Console
-      appId: "YOUR_APP_ID", // ➜ Console
-      measurementId: "G-476894022"
+      apiKey: 'YOUR_API_KEY',                 // <-- required
+      authDomain: 'warmapg-77acb.firebaseapp.com',
+      projectId: 'warmapg-77acb',
+      storageBucket: 'warmapg-77acb.appspot.com',
+      messagingSenderId: 'YOUR_MESSAGING_SENDER_ID', // <-- required
+      appId: 'YOUR_APP_ID',                   // <-- required
+      measurementId: 'G-476894022'
     };
 
-    // Başlat
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-
-    // Offline cache (IndexedDB)
-    enableIndexedDbPersistence(db).catch((err) => {
-      console.warn("IndexedDB persistence kapatılamadı:", err.message);
-    });
-
-    // Anonim giriş (GitHub Pages için pratik)
-    signInAnonymously(auth).catch((e) => console.error("Anon giriş hatası:", e));
-
-    /**********************
-     * UI Elements        *
-     **********************/
-    const elWord = document.getElementById('inp-word');
-    const elMean = document.getElementById('inp-meanings');
-    const elSent = document.getElementById('inp-sentences');
-    const elStatus = document.getElementById('sel-status');
-    const btnSave = document.getElementById('btn-save');
-    const btnClear = document.getElementById('btn-clear');
-    const btnDelete = document.getElementById('btn-delete');
-
-    const elSearch = document.getElementById('inp-search');
-    const elFilter = document.getElementById('sel-filter');
-    const elResults = document.getElementById('results');
-
-    const statTotal = document.getElementById('stat-total');
-    const statKnown = document.getElementById('stat-known');
-    const statUnknown = document.getElementById('stat-unknown');
-    const btnExport = document.getElementById('btn-export');
-
-    /**********************
-     * State              *
-     **********************/
-    let UID = null;
-    /** wordsCache: Map<id, {word, meanings[], sentences[], status, owner, createdAt, updatedAt}> */
-    const wordsCache = new Map();
-    let unsubscribe = null;
-
-    const toLines = (v) => (v || "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    const fromLines = (arr=[]) => arr.join("\n");
-    const toId = (w) => (w || "").trim().toLowerCase();
-
-    function clearForm() {
-      elWord.value = "";
-      elMean.value = "";
-      elSent.value = "";
-      elStatus.value = "none";
-      btnDelete.disabled = true;
+    // Sanity check to help you if Save doesn't work
+    if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('YOUR_')) {
+      console.warn('⚠️ Missing Firebase apiKey. Fill firebaseConfig first.');
     }
 
-    function fillFormFromDoc(d) {
-      elWord.value = d.word || "";
-      elMean.value = fromLines(d.meanings || []);
-      elSent.value = fromLines(d.sentences || []);
-      elStatus.value = d.status || "none";
+    const app   = initializeApp(firebaseConfig);
+    const db    = getFirestore(app);
+    const auth  = getAuth(app);
+
+    // Offline persistence (IndexedDB); if multiple tabs, it may throw — that's fine.
+    enableIndexedDbPersistence(db).catch(err => console.warn('IndexedDB persistence error:', err.code || err.message));
+
+    // Anon sign-in (works nicely on GitHub Pages)
+    signInAnonymously(auth).catch(e => toast('Auth error: ' + e.message, 'bad'));
+
+    /**********************
+     * Elements & State   *
+     **********************/
+    const $ = (sel, el=document) => el.querySelector(sel);
+    const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
+
+    const elWord = $('#inp-word');
+    const elMean = $('#inp-meanings');
+    const elSent = $('#inp-sentences');
+    const elStatus = $('#sel-status');
+    const btnSave = $('#btn-save');
+    const btnClear = $('#btn-clear');
+    const btnDelete = $('#btn-delete');
+
+    const elSearch = $('#inp-search');
+    const elResults = $('#results');
+    const dotAuth = $('#dot-auth');
+    const btnExport = $('#btn-export');
+    const statTotal = $('#stat-total');
+    const statKnown = $('#stat-known');
+    const statUnknown = $('#stat-unknown');
+
+    let UID = null;
+    let unsubscribe = null;
+    /** Map<id, doc> */
+    const wordsCache = new Map();
+    let activeTab = 'all'; // all | known | unknown
+
+    const toLines   = v => (v||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    const fromLines = a => (a||[]).join('\n');
+    const slug = s => (s||'').toLowerCase().trim().replace(/[^a-z0-9\-_' ]/g,'').replace(/\s+/g,'-').slice(0,128) || 'untitled';
+
+    function clearForm(){
+      elWord.value = '';
+      elMean.value = '';
+      elSent.value = '';
+      elStatus.value = 'none';
+      btnDelete.disabled = true;
+      elWord.focus();
+    }
+
+    function fillForm(d){
+      elWord.value = d.word || '';
+      elMean.value = fromLines(d.meanings);
+      elSent.value = fromLines(d.sentences);
+      elStatus.value = d.status || 'none';
       btnDelete.disabled = false;
       elWord.focus();
     }
 
-    function statsRender() {
+    function statsRender(){
       const all = [...wordsCache.values()];
-      const known = all.filter(x => x.status === 'known').length;
-      const unknown = all.filter(x => x.status === 'unknown').length;
-      statTotal.textContent = `Toplam: ${all.length}`;
-      statKnown.textContent = `Bilinen: ${known}`;
-      statUnknown.textContent = `Bilinmeyen: ${unknown}`;
+      const known = all.filter(x=>x.status==='known').length;
+      const unknown = all.filter(x=>x.status==='unknown').length;
+      statTotal.textContent = `Total: ${all.length}`;
+      statKnown.textContent = `Known: ${known}`;
+      statUnknown.textContent = `Unknown: ${unknown}`;
     }
 
-    function renderResults() {
-      const q = elSearch.value.trim().toLowerCase();
-      const filter = elFilter.value; // all/known/unknown
-      const list = [...wordsCache.values()].filter(d => {
-        if (filter !== 'all' && d.status !== filter) return false;
+    function render(){
+      const q = (elSearch.value||'').toLowerCase().trim();
+      const list = [...wordsCache.values()].filter(d=>{
+        if (activeTab!=='all' && d.status!==activeTab) return false;
         if (!q) return true;
-        const hay = [
-          d.word?.toLowerCase(),
-          ...(d.meanings || []).map(x => x.toLowerCase()),
-          ...(d.sentences || []).map(x => x.toLowerCase()),
-        ].join(" ");
+        const hay = [d.word, ...(d.meanings||[]), ...(d.sentences||[])].join(' \n ').toLowerCase();
         return hay.includes(q);
-      }).sort((a,b)=>a.word.localeCompare(b.word,'tr'));
+      }).sort((a,b)=>a.word.localeCompare(b.word,'en'));
 
-      elResults.innerHTML = "";
-      if (!list.length) {
-        elResults.innerHTML = `<div class="text-sm text-gray-400">Sonuç yok.</div>`;
+      elResults.innerHTML = '';
+      if (!list.length){
+        elResults.innerHTML = '<div class="text-sm text-gray-400">No results.</div>';
         return;
       }
 
-      for (const d of list) {
-        const badge = d.status === 'known' ? 
-          `<span class="chip bg-good/10 text-good">Bilinen</span>` :
-          d.status === 'unknown' ? `<span class="chip bg-bad/10 text-bad">Bilinmeyen</span>` :
-          `<span class="chip">Durum yok</span>`;
-
-        const meanings = (d.meanings||[]).map(m=>`<span class="chip">${escapeHtml(m)}</span>`).join(" ");
-        const sentences = (d.sentences||[]).map((s,i)=>`<li class="leading-relaxed">${escapeHtml(s)}</li>`).join("");
+      for (const d of list){
+        const badge = d.status==='known' ? '<span class="chip bg-good/10 text-good">Known</span>' :
+                      d.status==='unknown' ? '<span class="chip bg-bad/10 text-bad">Unknown</span>' :
+                      '<span class="chip">No status</span>';
+        const meanings = (d.meanings||[]).map(m=>`<span class=\"chip\">${escapeHtml(m)}</span>`).join(' ');
+        const sentences = (d.sentences||[]).map(s=>`<li class=\"leading-relaxed\">${escapeHtml(s)}</li>`).join('');
 
         const card = document.createElement('div');
-        card.className = "rounded-2xl border border-border bg-card p-4";
+        card.className = 'rounded-2xl border border-border bg-card p-4';
         card.innerHTML = `
           <div class="flex items-start justify-between gap-3">
             <div>
-              <h3 class="text-lg font-semibold">${escapeHtml(d.word || "")}</h3>
+              <h3 class="text-lg font-semibold">${escapeHtml(d.word||'')}</h3>
               <div class="mt-1 flex flex-wrap gap-2">${badge}</div>
             </div>
             <div class="flex items-center gap-2">
-              <button data-id="${d.id}" class="btn-edit px-3 py-1.5 rounded-lg border border-border hover:bg-white/5 text-sm">Düzenle</button>
-              <button data-id="${d.id}" class="btn-toggle px-3 py-1.5 rounded-lg bg-acc text-black text-sm">Durum Değiştir</button>
+              <button data-id="${d.id}" class="btn-edit px-3 py-1.5 rounded-lg border border-border hover:bg-white/5 text-sm">Edit</button>
+              <div class="relative inline-block text-left">
+                <button class="btn px-3 py-1.5 rounded-lg bg-acc text-black text-sm">Set Status ▾</button>
+                <div class="menu hidden absolute right-0 mt-2 w-36 rounded-xl border border-border bg-card shadow-soft">
+                  <button data-act="known"   data-id="${d.id}" class="block w-full text-left px-3 py-2 hover:bg-white/5">Known</button>
+                  <button data-act="unknown" data-id="${d.id}" class="block w-full text-left px-3 py-2 hover:bg-white/5">Unknown</button>
+                  <button data-act="none"    data-id="${d.id}" class="block w-full text-left px-3 py-2 hover:bg-white/5">None</button>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="mt-3 flex flex-wrap gap-2">${meanings || '<span class="text-gray-400 text-sm">Anlam yok</span>'}</div>
+          <div class="mt-3 flex flex-wrap gap-2">${meanings || '<span class="text-gray-400 text-sm">No meanings</span>'}</div>
           <div class="mt-3">
-            <ol class="list-decimal list-inside space-y-1">${sentences || '<li class="text-gray-400 text-sm list-none">Cümle yok</li>'}</ol>
+            <ol class="list-decimal list-inside space-y-1">${sentences || '<li class="text-gray-400 text-sm list-none">No sentences</li>'}</ol>
           </div>
         `;
         elResults.appendChild(card);
       }
 
-      // Wire buttons
-      elResults.querySelectorAll('.btn-edit').forEach(btn=>{
+      // Edit handlers
+      $$('#results .btn-edit').forEach(btn=>{
         btn.addEventListener('click', ()=>{
           const id = btn.getAttribute('data-id');
           const d = wordsCache.get(id);
-          if (d) fillFormFromDoc(d);
+          if (d) fillForm(d);
         });
       });
-      elResults.querySelectorAll('.btn-toggle').forEach(btn=>{
-        btn.addEventListener('click', async ()=>{
-          const id = btn.getAttribute('data-id');
-          const d = wordsCache.get(id);
-          if (!d) return;
-          const next = d.status === 'known' ? 'unknown' : d.status === 'unknown' ? 'none' : 'known';
-          await updateStatus(id, next);
+      // Status dropdown
+      $$('#results .menu').forEach(menu=>{
+        const trigger = menu.previousElementSibling;
+        trigger.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          closeAllMenus();
+          menu.classList.toggle('hidden');
+        });
+        menu.querySelectorAll('button').forEach(item=>{
+          item.addEventListener('click', async ()=>{
+            const id = item.getAttribute('data-id');
+            const next = item.getAttribute('data-act');
+            await updateStatus(id, next);
+            menu.classList.add('hidden');
+          });
         });
       });
     }
 
-    function escapeHtml(s="") {
-      return s.replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-    }
+    function closeAllMenus(){ $$('#results .menu').forEach(m=>m.classList.add('hidden')); }
+    document.addEventListener('click', closeAllMenus);
+
+    function escapeHtml(s=''){ return s.replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[c])); }
 
     /**********************
      * Firestore helpers  *
      **********************/
-    async function saveWord() {
-      const word = elWord.value.trim();
-      if (!word) { alert("Kelime boş olamaz."); return; }
-      const id = toId(word);
+    function wordsCol(){ return collection(db, 'users', UID, 'words'); }
+    function wordRef(id){ return doc(db, 'users', UID, 'words', id); }
+
+    async function saveWord(){
+      if (!UID) return toast('Not signed in yet. Please wait a second and try again.', 'warn');
+      const word = (elWord.value||'').trim();
+      if (!word) return toast('Word is required.', 'bad');
+      const id = slug(word);
       const meanings = toLines(elMean.value);
       const sentences = toLines(elSent.value);
       const status = elStatus.value;
 
-      const ref = doc(db, 'words', id);
+      const ref = wordRef(id);
       const snap = await getDoc(ref);
       const payload = {
-        id,
-        word,
-        wordLower: id,
-        meanings,
-        sentences,
-        status,
-        owner: UID,
-        updatedAt: serverTimestamp(),
-        ...(snap.exists() ? {} : { createdAt: serverTimestamp() })
+        id, word, wordLower: word.toLowerCase(),
+        meanings, sentences, status,
+        createdAt: snap.exists() ? (snap.data().createdAt||serverTimestamp()) : serverTimestamp(),
+        updatedAt: serverTimestamp()
       };
       await setDoc(ref, payload, { merge: true });
+      toast('Saved ✔', 'good');
       btnDelete.disabled = false;
     }
 
-    async function deleteWord() {
-      const word = elWord.value.trim();
+    async function removeWord(){
+      const word = (elWord.value||'').trim();
       if (!word) return;
-      const id = toId(word);
-      if (!confirm(`"${word}" silinsin mi?`)) return;
-      await deleteDoc(doc(db, 'words', id));
+      const id = slug(word);
+      if (!confirm(`Delete "${word}"?`)) return;
+      await deleteDoc(wordRef(id));
+      toast('Deleted', 'bad');
       clearForm();
     }
 
-    async function updateStatus(id, status) {
-      await updateDoc(doc(db,'words',id), { status, updatedAt: serverTimestamp() });
+    async function updateStatus(id, status){
+      await updateDoc(wordRef(id), { status, updatedAt: serverTimestamp() });
+      toast('Status updated', 'good');
     }
 
-    function listenWords() {
+    function listen(){
       if (unsubscribe) { unsubscribe(); unsubscribe = null; }
-      const qRef = query(collection(db, 'words'), where('owner', '==', UID));
-      unsubscribe = onSnapshot(qRef, (snap)=>{
+      const qRef = query(wordsCol(), where('wordLower', '>=', '')); // all docs for this user
+      unsubscribe = onSnapshot(qRef, snap => {
         wordsCache.clear();
-        snap.forEach(docSnap=>{
-          const d = docSnap.data();
-          wordsCache.set(d.id, d);
-        });
+        snap.forEach(docSnap => wordsCache.set(docSnap.id, docSnap.data()));
         statsRender();
-        renderResults();
+        render();
       });
     }
 
     /**********************
      * Export JSON        *
      **********************/
-    function exportJson() {
-      const arr = [...wordsCache.values()].sort((a,b)=>a.word.localeCompare(b.word,'tr'));
-      const blob = new Blob([JSON.stringify(arr, null, 2)], {type:'application/json'});
+    function exportJson(){
+      const arr = [...wordsCache.values()].sort((a,b)=>a.word.localeCompare(b.word,'en'));
+      const blob = new Blob([JSON.stringify(arr, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = 'wordvault_export.json';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      a.href = url; a.download = 'wordvault_export.json';
+      document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
     }
 
@@ -374,25 +378,42 @@
      **********************/
     btnSave.addEventListener('click', saveWord);
     btnClear.addEventListener('click', clearForm);
-    btnDelete.addEventListener('click', deleteWord);
+    btnDelete.addEventListener('click', removeWord);
     btnExport.addEventListener('click', exportJson);
 
-    elSearch.addEventListener('input', renderResults);
-    elFilter.addEventListener('change', renderResults);
+    elSearch.addEventListener('input', render);
+    $$('.tab').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ activeTab = btn.getAttribute('data-tab'); render(); });
+    });
+    elWord.addEventListener('keydown', (e)=>{ if (e.key==='Enter' && (e.ctrlKey||e.metaKey)) saveWord(); });
 
-    // Enter tuşu ile hızlı kaydet
-    elWord.addEventListener('keydown', (e)=>{ if (e.key === 'Enter' && (e.ctrlKey||e.metaKey)) btnSave.click(); });
-
-    // Auth hazır olunca verileri dinle
-    onAuthStateChanged(auth, (user)=>{
+    onAuthStateChanged(auth, user => {
       if (user) {
         UID = user.uid;
-        listenWords();
+        dotAuth.classList.remove('bg-red-500');
+        dotAuth.classList.add('bg-good');
+        listen();
       } else {
         UID = null;
+        dotAuth.classList.remove('bg-good');
+        dotAuth.classList.add('bg-red-500');
       }
     });
 
+    /**********************
+     * Toast helper       *
+     **********************/
+    function toast(msg, type='info'){
+      const box = document.createElement('div');
+      box.className = `px-3 py-2 rounded-xl border shadow-soft ${
+        type==='good' ? 'bg-green-500/15 border-green-500/40' :
+        type==='bad'  ? 'bg-red-500/15 border-red-500/40' :
+        type==='warn' ? 'bg-yellow-500/15 border-yellow-500/40' : 'bg-white/10 border-white/20'
+      }`;
+      box.textContent = msg;
+      $('#toasts').appendChild(box);
+      setTimeout(()=> box.remove(), 2200);
+    }
   </script>
 </body>
 </html>
