@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WordVault — Vocabulary Trainer</title>
+  <title>WordVault — Vocabulary Manager</title>
   <!--
-    Firestore security rules (recommended)
+    ✅ Firestore security rules (recommended)
     rules_version = '2';
     service cloud.firestore {
       match /databases/{database}/documents {
@@ -15,17 +15,22 @@
       }
     }
   -->
-  <!-- Tailwind (CDN for simplicity). For production builds, prefer compiled CSS. -->
-  <script>
-    window.tailwind = { config: { darkMode: 'class', theme: { extend: {
-      fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','Segoe UI','Roboto','Helvetica','Arial'] },
-      colors: {
-        bg: '#0b1220', card: '#0f172a', card2: '#111a2e', border: '#1a2748',
-        acc: '#8b5cf6', good: '#22c55e', warn: '#f59e0b', bad: '#ef4444'
-      }, boxShadow: { soft: '0 12px 40px rgba(0,0,0,.25)' }
-    }}} };
-  </script>
+  <!-- Tailwind (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','Segoe UI','Roboto','Helvetica','Arial'] },
+          colors: {
+            bg: '#0b1220', card: '#0f172a', card2: '#111a2e', border: '#1a2748',
+            acc: '#8b5cf6', good: '#22c55e', warn: '#f59e0b', bad: '#ef4444'
+          },
+          boxShadow: { soft: '0 12px 40px rgba(0,0,0,.25)' }
+        }
+      }
+    }
+  </script>
   <style>
     .glass { background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03)); backdrop-filter: blur(8px); }
     .chip  { border:1px solid rgba(255,255,255,.12); padding:4px 10px; border-radius:999px; font-size:12px; }
@@ -33,28 +38,19 @@
     .btn:active { transform: translateY(1px); }
     .status-dot{ width:10px; height:10px; border-radius:999px; display:inline-block; }
     .toast-wrap{ position:fixed; right:16px; bottom:16px; display:flex; flex-direction:column; gap:8px; z-index:50; }
-    .light .chip{ border-color: rgba(0,0,0,.12); }
   </style>
 </head>
-<body class="min-h-screen bg-bg text-white light:!bg-white light:!text-[#0b1220]">
+<body class="min-h-screen bg-bg text-white">
   <!-- Header -->
-  <header class="sticky top-0 z-20 bg-gradient-to-b from-[#0d1630] to-[#0b1220] dark:border-b border-border light:from-white light:to-white light:border-gray-200">
-    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-wrap items-center gap-3 justify-between">
+  <header class="sticky top-0 z-20 bg-gradient-to-b from-[#0d1630] to-[#0b1220] border-b border-border">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-2xl bg-acc/20 grid place-items-center">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z"/></svg>
         </div>
-        <h1 class="text-xl font-semibold tracking-wide">WordVault — Vocabulary Trainer</h1>
+        <h1 class="text-xl font-semibold tracking-wide">WordVault — Vocabulary Manager</h1>
       </div>
-
-      <div class="flex-1 min-w-[240px] max-w-xl order-2 md:order-none">
-        <div class="relative">
-          <input id="inp-search" class="w-full rounded-xl bg-card2 light:bg-white light:border-gray-200 border border-border pl-10 pr-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="Search word / meaning / sentence..." />
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="2" d="m21 21-4.35-4.35M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"/></svg>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-3 text-sm text-gray-300 light:text-gray-600">
+      <div class="flex items-center gap-3 text-sm text-gray-300">
         <span id="stat-total"   class="chip">Total: 0</span>
         <span id="stat-known"   class="chip">Known: 0</span>
         <span id="stat-unknown" class="chip">Unknown: 0</span>
@@ -62,111 +58,68 @@
           <span class="opacity-70">Auth</span>
           <span id="dot-auth" class="status-dot bg-red-500"></span>
         </div>
-        <button id="btn-export" class="chip hover:bg-white/10 light:hover:bg-black/5">Export</button>
-        <button id="btn-import" class="chip hover:bg-white/10 light:hover:bg-black/5">Import</button>
-        <button id="btn-theme"  class="chip hover:bg-white/10 light:hover:bg-black/5">🌙/☀️</button>
-      </div>
-    </div>
-
-    <div class="border-t border-border light:border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 py-2 flex items-center gap-2 overflow-auto">
-        <nav class="flex rounded-xl overflow-hidden border border-border light:border-gray-200">
-          <button data-tab="library" class="tab px-3 py-2 bg-card2 light:bg-white hover:bg-white/5 light:hover:bg-black/5 text-sm">Library</button>
-          <button data-tab="test"    class="tab px-3 py-2 bg-card2 light:bg-white hover:bg-white/5 light:hover:bg-black/5 text-sm">Test</button>
-          <button data-tab="editor"  class="tab px-3 py-2 bg-card2 light:bg-white hover:bg-white/5 light:hover:bg-black/5 text-sm">Add / Edit</button>
-        </nav>
-        <div class="flex items-center gap-2 ml-auto">
-          <span class="chip">Filter:</span>
-          <button data-filter="all"     class="chip btn-filter">All</button>
-          <button data-filter="known"   class="chip btn-filter">Known</button>
-          <button data-filter="unknown" class="chip btn-filter">Unknown</button>
-        </div>
+        <button id="btn-export" class="chip hover:bg-white/10">Export JSON</button>
       </div>
     </div>
   </header>
 
-  <main class="max-w-7xl mx-auto px-4 py-6 grid lg:grid-cols-3 gap-6">
-    <!-- Left: Letter index & Lists -->
-    <aside class="glass rounded-2xl shadow-soft border border-border p-4 h-max light:!bg-white light:border-gray-200">
-      <h2 class="text-sm font-semibold mb-2">Letters</h2>
-      <div id="letters" class="flex flex-wrap gap-2"></div>
-      <div class="mt-4 text-xs text-gray-400 light:text-gray-600">Click a letter to filter by initial.</div>
-
-      <h2 class="text-sm font-semibold mt-6 mb-2">Quick Lists</h2>
-      <div class="grid gap-2">
-        <button id="btn-show-all" class="btn chip w-max">All Words</button>
-        <button id="btn-show-known" class="btn chip w-max">Known</button>
-        <button id="btn-show-unknown" class="btn chip w-max">Unknown</button>
-      </div>
-    </aside>
-
-    <!-- Center: Library (results) & Test -->
-    <section class="lg:col-span-2 grid gap-6">
-      <!-- Library Panel -->
-      <section id="panel-library" class="glass rounded-2xl shadow-soft border border-border p-5 light:!bg-white light:border-gray-200">
-        <h2 class="text-lg font-semibold mb-4">Library</h2>
-        <div id="results" class="grid gap-3 max-h-[60vh] overflow-auto pr-1"></div>
-      </section>
-
-      <!-- Test Panel -->
-      <section id="panel-test" class="hidden glass rounded-2xl shadow-soft border border-border p-5 light:!bg-white light:border-gray-200">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-semibold">Quick Test</h2>
-          <label class="chip flex items-center gap-2 text-sm"><input id="chk-unknown-first" type="checkbox" class="accent-acc"> Unknown first</label>
-        </div>
-        <div id="test-card" class="rounded-2xl border border-border p-6 bg-card2 light:bg-white">
-          <div class="text-2xl font-bold" id="test-word">—</div>
-          <div class="mt-2 text-gray-300 light:text-gray-600" id="test-meanings">—</div>
-          <div class="mt-2 text-sm text-gray-400 light:text-gray-600" id="test-sentences">—</div>
-          <div class="mt-4 flex flex-wrap gap-3">
-            <button id="btn-show" class="btn px-4 py-2 rounded-xl border border-border hover:bg-white/5 light:hover:bg-black/5">Show Meaning</button>
-            <button id="btn-next" class="btn px-4 py-2 rounded-xl bg-acc text-black font-medium">Next Random</button>
-            <button id="btn-mark-unknown" class="btn px-4 py-2 rounded-xl bg-bad/80 hover:bg-bad text-white">Mark Unknown</button>
-            <button id="btn-mark-known" class="btn px-4 py-2 rounded-xl bg-good/80 hover:bg-good text-black">Mark Known</button>
-          </div>
-        </div>
-      </section>
-    </section>
-
-    <!-- Right: Add/Edit Form -->
-    <section id="panel-editor" class="hidden glass rounded-2xl shadow-soft border border-border p-5 light:!bg-white light:border-gray-200">
+  <main class="max-w-6xl mx-auto px-4 py-6 grid lg:grid-cols-2 gap-6">
+    <!-- Form panel -->
+    <section class="glass rounded-2xl shadow-soft border border-border p-5">
       <h2 class="text-lg font-semibold mb-4">Add / Edit Word</h2>
       <div class="grid gap-3">
-        <label class="text-sm text-gray-300 light:text-gray-700">Word</label>
-        <input id="inp-word" class="w-full rounded-xl bg-card2 light:bg-white light:border-gray-200 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="e.g., anyway" />
+        <label class="text-sm text-gray-300">Word</label>
+        <input id="inp-word" class="w-full rounded-xl bg-card2 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="e.g., anyway" />
 
         <div class="grid md:grid-cols-2 gap-4">
           <div>
-            <label class="text-sm text-gray-300 light:text-gray-700">Meaning(s) <span class="text-gray-400">(one per line)</span></label>
-            <textarea id="inp-meanings" rows="7" class="w-full rounded-xl bg-card2 light:bg-white light:border-gray-200 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="anyhow\nno matter what"></textarea>
+            <label class="text-sm text-gray-300">Meaning(s) <span class="text-gray-400">(one per line)</span></label>
+            <textarea id="inp-meanings" rows="7" class="w-full rounded-xl bg-card2 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="anyhow\nno matter what"></textarea>
           </div>
           <div>
-            <label class="text-sm text-gray-300 light:text-gray-700">Sentence(s) <span class="text-gray-400">(one per line)</span></label>
-            <textarea id="inp-sentences" rows="7" class="w-full rounded-xl bg-card2 light:bg-white light:border-gray-200 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="It was raining, but we went out anyway.\nAnyway, let's focus on the main problem."></textarea>
+            <label class="text-sm text-gray-300">Sentence(s) <span class="text-gray-400">(one per line)</span></label>
+            <textarea id="inp-sentences" rows="7" class="w-full rounded-xl bg-card2 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="It was raining, but we went out anyway.\nAnyway, let's focus on the main problem."></textarea>
           </div>
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
-          <label class="text-sm text-gray-300 light:text-gray-700">Status:</label>
-          <select id="sel-status" class="rounded-xl bg-card2 light:bg-white light:border-gray-200 border border-border px-3 py-2 outline-none">
+          <label class="text-sm text-gray-300">Status:</label>
+          <select id="sel-status" class="rounded-xl bg-card2 border border-border px-3 py-2 outline-none">
             <option value="none">None</option>
             <option value="known">Known</option>
             <option value="unknown">Unknown</option>
           </select>
           <div class="flex-1"></div>
           <button id="btn-save" class="btn px-4 py-2 rounded-xl bg-acc text-black font-medium hover:opacity-90">Save</button>
-          <button id="btn-clear" class="btn px-4 py-2 rounded-xl border border-border hover:bg-white/5 light:hover:bg-black/5">Clear</button>
+          <button id="btn-clear" class="btn px-4 py-2 rounded-xl border border-border hover:bg-white/5">Clear</button>
           <button id="btn-delete" class="btn px-4 py-2 rounded-xl bg-bad/80 hover:bg-bad disabled:opacity-40" disabled>Delete</button>
         </div>
-        <p class="text-xs text-gray-400 light:text-gray-600">Re-entering the same word updates it. Document ID uses a URL-safe lowercase slug.</p>
+        <p class="text-xs text-gray-400">Note: Re-entering the same word updates it. Document ID is the <em>lowercase</em> form of the word.</p>
       </div>
+    </section>
+
+    <!-- Search & Lists -->
+    <section class="glass rounded-2xl shadow-soft border border-border p-5">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="relative flex-1">
+          <input id="inp-search" class="w-full rounded-xl bg-card2 border border-border pl-10 pr-3 py-2 outline-none focus:ring-2 focus:ring-acc/50" placeholder="Search word / meaning / sentence..." />
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="2" d="m21 21-4.35-4.35M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"/></svg>
+        </div>
+        <nav class="flex rounded-xl overflow-hidden border border-border">
+          <button data-tab="all"     class="tab px-3 py-2 bg-card2 hover:bg-white/5 text-sm">All</button>
+          <button data-tab="known"   class="tab px-3 py-2 bg-card2 hover:bg-white/5 text-sm">Known</button>
+          <button data-tab="unknown" class="tab px-3 py-2 bg-card2 hover:bg-white/5 text-sm">Unknown</button>
+        </nav>
+      </div>
+
+      <div id="results" class="grid gap-3 max-h-[62vh] overflow-auto pr-1"></div>
     </section>
   </main>
 
-  <footer class="max-w-7xl mx-auto px-4 pb-10 text-xs text-gray-400 light:text-gray-600">
+  <footer class="max-w-6xl mx-auto px-4 pb-10 text-xs text-gray-400">
     <div class="flex items-center justify-between gap-4">
-      <span>Offline capable • Firestore • Light/Dark theme • JSON import/export</span>
-      <a class="underline hover:text-white light:hover:text-black" href="https://firebase.google.com/docs/web/setup" target="_blank" rel="noreferrer">Firebase Web (modular)</a>
+      <span>Offline capable • Saves to Firestore • GitHub Pages ready</span>
+      <a class="underline hover:text-white" href="https://firebase.google.com/docs/web/setup" target="_blank" rel="noreferrer">Firebase Web (modular)</a>
     </div>
   </footer>
 
@@ -180,31 +133,36 @@
      **********************/
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
     import {
-      initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-      doc, setDoc, getDoc, deleteDoc, onSnapshot, getDocs,
-      collection, query, where, updateDoc, serverTimestamp
+      getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot,
+      collection, query, where, enableIndexedDbPersistence, updateDoc,
+      serverTimestamp
     } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
     import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
-    // ✅ Your Firebase project (provided)
+    // 👉 FILL THESE with your Console values
     const firebaseConfig = {
-      apiKey: "AIzaSyCINihMNGs-qRYIIBLzXyeaLnM_Lhp-iwg",
-      authDomain: "warmapg-77acb.firebaseapp.com",
-      databaseURL: "https://warmapg-77acb-default-rtdb.firebaseio.com",
-      projectId: "warmapg-77acb",
-      storageBucket: "warmapg-77acb.firebasestorage.app",
-      messagingSenderId: "895613631339",
-      appId: "1:895613631339:web:9441b6185ad1a14ee02a2e",
-      measurementId: "G-3MYC7P9PZC"
+      apiKey: 'YOUR_API_KEY',                 // <-- required
+      authDomain: 'warmapg-77acb.firebaseapp.com',
+      projectId: 'warmapg-77acb',
+      storageBucket: 'warmapg-77acb.appspot.com',
+      messagingSenderId: 'YOUR_MESSAGING_SENDER_ID', // <-- required
+      appId: 'YOUR_APP_ID',                   // <-- required
+      measurementId: 'G-476894022'
     };
 
-    const app  = initializeApp(firebaseConfig);
-    const db   = initializeFirestore(app, {
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-    });
-    const auth = getAuth(app);
+    // Sanity check to help you if Save doesn't work
+    if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('YOUR_')) {
+      console.warn('⚠️ Missing Firebase apiKey. Fill firebaseConfig first.');
+    }
 
-    // Anonymous sign-in for GitHub Pages
+    const app   = initializeApp(firebaseConfig);
+    const db    = getFirestore(app);
+    const auth  = getAuth(app);
+
+    // Offline persistence (IndexedDB); if multiple tabs, it may throw — that's fine.
+    enableIndexedDbPersistence(db).catch(err => console.warn('IndexedDB persistence error:', err.code || err.message));
+
+    // Anon sign-in (works nicely on GitHub Pages)
     signInAnonymously(auth).catch(e => toast('Auth error: ' + e.message, 'bad'));
 
     /**********************
@@ -213,22 +171,6 @@
     const $ = (sel, el=document) => el.querySelector(sel);
     const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
 
-    const elSearch = $('#inp-search');
-    const dotAuth = $('#dot-auth');
-    const btnExport = $('#btn-export');
-    const btnImport = $('#btn-import');
-    const btnTheme  = $('#btn-theme');
-
-    const statTotal = $('#stat-total');
-    const statKnown = $('#stat-known');
-    const statUnknown = $('#stat-unknown');
-
-    // Panels
-    const panelLibrary = $('#panel-library');
-    const panelTest    = $('#panel-test');
-    const panelEditor  = $('#panel-editor');
-
-    // Editor elements
     const elWord = $('#inp-word');
     const elMean = $('#inp-meanings');
     const elSent = $('#inp-sentences');
@@ -237,49 +179,41 @@
     const btnClear = $('#btn-clear');
     const btnDelete = $('#btn-delete');
 
-    // Lists & letters
-    const elLetters = $('#letters');
-    const btnShowAll = $('#btn-show-all');
-    const btnShowKnown = $('#btn-show-known');
-    const btnShowUnknown = $('#btn-show-unknown');
-
-    // Test elements
-    const chkUnknownFirst = $('#chk-unknown-first');
-    const testWord = $('#test-word');
-    const testMean = $('#test-meanings');
-    const testSent = $('#test-sentences');
-    const btnShow = $('#btn-show');
-    const btnNext = $('#btn-next');
-    const btnMarkUnknown = $('#btn-mark-unknown');
-    const btnMarkKnown   = $('#btn-mark-known');
+    const elSearch = $('#inp-search');
+    const elResults = $('#results');
+    const dotAuth = $('#dot-auth');
+    const btnExport = $('#btn-export');
+    const statTotal = $('#stat-total');
+    const statKnown = $('#stat-known');
+    const statUnknown = $('#stat-unknown');
 
     let UID = null;
     let unsubscribe = null;
     /** Map<id, doc> */
     const wordsCache = new Map();
-    let filterStatus = 'all'; // all|known|unknown
-    let filterInitial = '';
+    let activeTab = 'all'; // all | known | unknown
 
-    // Helpers
     const toLines   = v => (v||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
     const fromLines = a => (a||[]).join('\n');
     const slug = s => (s||'').toLowerCase().trim().replace(/[^a-z0-9\-_' ]/g,'').replace(/\s+/g,'-').slice(0,128) || 'untitled';
 
-    /**********************
-     * Theme (dark/light) *
-     **********************/
-    const root = document.documentElement;
-    function setTheme(mode){
-      if (mode === 'light') { root.classList.remove('dark'); root.classList.add('light'); localStorage.theme='light'; }
-      else { root.classList.add('dark'); root.classList.remove('light'); localStorage.theme='dark'; }
+    function clearForm(){
+      elWord.value = '';
+      elMean.value = '';
+      elSent.value = '';
+      elStatus.value = 'none';
+      btnDelete.disabled = true;
+      elWord.focus();
     }
-    setTheme(localStorage.theme || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light':'dark'));
-    btnTheme.addEventListener('click', ()=> setTheme(root.classList.contains('dark') ? 'light' : 'dark'));
 
-    /**********************
-     * Rendering          *
-     **********************/
-    const elResults = $('#results');
+    function fillForm(d){
+      elWord.value = d.word || '';
+      elMean.value = fromLines(d.meanings);
+      elSent.value = fromLines(d.sentences);
+      elStatus.value = d.status || 'none';
+      btnDelete.disabled = false;
+      elWord.focus();
+    }
 
     function statsRender(){
       const all = [...wordsCache.values()];
@@ -290,33 +224,30 @@
       statUnknown.textContent = `Unknown: ${unknown}`;
     }
 
-    function renderLetters(){
-      const A = 'A'.charCodeAt(0), Z='Z'.charCodeAt(0);
-      elLetters.innerHTML = '';
-      const make = (t,val) => { const b=document.createElement('button'); b.textContent=t; b.className='chip hover:bg-white/10 light:hover:bg-black/5'; b.addEventListener('click',()=>{filterInitial=val; renderLibrary();}); return b; };
-      elLetters.appendChild(make('All',''));
-      for(let c=A;c<=Z;c++){ elLetters.appendChild(make(String.fromCharCode(c), String.fromCharCode(c).toLowerCase())); }
-    }
-
-    function filterList(){
+    function render(){
       const q = (elSearch.value||'').toLowerCase().trim();
-      let list = [...wordsCache.values()];
-      if (filterStatus!=='all') list = list.filter(d=>d.status===filterStatus);
-      if (filterInitial) list = list.filter(d=> (d.word||'').toLowerCase().startsWith(filterInitial));
-      if (q) list = list.filter(d=> [d.word, ...(d.meanings||[]), ...(d.sentences||[])].join(' \n ').toLowerCase().includes(q));
-      return list.sort((a,b)=>a.word.localeCompare(b.word,'en'));
-    }
+      const list = [...wordsCache.values()].filter(d=>{
+        if (activeTab!=='all' && d.status!==activeTab) return false;
+        if (!q) return true;
+        const hay = [d.word, ...(d.meanings||[]), ...(d.sentences||[])].join(' \n ').toLowerCase();
+        return hay.includes(q);
+      }).sort((a,b)=>a.word.localeCompare(b.word,'en'));
 
-    function renderLibrary(){
-      const list = filterList();
-      elResults.innerHTML='';
-      if (!list.length){ elResults.innerHTML = '<div class="text-sm text-gray-400 light:text-gray-600">No results.</div>'; return; }
+      elResults.innerHTML = '';
+      if (!list.length){
+        elResults.innerHTML = '<div class="text-sm text-gray-400">No results.</div>';
+        return;
+      }
+
       for (const d of list){
-        const badge = d.status==='known' ? '<span class="chip bg-good/10 text-good">Known</span>' : d.status==='unknown' ? '<span class="chip bg-bad/10 text-bad">Unknown</span>' : '<span class="chip">No status</span>';
+        const badge = d.status==='known' ? '<span class="chip bg-good/10 text-good">Known</span>' :
+                      d.status==='unknown' ? '<span class="chip bg-bad/10 text-bad">Unknown</span>' :
+                      '<span class="chip">No status</span>';
         const meanings = (d.meanings||[]).map(m=>`<span class=\"chip\">${escapeHtml(m)}</span>`).join(' ');
         const sentences = (d.sentences||[]).map(s=>`<li class=\"leading-relaxed\">${escapeHtml(s)}</li>`).join('');
+
         const card = document.createElement('div');
-        card.className = 'rounded-2xl border border-border light:border-gray-200 bg-card light:bg-white p-4';
+        card.className = 'rounded-2xl border border-border bg-card p-4';
         card.innerHTML = `
           <div class="flex items-start justify-between gap-3">
             <div>
@@ -324,64 +255,88 @@
               <div class="mt-1 flex flex-wrap gap-2">${badge}</div>
             </div>
             <div class="flex items-center gap-2">
-              <button data-id="${d.id}" class="btn-edit px-3 py-1.5 rounded-lg border border-border light:border-gray-200 hover:bg-white/5 light:hover:bg-black/5 text-sm">Edit</button>
+              <button data-id="${d.id}" class="btn-edit px-3 py-1.5 rounded-lg border border-border hover:bg-white/5 text-sm">Edit</button>
               <div class="relative inline-block text-left">
                 <button class="btn px-3 py-1.5 rounded-lg bg-acc text-black text-sm">Set Status ▾</button>
-                <div class="menu hidden absolute right-0 mt-2 w-36 rounded-xl border border-border light:border-gray-200 bg-card light:bg-white shadow-soft">
-                  <button data-act="known"   data-id="${d.id}" class="block w-full text-left px-3 py-2 hover:bg-white/5 light:hover:bg-black/5">Known</button>
-                  <button data-act="unknown" data-id="${d.id}" class="block w-full text-left px-3 py-2 hover:bg-white/5 light:hover:bg-black/5">Unknown</button>
-                  <button data-act="none"    data-id="${d.id}" class="block w-full text-left px-3 py-2 hover:bg-white/5 light:hover:bg-black/5">None</button>
+                <div class="menu hidden absolute right-0 mt-2 w-36 rounded-xl border border-border bg-card shadow-soft">
+                  <button data-act="known"   data-id="${d.id}" class="block w-full text-left px-3 py-2 hover:bg-white/5">Known</button>
+                  <button data-act="unknown" data-id="${d.id}" class="block w-full text-left px-3 py-2 hover:bg-white/5">Unknown</button>
+                  <button data-act="none"    data-id="${d.id}" class="block w-full text-left px-3 py-2 hover:bg-white/5">None</button>
                 </div>
               </div>
             </div>
           </div>
-          <div class="mt-3 flex flex-wrap gap-2">${meanings || '<span class="text-gray-400 text-sm light:text-gray-600">No meanings</span>'}</div>
-          <div class="mt-3"><ol class="list-decimal list-inside space-y-1">${sentences || '<li class="text-gray-400 text-sm list-none light:text-gray-600">No sentences</li>'}</ol></div>
+          <div class="mt-3 flex flex-wrap gap-2">${meanings || '<span class="text-gray-400 text-sm">No meanings</span>'}</div>
+          <div class="mt-3">
+            <ol class="list-decimal list-inside space-y-1">${sentences || '<li class="text-gray-400 text-sm list-none">No sentences</li>'}</ol>
+          </div>
         `;
         elResults.appendChild(card);
       }
-      // wire buttons
-      $$('#results .btn-edit').forEach(btn=> btn.addEventListener('click', ()=>{ const id=btn.getAttribute('data-id'); const d=wordsCache.get(id); if(d){ fillForm(d); switchPanel('editor'); } }));
+
+      // Edit handlers
+      $$('#results .btn-edit').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const id = btn.getAttribute('data-id');
+          const d = wordsCache.get(id);
+          if (d) fillForm(d);
+        });
+      });
+      // Status dropdown
       $$('#results .menu').forEach(menu=>{
         const trigger = menu.previousElementSibling;
-        trigger.addEventListener('click', (e)=>{ e.stopPropagation(); closeAllMenus(); menu.classList.toggle('hidden'); });
-        menu.querySelectorAll('button').forEach(item=> item.addEventListener('click', async ()=>{ const id=item.getAttribute('data-id'); const next=item.getAttribute('data-act'); await updateStatus(id,next); menu.classList.add('hidden'); }));
+        trigger.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          closeAllMenus();
+          menu.classList.toggle('hidden');
+        });
+        menu.querySelectorAll('button').forEach(item=>{
+          item.addEventListener('click', async ()=>{
+            const id = item.getAttribute('data-id');
+            const next = item.getAttribute('data-act');
+            await updateStatus(id, next);
+            menu.classList.add('hidden');
+          });
+        });
       });
     }
 
     function closeAllMenus(){ $$('#results .menu').forEach(m=>m.classList.add('hidden')); }
     document.addEventListener('click', closeAllMenus);
+
     function escapeHtml(s=''){ return s.replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[c])); }
 
     /**********************
      * Firestore helpers  *
      **********************/
-    const wordsCol = () => collection(db, 'users', UID, 'words');
-    const wordRef  = (id) => doc(db, 'users', UID, 'words', id);
+    function wordsCol(){ return collection(db, 'users', UID, 'words'); }
+    function wordRef(id){ return doc(db, 'users', UID, 'words', id); }
 
     async function saveWord(){
-      if (!UID) return toast('Not signed in yet. Try again in a moment.', 'warn');
+      if (!UID) return toast('Not signed in yet. Please wait a second and try again.', 'warn');
       const word = (elWord.value||'').trim();
       if (!word) return toast('Word is required.', 'bad');
       const id = slug(word);
+      const meanings = toLines(elMean.value);
+      const sentences = toLines(elSent.value);
+      const status = elStatus.value;
+
+      const ref = wordRef(id);
+      const snap = await getDoc(ref);
       const payload = {
-        id,
-        word,
-        wordLower: word.toLowerCase(),
-        meanings: toLines(elMean.value),
-        sentences: toLines(elSent.value),
-        status: elStatus.value,
-        updatedAt: serverTimestamp(),
+        id, word, wordLower: word.toLowerCase(),
+        meanings, sentences, status,
+        createdAt: snap.exists() ? (snap.data().createdAt||serverTimestamp()) : serverTimestamp(),
+        updatedAt: serverTimestamp()
       };
-      const snap = await getDoc(wordRef(id));
-      if (!snap.exists()) payload.createdAt = serverTimestamp();
-      await setDoc(wordRef(id), payload, { merge: true });
+      await setDoc(ref, payload, { merge: true });
       toast('Saved ✔', 'good');
       btnDelete.disabled = false;
     }
 
     async function removeWord(){
-      const word = (elWord.value||'').trim(); if (!word) return;
+      const word = (elWord.value||'').trim();
+      if (!word) return;
       const id = slug(word);
       if (!confirm(`Delete "${word}"?`)) return;
       await deleteDoc(wordRef(id));
@@ -389,124 +344,60 @@
       clearForm();
     }
 
-    async function updateStatus(id, status){ await updateDoc(wordRef(id), { status, updatedAt: serverTimestamp() }); toast('Status updated', 'good'); }
+    async function updateStatus(id, status){
+      await updateDoc(wordRef(id), { status, updatedAt: serverTimestamp() });
+      toast('Status updated', 'good');
+    }
 
     function listen(){
       if (unsubscribe) { unsubscribe(); unsubscribe = null; }
-      const qRef = query(wordsCol(), where('wordLower','>=',''));
+      const qRef = query(wordsCol(), where('wordLower', '>=', '')); // all docs for this user
       unsubscribe = onSnapshot(qRef, snap => {
         wordsCache.clear();
         snap.forEach(docSnap => wordsCache.set(docSnap.id, docSnap.data()));
-        statsRender(); renderLibrary();
-      }, err => {
-        console.error('onSnapshot error', err); toast((err && err.message) || 'Snapshot error', 'bad');
+        statsRender();
+        render();
       });
     }
 
     /**********************
-     * Library/Event Wire *
-     **********************/
-    $('#btn-save').addEventListener('click', saveWord);
-    $('#btn-clear').addEventListener('click', clearForm);
-    $('#btn-delete').addEventListener('click', removeWord);
-
-    $('#btn-export').addEventListener('click', exportJson);
-    $('#btn-import').addEventListener('click', importJson);
-
-    $$('.btn-filter').forEach(b=> b.addEventListener('click', ()=>{ filterStatus=b.getAttribute('data-filter'); renderLibrary(); }));
-
-    $('#btn-show-all').addEventListener('click', ()=>{ filterStatus='all'; filterInitial=''; renderLibrary(); });
-    $('#btn-show-known').addEventListener('click', ()=>{ filterStatus='known'; filterInitial=''; renderLibrary(); });
-    $('#btn-show-unknown').addEventListener('click', ()=>{ filterStatus='unknown'; filterInitial=''; renderLibrary(); });
-
-    $('#inp-search').addEventListener('input', renderLibrary);
-
-    // Tabs
-    $$('.tab').forEach(btn=> btn.addEventListener('click', ()=> switchPanel(btn.getAttribute('data-tab'))));
-    function switchPanel(name){
-      panelLibrary.classList.toggle('hidden', name!=='library');
-      panelTest.classList.toggle('hidden', name!=='test');
-      panelEditor.classList.toggle('hidden', name!=='editor');
-    }
-
-    // Letters
-    renderLetters();
-
-    /**********************
-     * Editor helpers     *
-     **********************/
-    function clearForm(){ elWord.value=''; elMean.value=''; elSent.value=''; elStatus.value='none'; btnDelete.disabled=true; elWord.focus(); }
-    function fillForm(d){ elWord.value=d.word||''; elMean.value=fromLines(d.meanings); elSent.value=fromLines(d.sentences); elStatus.value=d.status||'none'; btnDelete.disabled=false; elWord.focus(); }
-
-    /**********************
-     * Test mode          *
-     **********************/
-    let testCurrent = null;
-    function pickRandom(){
-      let list = [...wordsCache.values()];
-      if (chkUnknownFirst.checked){ const unk=list.filter(x=>x.status==='unknown'); if (unk.length) list = unk; }
-      if (!list.length){ testCurrent=null; return null; }
-      const i = Math.floor(Math.random()*list.length);
-      return list[i];
-    }
-    function renderTest(show=false){
-      testCurrent = pickRandom();
-      if (!testCurrent){
-        testWord.textContent = '—';
-        testMean.textContent = 'No words yet.';
-        testSent.textContent = '';
-        return;
-      }
-      testWord.textContent = testCurrent.word || '—';
-      if (show){
-        testMean.innerHTML = (testCurrent.meanings||[]).map(m=>`<span class=\"chip\">${escapeHtml(m)}</span>`).join(' ');
-        testSent.innerHTML = (testCurrent.sentences||[]).map(s=>`<div class=\"mt-1\">${escapeHtml(s)}</div>`).join('');
-      } else {
-        testMean.textContent = '•••';
-        testSent.textContent = '';
-      }
-    }
-    btnShow.addEventListener('click', ()=> renderTest(true));
-    btnNext.addEventListener('click', ()=> renderTest(false));
-    btnMarkUnknown.addEventListener('click', async ()=>{ if(!testCurrent) return; await updateStatus(testCurrent.id,'unknown'); renderTest(false); });
-    btnMarkKnown.addEventListener('click', async ()=>{ if(!testCurrent) return; await updateStatus(testCurrent.id,'known'); renderTest(false); });
-
-    /**********************
-     * Import/Export      *
+     * Export JSON        *
      **********************/
     function exportJson(){
       const arr = [...wordsCache.values()].sort((a,b)=>a.word.localeCompare(b.word,'en'));
       const blob = new Blob([JSON.stringify(arr, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob); const a = document.createElement('a');
-      a.href=url; a.download='wordvault_export.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    }
-    function importJson(){
-      const inp = document.createElement('input'); inp.type='file'; inp.accept='application/json';
-      inp.onchange = async () => {
-        const file = inp.files[0]; if (!file) return;
-        const text = await file.text();
-        let arr = [];
-        try { arr = JSON.parse(text); } catch(e){ return toast('Invalid JSON', 'bad'); }
-        for (const d of arr){
-          if (!d.word) continue;
-          const id = slug(d.word);
-          await setDoc(wordRef(id), {
-            id, word:d.word, wordLower:(d.word||'').toLowerCase(),
-            meanings:d.meanings||[], sentences:d.sentences||[], status:d.status||'none',
-            updatedAt: serverTimestamp(),
-          }, { merge:true });
-        }
-        toast('Imported', 'good');
-      };
-      inp.click();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'wordvault_export.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
     }
 
     /**********************
-     * Auth & bootstrap   *
+     * Events             *
      **********************/
+    btnSave.addEventListener('click', saveWord);
+    btnClear.addEventListener('click', clearForm);
+    btnDelete.addEventListener('click', removeWord);
+    btnExport.addEventListener('click', exportJson);
+
+    elSearch.addEventListener('input', render);
+    $$('.tab').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ activeTab = btn.getAttribute('data-tab'); render(); });
+    });
+    elWord.addEventListener('keydown', (e)=>{ if (e.key==='Enter' && (e.ctrlKey||e.metaKey)) saveWord(); });
+
     onAuthStateChanged(auth, user => {
-      if (user) { UID = user.uid; dotAuth.classList.remove('bg-red-500'); dotAuth.classList.add('bg-good'); listen(); renderTest(false); }
-      else { UID = null; dotAuth.classList.remove('bg-good'); dotAuth.classList.add('bg-red-500'); }
+      if (user) {
+        UID = user.uid;
+        dotAuth.classList.remove('bg-red-500');
+        dotAuth.classList.add('bg-good');
+        listen();
+      } else {
+        UID = null;
+        dotAuth.classList.remove('bg-good');
+        dotAuth.classList.add('bg-red-500');
+      }
     });
 
     /**********************
@@ -520,8 +411,8 @@
         type==='warn' ? 'bg-yellow-500/15 border-yellow-500/40' : 'bg-white/10 border-white/20'
       }`;
       box.textContent = msg;
-      document.getElementById('toasts').appendChild(box);
-      setTimeout(()=> box.remove(), 2400);
+      $('#toasts').appendChild(box);
+      setTimeout(()=> box.remove(), 2200);
     }
   </script>
 </body>
