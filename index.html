@@ -1,453 +1,660 @@
 <!doctype html>
-<html lang="en">
+<html lang="tr">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>WordVault — Elegant Vocabulary Trainer</title>
-<style>
-  :root{
-    --bg:#0b1220; --bg-soft:#0e1830; --card:#0f172a; --card-2:#101b33; --text:#edf2ff;
-    --muted:#a6b1d4; --border:#1a2748; --brand:#8b5cf6; --good:#22c55e; --bad:#ef4444; --warn:#f59e0b;
-    --shadow:0 16px 50px rgba(0,0,0,.35);
-  }
-  .theme-light{
-    --bg:#f7f9fd; --bg-soft:#eef3ff; --card:#ffffff; --card-2:#ffffff; --text:#0b1220;
-    --muted:#5b678b; --border:#dfe5f2;
-    --shadow:0 16px 40px rgba(12,22,48,.12);
-  }
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{margin:0;font:14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:var(--bg); color:var(--text)}
-  .wrap{max-width:1100px;margin:0 auto;padding:0 16px}
-  /* header */
-  .top{position:sticky;top:0;z-index:50;border-bottom:1px solid var(--border);
-       background:linear-gradient(0deg, rgba(255,255,255,0), rgba(255,255,255,.02)) , var(--bg); backdrop-filter:saturate(1.2) blur(8px)}
-  .row{display:flex;align-items:center;gap:12px;padding:14px 0}
-  .brand{display:flex;align-items:center;gap:10px}
-  .logo{width:38px;height:38px;border-radius:14px;background:color-mix(in oklab, var(--brand) 25%, transparent); display:grid;place-items:center}
-  .logo svg{width:20px;height:20px;fill:var(--brand)}
-  .h1{font-weight:700;font-size:16px;letter-spacing:.2px}
-  .muted{color:var(--muted)}
-  /* search */
-  .search{position:relative;flex:1;max-width:560px}
-  .search input{width:100%;background:var(--card-2);border:1px solid var(--border);color:var(--text);
-    border-radius:12px;padding:10px 36px 10px 38px;outline:none}
-  .search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:.7}
-  /* chips & buttons */
-  .chip{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:12px;background:color-mix(in oklab, var(--card) 85%, transparent)}
-  .btn{cursor:pointer;transition:.12s transform,.2s opacity}
-  .btn:active{transform:translateY(1px)}
-  .btn-ghost{border:1px solid var(--border);background:var(--card)}
-  .btn-primary{background:var(--brand);color:#fff;border:none}
-  .btn-danger{background:color-mix(in oklab, var(--bad) 90%, #fff); color:#fff;border:none}
-  .btn-ok{background:color-mix(in oklab, var(--good) 90%, #fff); color:#fff;border:none}
-  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
-  .stat{display:flex;align-items:center;gap:8px}
-  .dot{width:10px;height:10px;border-radius:999px;background:#ef4444}
-  /* tabs */
-  .tabs{display:flex;gap:8px;border:1px solid var(--border);border-radius:12px;overflow:hidden}
-  .tab{padding:8px 12px;background:var(--card);border-right:1px solid var(--border)}
-  .tab:last-child{border-right:0}
-  .tab.active{background:color-mix(in oklab, var(--brand) 12%, var(--card)); color:var(--text)}
-  /* layout */
-  .grid{display:grid;gap:18px;margin:18px 0}
-  @media (min-width:980px){ .grid{grid-template-columns:260px 1fr} }
-  .panel{background:var(--card);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow)}
-  .panel .hd{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;justify-content:space-between}
-  .panel .bd{padding:16px}
-  /* sidebar */
-  .letters{display:flex;flex-wrap:wrap;gap:6px}
-  .letters .chip{padding:5px 8px}
-  .filters{display:flex;gap:8px;flex-wrap:wrap}
-  /* list */
-  .list{max-height:66vh;overflow:auto}
-  .item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 10px;border-bottom:1px solid color-mix(in oklab, var(--border) 70%, transparent);cursor:pointer}
-  .item:hover{background:color-mix(in oklab, var(--card) 85%, transparent)}
-  .badge{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
-  .badge.ok{color:var(--good);border-color:color-mix(in oklab, var(--good) 55%, var(--border))}
-  .badge.bad{color:var(--bad);border-color:color-mix(in oklab, var(--bad) 55%, var(--border))}
-  /* details */
-  .d-title{font-size:22px;font-weight:800}
-  .tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
-  .tag{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:12px;background:color-mix(in oklab, var(--card) 85%, transparent)}
-  .sent li{margin:.2rem 0}
-  /* form */
-  .field{display:grid;gap:6px;margin:8px 0}
-  .inp, .sel, .ta{width:100%;background:var(--card-2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:10px;outline:none}
-  .ta{min-height:120px;resize:vertical}
-  /* test */
-  .test-word{font-size:32px;font-weight:800}
-  /* toast */
-  .toasts{position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:999}
-  .toast{padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:color-mix(in oklab, var(--card) 85%, transparent)}
-  .toast.good{border-color:color-mix(in oklab, var(--good) 55%, var(--border)); background:color-mix(in oklab, var(--good) 20%, var(--card))}
-  .toast.bad{border-color:color-mix(in oklab, var(--bad) 55%, var(--border)); background:color-mix(in oklab, var(--bad) 20%, var(--card))}
-  .toast.warn{border-color:color-mix(in oklab, var(--warn) 55%, var(--border)); background:color-mix(in oklab, var(--warn) 20%, var(--card))}
-  .right{margin-left:auto}
-  .row-wrap{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Oxford 3000 — A–B: Türkçe Anlam + 4 Örnek Cümle</title>
+  <style>
+    :root{--bg:#0b1220;--fg:#e6edf7;--muted:#9fb0c9;--card:#101a33;--border:#1a2748;--acc:#8b5cf6}
+    body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,Segoe UI,Roboto,Arial}
+    header{padding:18px 20px;background:linear-gradient(180deg,#0f1a33,#0b1220);border-bottom:1px solid var(--border)}
+    h1{margin:0;font-size:20px}
+    .wrap{max-width:1050px;margin:24px auto;padding:0 16px}
+    details{background:var(--card);border:1px solid var(--border);border-radius:14px;margin:12px 0}
+    summary{cursor:pointer;padding:12px 14px}
+    summary .en{font-weight:700}
+    summary .tr{color:var(--muted)}
+    ol{margin:0;padding:0 0 14px 38px}
+    li{margin:6px 0}
+    .pos{font-size:12px;color:var(--muted);margin-left:8px}
+  </style>
 </head>
 <body>
-  <header class="top">
-    <div class="wrap row">
-      <div class="brand">
-        <div class="logo">
-          <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z"/></svg>
-        </div>
-        <div>
-          <div class="h1">WordVault</div>
-          <div class="muted" style="font-size:12px">Elegant vocabulary trainer</div>
-        </div>
-      </div>
+<header>
+  <h1>Oxford 3000 — A–B Bölümü: Türkçe anlamları ve her kelime için 4 örnek cümle</h1>
+</header>
+<div class="wrap">
 
-      <div class="search">
-        <input id="q" placeholder="Search word / meaning / sentence…" />
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="m21 21-4.35-4.35M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"/></svg>
-      </div>
+  <details>
+    <summary><span class="en">attend</span> <span class="pos">v. A2</span> — <span class="tr">katılmak; (okul/derse) devam etmek; ilgilenmek</span></summary>
+    <ol>
+      <li>I will attend the meeting at three o’clock.</li>
+      <li>Only invited guests may attend the ceremony.</li>
+      <li>She attends evening classes twice a week.</li>
+      <li>Doctors quickly attended to the injured player.</li>
+    </ol>
+  </details>
 
-      <div class="row-wrap">
-        <span class="chip stat">Total <b id="st-total">0</b></span>
-        <span class="chip stat">Known <b id="st-known">0</b></span>
-        <span class="chip stat">Unknown <b id="st-unknown">0</b></span>
-        <span class="chip stat">Auth <span id="dot" class="dot"></span></span>
-        <button id="btn-theme" class="chip btn">🌓</button>
-        <button id="btn-export" class="chip btn">Export</button>
-        <button id="btn-import" class="chip btn">Import</button>
-      </div>
-    </div>
+  <details>
+    <summary><span class="en">attention</span> <span class="pos">n., exclam. A2</span> — <span class="tr">dikkat; “Dikkat!” uyarısı</span></summary>
+    <ol>
+      <li>Please pay attention to the instructions.</li>
+      <li>The baby needs a lot of attention.</li>
+      <li>Her speech drew the attention of the audience.</li>
+      <li>Attention! The doors are closing.</li>
+    </ol>
+  </details>
 
-    <div class="wrap" style="padding-bottom:12px; display:flex; gap:10px; align-items:center; justify-content:space-between">
-      <div class="tabs" role="tablist">
-        <button class="tab btn" data-tab="library" aria-selected="true">Library</button>
-        <button class="tab btn" data-tab="editor">Add/Edit</button>
-        <button class="tab btn" data-tab="test">Test</button>
-      </div>
-      <div class="filters">
-        <button class="chip btn" data-filter="all">All</button>
-        <button class="chip btn" data-filter="known">Known</button>
-        <button class="chip btn" data-filter="unknown">Unknown</button>
-        <span class="muted" style="font-size:12px">Filter by letter:</span>
-        <span id="letters" class="letters"></span>
-      </div>
-    </div>
-  </header>
+  <details>
+    <summary><span class="en">attitude</span> <span class="pos">n. B1</span> — <span class="tr">tutum, tavır</span></summary>
+    <ol>
+      <li>His positive attitude helped the whole team.</li>
+      <li>She has a practical attitude to problems.</li>
+      <li>The teacher noticed a change in his attitude.</li>
+      <li>We must keep a respectful attitude at work.</li>
+    </ol>
+  </details>
 
-  <main class="wrap grid">
-    <!-- Sidebar (letters live in header); left card shows details -->
-    <section class="panel" id="card-details">
-      <div class="hd"><strong>Details</strong>
-        <div class="row-wrap">
-          <button id="btn-edit-from-detail" class="btn btn-outline">Edit</button>
-          <div class="row-wrap">
-            <button class="btn btn-ok" id="btn-set-known">Mark Known</button>
-            <button class="btn btn-danger" id="btn-set-unknown">Mark Unknown</button>
-          </div>
-        </div>
-      </div>
-      <div class="bd">
-        <div id="detail-empty" class="muted">Select a word from the list.</div>
-        <div id="detail" style="display:none">
-          <div class="d-title" id="d-word">—</div>
-          <div class="tags" id="d-badges"></div>
-          <h4 style="margin:14px 0 6px">Meanings</h4>
-          <div class="tags" id="d-meanings"></div>
-          <h4 style="margin:14px 0 6px">Sentences</h4>
-          <ol class="sent" id="d-sentences"></ol>
-        </div>
-      </div>
-    </section>
+  <details>
+    <summary><span class="en">attract</span> <span class="pos">v. B1</span> — <span class="tr">çekmek, cezbetmek</span></summary>
+    <ol>
+      <li>Low prices attract new customers.</li>
+      <li>The festival attracts visitors from many countries.</li>
+      <li>The flowers attract bees in the spring.</li>
+      <li>Her idea attracted a lot of interest online.</li>
+    </ol>
+  </details>
 
-    <!-- Right: Library list / Editor / Test -->
-    <section class="panel" id="card-right">
-      <div class="hd">
-        <strong id="right-title">Library</strong>
-        <div class="row-wrap">
-          <button id="btn-random-detail" class="btn btn-outline">Random</button>
-          <button id="btn-new" class="btn btn-primary">+ New</button>
-        </div>
-      </div>
-      <div class="bd" id="view-library">
-        <div id="list" class="list"></div>
-      </div>
+  <details>
+    <summary><span class="en">attraction</span> <span class="pos">n. B1</span> — <span class="tr">cazibe; turistik yer</span></summary>
+    <ol>
+      <li>The museum is the city’s main attraction.</li>
+      <li>There is a natural attraction between the two metals.</li>
+      <li>The park added a new attraction for kids.</li>
+      <li>Night markets are a big attraction for tourists.</li>
+    </ol>
+  </details>
 
-      <div class="bd" id="view-editor" style="display:none">
-        <div class="field">
-          <label>Word</label>
-          <input id="w-word" class="inp" placeholder="e.g., anyway" />
-        </div>
-        <div class="field">
-          <label>Status</label>
-          <select id="w-status" class="sel">
-            <option value="none">None</option>
-            <option value="known">Known</option>
-            <option value="unknown">Unknown</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Meaning(s) <span class="muted">(one per line)</span></label>
-          <textarea id="w-meanings" class="ta" placeholder="anyhow&#10;no matter what"></textarea>
-        </div>
-        <div class="field">
-          <label>Sentence(s) <span class="muted">(one per line)</span></label>
-          <textarea id="w-sentences" class="ta" placeholder="It was raining, but we went out anyway.&#10;Anyway, let's focus on the main problem."></textarea>
-        </div>
-        <div class="row" style="gap:10px">
-          <button id="btn-save" class="btn btn-primary">Save</button>
-          <button id="btn-clear" class="btn btn-outline">Clear</button>
-          <button id="btn-delete" class="btn btn-danger right" disabled>Delete</button>
-        </div>
-        <p class="muted" style="font-size:12px;margin-top:8px">Re-entering the same word updates it. Document ID is a lowercase slug of the word.</p>
-      </div>
+  <details>
+    <summary><span class="en">attractive</span> <span class="pos">adj. A2</span> — <span class="tr">çekici, cazip</span></summary>
+    <ol>
+      <li>They offered an attractive salary package.</li>
+      <li>The town has many attractive old houses.</li>
+      <li>He is intelligent and very attractive.</li>
+      <li>The design looks simple but attractive.</li>
+    </ol>
+  </details>
 
-      <div class="bd" id="view-test" style="display:none">
-        <div class="row" style="justify-content:space-between">
-          <strong>Quick Test</strong>
-          <label class="row" style="gap:8px"><input id="unknown-first" type="checkbox" /> <span class="muted">Unknown first</span></label>
-        </div>
-        <div style="border:1px solid var(--border);border-radius:14px;padding:18px;background:var(--card-2);margin-top:12px">
-          <div class="test-word" id="t-word">—</div>
-          <div class="tags" id="t-meanings" style="margin-top:10px"></div>
-          <div class="muted" id="t-sentences" style="margin-top:8px"></div>
-          <div class="row" style="gap:10px;margin-top:16px;flex-wrap:wrap">
-            <button id="t-show" class="btn btn-outline">Show Meaning</button>
-            <button id="t-next" class="btn btn-primary">Next Random</button>
-            <button id="t-unknown" class="btn btn-danger">Mark Unknown</button>
-            <button id="t-known" class="btn btn-ok">Mark Known</button>
-          </div>
-          <div class="muted" style="font-size:12px;margin-top:10px">Tip: Press <b>N</b> for next.</div>
-        </div>
-      </div>
-    </section>
-  </main>
+  <details>
+    <summary><span class="en">audience</span> <span class="pos">n. A2</span> — <span class="tr">seyirci, izleyici, dinleyici</span></summary>
+    <ol>
+      <li>The audience clapped for several minutes.</li>
+      <li>She asked the audience a question.</li>
+      <li>Our video reached a global audience.</li>
+      <li>He performed well in front of a large audience.</li>
+    </ol>
+  </details>
 
-  <div class="toasts" id="toasts"></div>
+  <details>
+    <summary><span class="en">August</span> <span class="pos">n. A1</span> — <span class="tr">Ağustos</span></summary>
+    <ol>
+      <li>We will travel in August.</li>
+      <li>August is usually very hot here.</li>
+      <li>School starts at the end of August.</li>
+      <li>They moved in on August 15.</li>
+    </ol>
+  </details>
 
-  <!-- Firebase + App -->
-  <script type="module">
-    /********* Firebase (modular) *********/
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-    import {
-      initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-      collection, doc, setDoc, getDoc, deleteDoc, onSnapshot,
-      query, orderBy, updateDoc, serverTimestamp
-    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-    import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+  <details>
+    <summary><span class="en">aunt</span> <span class="pos">n. A1</span> — <span class="tr">hala, teyze, yenge</span></summary>
+    <ol>
+      <li>My aunt lives in İzmir.</li>
+      <li>We visit my aunt every weekend.</li>
+      <li>My aunt makes delicious cookies.</li>
+      <li>Her aunt helped her find a job.</li>
+    </ol>
+  </details>
 
-    // ✅ Your Firebase project (from your message)
-    const firebaseConfig = {
-      apiKey: "AIzaSyCINihMNGs-qRYIIBLzXyeaLnM_Lhp-iwg",
-      authDomain: "warmapg-77acb.firebaseapp.com",
-      databaseURL: "https://warmapg-77acb-default-rtdb.firebaseio.com",
-      projectId: "warmapg-77acb",
-      storageBucket: "warmapg-77acb.firebasestorage.app",
-      messagingSenderId: "895613631339",
-      appId: "1:895613631339:web:9441b6185ad1a14ee02a2e",
-      measurementId: "G-3MYC7P9PZC"
-    };
+  <details>
+    <summary><span class="en">author</span> <span class="pos">n. A2</span> — <span class="tr">yazar</span></summary>
+    <ol>
+      <li>The author wrote three bestsellers.</li>
+      <li>Do you know the author of this article?</li>
+      <li>She became an author at twenty-five.</li>
+      <li>The author will sign books after the talk.</li>
+    </ol>
+  </details>
 
-    const app = initializeApp(firebaseConfig);
-    const db  = initializeFirestore(app, {
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-    });
-    const auth = getAuth(app);
+  <details>
+    <summary><span class="en">authority</span> <span class="pos">n. B1</span> — <span class="tr">otorite; yetkili makam</span></summary>
+    <ol>
+      <li>Local authorities closed the road.</li>
+      <li>She speaks with authority on the topic.</li>
+      <li>The teacher has the authority to decide.</li>
+      <li>We must follow the health authority’s rules.</li>
+    </ol>
+  </details>
 
-    // Anon sign-in
-    signInAnonymously(auth).catch(e => toast('Auth error: '+e.message, 'bad'));
+  <details>
+    <summary><span class="en">autumn</span> <span class="pos">n. A1</span> — <span class="tr">sonbahar</span></summary>
+    <ol>
+      <li>Leaves turn yellow in autumn.</li>
+      <li>We will harvest in early autumn.</li>
+      <li>Autumn nights are cool and quiet.</li>
+      <li>Classes start in the autumn term.</li>
+    </ol>
+  </details>
 
-    /********* Helpers *********/
-    const $  = (s,el=document)=>el.querySelector(s);
-    const $$ = (s,el=document)=>Array.from(el.querySelectorAll(s));
-    const slug = s => (s||'').toLowerCase().trim()
-                    .replace(/[^a-z0-9\-_' ]/g,'')
-                    .replace(/\s+/g,'-').slice(0,128) || 'untitled';
-    const toLines = v => (v||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-    const fromLines = a => (a||[]).join('\n');
-    const esc = s => (s||'').replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[c]));
+  <details>
+    <summary><span class="en">available</span> <span class="pos">adj. A2</span> — <span class="tr">mevcut, uygun, erişilebilir</span></summary>
+    <ol>
+      <li>Is this seat available?</li>
+      <li>The doctor is available after two.</li>
+      <li>The file is available online.</li>
+      <li>We have no rooms available tonight.</li>
+    </ol>
+  </details>
 
-    let UID=null, unsub=null, selectedId=null, filterStatus='all', filterInitial='', wordsCache=new Map();
-    const stats = ()=>{ const arr=[...wordsCache.values()];
-      $('#st-total').textContent=arr.length;
-      $('#st-known').textContent=arr.filter(x=>x.status==='known').length;
-      $('#st-unknown').textContent=arr.filter(x=>x.status==='unknown').length;
-    };
+  <details>
+    <summary><span class="en">average</span> <span class="pos">adj., n. A2; v. B1</span> — <span class="tr">ortalama; ortalamada olmak</span></summary>
+    <ol>
+      <li>The average score was 72.</li>
+      <li>He runs at an average speed.</li>
+      <li>Prices average around $20.</li>
+      <li>On average, I sleep seven hours.</li>
+    </ol>
+  </details>
 
-    function wordsCol(){ return collection(db,'users',UID,'words'); }
-    const wordRef = id => doc(db,'users',UID,'words',id);
+  <details>
+    <summary><span class="en">avoid</span> <span class="pos">v. A2</span> — <span class="tr">kaçınmak, sakınmak</span></summary>
+    <ol>
+      <li>Try to avoid sugary drinks.</li>
+      <li>We avoided the busy road.</li>
+      <li>He avoided answering the question.</li>
+      <li>Wear a hat to avoid sunburn.</li>
+    </ol>
+  </details>
 
-    /********* Theme *********/
-    function setTheme(mode){
-      document.documentElement.classList.toggle('theme-light', mode==='light');
-      localStorage.theme = mode;
-    }
-    setTheme(localStorage.theme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
-    $('#btn-theme').addEventListener('click', ()=> setTheme(document.documentElement.classList.contains('theme-light') ? 'dark' : 'light'));
+  <details>
+    <summary><span class="en">award</span> <span class="pos">n. A2; v. B1</span> — <span class="tr">ödül; ödüllendirmek</span></summary>
+    <ol>
+      <li>She won an award for her project.</li>
+      <li>The film received many awards.</li>
+      <li>The committee awarded him a scholarship.</li>
+      <li>They will award the prize tonight.</li>
+    </ol>
+  </details>
 
-    /********* Letters *********/
-    const lettersEl = $('#letters');
-    (function renderLetters(){
-      const frag = document.createDocumentFragment();
-      const mk = (t,v)=>{ const b=document.createElement('button'); b.className='chip btn'; b.textContent=t;
-        b.onclick=()=>{ filterInitial=v; renderList(); }; return b; };
-      frag.appendChild(mk('All',''));
-      for(let i=65;i<=90;i++){ const ch=String.fromCharCode(i); frag.appendChild(mk(ch, ch.toLowerCase())); }
-      lettersEl.appendChild(frag);
-    })();
+  <details>
+    <summary><span class="en">aware</span> <span class="pos">adj. B1</span> — <span class="tr">farkında, haberdar</span></summary>
+    <ol>
+      <li>Are you aware of the risks?</li>
+      <li>I am fully aware of the rules.</li>
+      <li>She became aware of a noise.</li>
+      <li>We need to be climate-aware.</li>
+    </ol>
+  </details>
 
-    /********* Tabs *********/
-    const views = { library:$('#view-library'), editor:$('#view-editor'), test:$('#view-test') };
-    const rightTitle = $('#right-title');
-    function switchTab(name){
-      Object.entries(views).forEach(([k,el])=> el.style.display = (k===name)?'block':'none');
-      $$('.tab').forEach(b=> b.classList.toggle('active', b.dataset.tab===name));
-      rightTitle.textContent = name==='library' ? 'Library' : (name==='editor'?'Add/Edit':'Test');
-      if (name==='test') nextTest(false);
-    }
-    $$('.tab').forEach(b=> b.addEventListener('click', ()=> switchTab(b.dataset.tab)));
-    switchTab('library');
+  <details>
+    <summary><span class="en">away</span> <span class="pos">adv. A1</span> — <span class="tr">uzakta; uzaklaşmış</span></summary>
+    <ol>
+      <li>He lives far away from here.</li>
+      <li>Put your phone away, please.</li>
+      <li>The bus is five minutes away.</li>
+      <li>The clouds slowly moved away.</li>
+    </ol>
+  </details>
 
-    /********* Filters *********/
-    $('[data-filter="all"]').onclick     = ()=>{ filterStatus='all'; renderList(); };
-    $('[data-filter="known"]').onclick   = ()=>{ filterStatus='known'; renderList(); };
-    $('[data-filter="unknown"]').onclick = ()=>{ filterStatus='unknown'; renderList(); };
+  <details>
+    <summary><span class="en">awful</span> <span class="pos">adj. A2</span> — <span class="tr">berbat, çok kötü</span></summary>
+    <ol>
+      <li>The weather was awful yesterday.</li>
+      <li>I feel awful about the mistake.</li>
+      <li>The soup tastes awful.</li>
+      <li>We had an awful experience there.</li>
+    </ol>
+  </details>
 
-    $('#q').addEventListener('input', renderList);
+  <details>
+    <summary><span class="en">baby</span> <span class="pos">n. A1</span> — <span class="tr">bebek</span></summary>
+    <ol>
+      <li>The baby is sleeping now.</li>
+      <li>She held the baby gently.</li>
+      <li>The baby’s first tooth appeared.</li>
+      <li>Babies learn fast by watching.</li>
+    </ol>
+  </details>
 
-    /********* List + Detail *********/
-    function renderList(){
-      const q=($('#q').value||'').toLowerCase().trim();
-      let arr=[...wordsCache.values()];
-      if (filterStatus!=='all') arr=arr.filter(x=>x.status===filterStatus);
-      if (filterInitial) arr=arr.filter(x=> (x.word||'').toLowerCase().startsWith(filterInitial));
-      if (q) arr=arr.filter(x=> [x.word,...(x.meanings||[]),...(x.sentences||[])].join('\n').toLowerCase().includes(q));
-      arr.sort((a,b)=>a.word.localeCompare(b.word,'en'));
-      const list=$('#list'); list.innerHTML='';
-      if(!arr.length){ list.innerHTML='<div class="muted">No results.</div>'; $('#detail').style.display='none'; $('#detail-empty').style.display='block'; return; }
-      arr.forEach(d=>{
-        const row=document.createElement('div'); row.className='item';
-        const badge = d.status==='known' ? '<span class="badge ok">Known</span>' : d.status==='unknown' ? '<span class="badge bad">Unknown</span>' : '<span class="badge">—</span>';
-        row.innerHTML = `<div><strong>${esc(d.word)}</strong></div><div>${badge}</div>`;
-        row.onclick=()=> showDetail(d.id);
-        list.appendChild(row);
-      });
-      if (selectedId && wordsCache.has(selectedId)) showDetail(selectedId); else showDetail(arr[0].id);
-    }
+  <details>
+    <summary><span class="en">back</span> <span class="pos">n., adv. A1; adj. A2; v. B2</span> — <span class="tr">sırt; geri; arka; desteklemek/geri gitmek</span></summary>
+    <ol>
+      <li>My back hurts after lifting boxes.</li>
+      <li>Please sit back and relax.</li>
+      <li>Use the back door after 10 p.m.</li>
+      <li>Remember to back up your files.</li>
+    </ol>
+  </details>
 
-    function showDetail(id){
-      selectedId=id; const d=wordsCache.get(id); if(!d) return;
-      $('#detail-empty').style.display='none'; $('#detail').style.display='block';
-      $('#d-word').textContent=d.word||'';
-      $('#d-badges').innerHTML = d.status==='known' ? '<span class="tag" style="border-color: color-mix(in oklab, var(--good) 55%, var(--border)); color: var(--good)">Known</span>'
-        : d.status==='unknown' ? '<span class="tag" style="border-color: color-mix(in oklab, var(--bad) 55%, var(--border)); color: var(--bad)">Unknown</span>'
-        : '<span class="tag">No status</span>';
-      $('#d-meanings').innerHTML=(d.meanings||[]).map(m=>`<span class="tag">${esc(m)}</span>`).join('');
-      $('#d-sentences').innerHTML=(d.sentences||[]).map(s=>`<li>${esc(s)}</li>`).join('');
-    }
+  <details>
+    <summary><span class="en">background</span> <span class="pos">n. A2</span> — <span class="tr">arka plan; geçmiş</span></summary>
+    <ol>
+      <li>The background of the photo is blurry.</li>
+      <li>She has a medical background.</li>
+      <li>Music played softly in the background.</li>
+      <li>We need some background information.</li>
+    </ol>
+  </details>
 
-    $('#btn-random-detail').onclick = ()=>{ const ids=[...wordsCache.keys()]; if(!ids.length) return; const id=ids[Math.floor(Math.random()*ids.length)]; showDetail(id); };
-    $('#btn-edit-from-detail').onclick = ()=>{ const d=selectedId?wordsCache.get(selectedId):null; if(d){ fillForm(d); switchTab('editor'); } };
-    $('#btn-set-known').onclick   = ()=> selectedId && setStatus(selectedId,'known');
-    $('#btn-set-unknown').onclick = ()=> selectedId && setStatus(selectedId,'unknown');
-    $('#btn-new').onclick = ()=>{ clearForm(); switchTab('editor'); };
+  <details>
+    <summary><span class="en">backwards</span> <span class="pos">adv. B1</span> — <span class="tr">geriye doğru</span></summary>
+    <ol>
+      <li>Don’t walk backwards near the stairs.</li>
+      <li>The film plays backwards in that scene.</li>
+      <li>He wore his cap backwards.</li>
+      <li>Count backwards from ten.</li>
+    </ol>
+  </details>
 
-    /********* Editor *********/
-    function fillForm(d){ $('#w-word').value=d.word||''; $('#w-status').value=d.status||'none'; $('#w-meanings').value=fromLines(d.meanings); $('#w-sentences').value=fromLines(d.sentences); $('#btn-delete').disabled=false; }
-    function clearForm(){ $('#w-word').value=''; $('#w-status').value='none'; $('#w-meanings').value=''; $('#w-sentences').value=''; $('#btn-delete').disabled=true; $('#w-word').focus(); }
+  <details>
+    <summary><span class="en">bacteria</span> <span class="pos">n. B2</span> — <span class="tr">bakteriler</span></summary>
+    <ol>
+      <li>Some bacteria are helpful in the gut.</li>
+      <li>High heat kills most bacteria.</li>
+      <li>The lab grew bacteria in a dish.</li>
+      <li>Raw meat can contain harmful bacteria.</li>
+    </ol>
+  </details>
 
-    async function saveWord(){
-      if (!UID) return toast('Not signed in yet. Try in a second.', 'warn');
-      const word=($('#w-word').value||'').trim(); if(!word) return toast('Word is required.', 'bad');
-      const id=slug(word);
-      const payload={
-        id, word, wordLower:word.toLowerCase(),
-        status: $('#w-status').value,
-        meanings: toLines($('#w-meanings').value),
-        sentences: toLines($('#w-sentences').value),
-        updatedAt: serverTimestamp()
-      };
-      const snap=await getDoc(wordRef(id));
-      if(!snap.exists()) payload.createdAt=serverTimestamp();
-      await setDoc(wordRef(id), payload, { merge:true });
-      toast('Saved ✔','good'); selectedId=id; switchTab('library');
-    }
-    async function deleteWord(){
-      const w=($('#w-word').value||'').trim(); if(!w) return;
-      if(!confirm(`Delete "${w}"?`)) return;
-      await deleteDoc(wordRef(slug(w))); toast('Deleted','bad'); clearForm();
-    }
-    async function setStatus(id,status){ await updateDoc(wordRef(id), { status, updatedAt:serverTimestamp() }); toast('Status updated','good'); }
+  <details>
+    <summary><span class="en">bad</span> <span class="pos">adj. A1</span> — <span class="tr">kötü</span></summary>
+    <ol>
+      <li>This is a bad idea.</li>
+      <li>The milk smells bad.</li>
+      <li>He had a bad day at work.</li>
+      <li>That’s not as bad as I thought.</li>
+    </ol>
+  </details>
 
-    $('#btn-save').onclick = saveWord;
-    $('#btn-clear').onclick = clearForm;
-    $('#btn-delete').onclick = deleteWord;
+  <details>
+    <summary><span class="en">badly</span> <span class="pos">adv. A2</span> — <span class="tr">kötü bir şekilde; çok (istemek)</span></summary>
+    <ol>
+      <li>He danced badly at the party.</li>
+      <li>The project was badly planned.</li>
+      <li>She wants the job badly.</li>
+      <li>The team played badly today.</li>
+    </ol>
+  </details>
 
-    /********* Test *********/
-    let current=null;
-    function pickRandom(){
-      let arr=[...wordsCache.values()];
-      if ($('#unknown-first').checked){
-        const u=arr.filter(x=>x.status==='unknown');
-        if (u.length) arr=u;
-      }
-      if (!arr.length) return null;
-      return arr[Math.floor(Math.random()*arr.length)];
-    }
-    function renderTest(show=false){
-      current = pickRandom();
-      if(!current){ $('#t-word').textContent='—'; $('#t-meanings').innerHTML=''; $('#t-sentences').textContent='Add some words first.'; return; }
-      $('#t-word').textContent=current.word||'';
-      if (show){
-        $('#t-meanings').innerHTML=(current.meanings||[]).map(m=>`<span class="tag">${esc(m)}</span>`).join('');
-        $('#t-sentences').innerHTML=(current.sentences||[]).map(s=>`<div>${esc(s)}</div>`).join('');
-      } else {
-        $('#t-meanings').innerHTML='<span class="muted">•••</span>';
-        $('#t-sentences').innerHTML='';
-      }
-    }
-    function nextTest(show=false){ renderTest(show); }
-    $('#t-show').onclick = ()=> renderTest(true);
-    $('#t-next').onclick = ()=> renderTest(false);
-    $('#t-unknown').onclick = async ()=>{ if(!current) return; await setStatus(current.id,'unknown'); renderTest(false); };
-    $('#t-known').onclick   = async ()=>{ if(!current) return; await setStatus(current.id,'known');   renderTest(false); };
-    document.addEventListener('keydown',(e)=>{ if(e.key.toLowerCase()==='n' && views.test.style.display!=='none'){ e.preventDefault(); renderTest(false);} });
+  <details>
+    <summary><span class="en">bag</span> <span class="pos">n. A1</span> — <span class="tr">çanta, torba</span></summary>
+    <ol>
+      <li>Put the apples in the bag.</li>
+      <li>Her bag is on the chair.</li>
+      <li>I brought an extra shopping bag.</li>
+      <li>He packed his bag quickly.</li>
+    </ol>
+  </details>
 
-    /********* Import / Export *********/
-    $('#btn-export').onclick = ()=>{
-      const arr=[...wordsCache.values()].sort((a,b)=>a.word.localeCompare(b.word,'en'));
-      const blob=new Blob([JSON.stringify(arr,null,2)], {type:'application/json'});
-      const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='wordvault_export.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    };
-    $('#btn-import').onclick = ()=>{
-      const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json';
-      inp.onchange=async ()=>{ const f=inp.files[0]; if(!f) return; const text=await f.text(); let arr=[]; try{arr=JSON.parse(text);}catch{ return toast('Invalid JSON','bad'); }
-        for(const d of arr){ if(!d.word) continue; const id=slug(d.word);
-          await setDoc(wordRef(id), { id, word:d.word, wordLower:(d.word||'').toLowerCase(), meanings:d.meanings||[], sentences:d.sentences||[], status:d.status||'none', updatedAt:serverTimestamp() }, { merge:true });
-        }
-        toast('Imported','good');
-      };
-      inp.click();
-    };
+  <details>
+    <summary><span class="en">bake</span> <span class="pos">v. B1</span> — <span class="tr">fırında pişirmek</span></summary>
+    <ol>
+      <li>We will bake bread this afternoon.</li>
+      <li>She baked a cake for my birthday.</li>
+      <li>The cookies need ten minutes to bake.</li>
+      <li>I love the smell of freshly baked bread.</li>
+    </ol>
+  </details>
 
-    /********* Live sync *********/
-    function listen(){
-      if (unsub){ unsub(); unsub=null; }
-      const qRef=query(wordsCol(), orderBy('wordLower'));
-      unsub = onSnapshot(qRef, snap=>{
-        wordsCache.clear();
-        snap.forEach(s=> wordsCache.set(s.id, s.data()));
-        stats(); renderList();
-      }, err=> toast(err.message||'Snapshot error','bad'));
-    }
+  <details>
+    <summary><span class="en">balance</span> <span class="pos">n., v. B1</span> — <span class="tr">denge; dengelemek</span></summary>
+    <ol>
+      <li>Work–life balance is important.</li>
+      <li>He lost his balance on the ladder.</li>
+      <li>We must balance cost and quality.</li>
+      <li>The flavors balance nicely.</li>
+    </ol>
+  </details>
 
-    onAuthStateChanged(auth, user=>{
-      if (user){ UID=user.uid; $('#dot').style.background= 'var(--good)'; listen(); nextTest(false); }
-      else { UID=null; $('#dot').style.background= 'var(--bad)'; }
-    });
+  <details>
+    <summary><span class="en">ball</span> <span class="pos">n. A1</span> — <span class="tr">top</span></summary>
+    <ol>
+      <li>Kick the ball to me.</li>
+      <li>The ball rolled under the table.</li>
+      <li>Children were playing with a ball.</li>
+      <li>She threw the ball very high.</li>
+    </ol>
+  </details>
 
-    /********* Toast *********/
-    function toast(msg, type='info'){
-      const box=document.createElement('div'); box.className='toast'+(type==='good'?' good':type==='bad'?' bad':type==='warn'?' warn':'');
-      box.textContent=msg; $('#toasts').appendChild(box); setTimeout(()=>box.remove(), 2400);
-    }
-  </script>
+  <details>
+    <summary><span class="en">ban</span> <span class="pos">v., n. B1</span> — <span class="tr">yasaklamak; yasak</span></summary>
+    <ol>
+      <li>The school banned phones in class.</li>
+      <li>Some countries ban plastic bags.</li>
+      <li>The ban starts next month.</li>
+      <li>They plan to lift the ban soon.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">banana</span> <span class="pos">n. A1</span> — <span class="tr">muz</span></summary>
+    <ol>
+      <li>I eat a banana every morning.</li>
+      <li>Banana bread is easy to make.</li>
+      <li>The bananas are still green.</li>
+      <li>She bought a bunch of bananas.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">band</span> <span class="pos">n. A1</span> — <span class="tr">müzik grubu; bant/şerit</span></summary>
+    <ol>
+      <li>The band is playing tonight.</li>
+      <li>He joined a rock band at school.</li>
+      <li>Wear a fitness band on your wrist.</li>
+      <li>A red band marks the danger zone.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">bank (money)</span> <span class="pos">n. A1</span> — <span class="tr">banka</span></summary>
+    <ol>
+      <li>I need to go to the bank.</li>
+      <li>The bank closes at five.</li>
+      <li>She works at a local bank.</li>
+      <li>We opened a new bank account.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">bank (river)</span> <span class="pos">n. B1</span> — <span class="tr">nehir kıyısı</span></summary>
+    <ol>
+      <li>They sat on the river bank.</li>
+      <li>Houses line the bank of the river.</li>
+      <li>Trees grow thick along the bank.</li>
+      <li>We walked down the muddy bank.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">bar</span> <span class="pos">n. A2; v. B2</span> — <span class="tr">bar; çubuk; engellemek/yasaklamak</span></summary>
+    <ol>
+      <li>We met at a small bar.</li>
+      <li>He ate a chocolate bar.</li>
+      <li>Iron bars protect the window.</li>
+      <li>The rules bar late entries.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">barrier</span> <span class="pos">n. B2</span> — <span class="tr">engel, bariyer</span></summary>
+    <ol>
+      <li>Language can be a barrier.</li>
+      <li>The road has safety barriers.</li>
+      <li>We must break down these barriers.</li>
+      <li>Cost is a major barrier for many.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">base</span> <span class="pos">n., v. B1</span> — <span class="tr">temel, üs; dayandırmak</span></summary>
+    <ol>
+      <li>The statue stands on a stone base.</li>
+      <li>We base our plan on data.</li>
+      <li>The team returned to base at dusk.</li>
+      <li>Trust is the base of our work.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">baseball</span> <span class="pos">n. A2</span> — <span class="tr">beyzbol</span></summary>
+    <ol>
+      <li>He plays baseball on weekends.</li>
+      <li>We watched a baseball game.</li>
+      <li>Grab your baseball glove.</li>
+      <li>Baseball is popular in the U.S.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">based</span> <span class="pos">adj. A2</span> — <span class="tr">-e dayalı; merkezli</span></summary>
+    <ol>
+      <li>The film is based on a true story.</li>
+      <li>Our decision is based on facts.</li>
+      <li>The company is based in Berlin.</li>
+      <li>It’s a plant-based menu.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">basic</span> <span class="pos">adj. B1</span> — <span class="tr">temel, basit</span></summary>
+    <ol>
+      <li>Start with the basic steps.</li>
+      <li>We covered basic grammar today.</li>
+      <li>Food and water are basic needs.</li>
+      <li>This phone is basic but reliable.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">basically</span> <span class="pos">adv. B2</span> — <span class="tr">temelde, aslında</span></summary>
+    <ol>
+      <li>Basically, we agree on the goal.</li>
+      <li>It’s basically the same idea.</li>
+      <li>Basically, he was right.</li>
+      <li>We basically finished the work.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">basis</span> <span class="pos">n. B1</span> — <span class="tr">temel, esas</span></summary>
+    <ol>
+      <li>Trust is the basis of a good team.</li>
+      <li>We meet on a weekly basis.</li>
+      <li>There is no legal basis for this.</li>
+      <li>Make decisions on a case-by-case basis.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">basketball</span> <span class="pos">n. A2</span> — <span class="tr">basketbol</span></summary>
+    <ol>
+      <li>They play basketball after school.</li>
+      <li>He scored ten points in basketball.</li>
+      <li>Basketball requires teamwork.</li>
+      <li>We bought a new basketball hoop.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">bath</span> <span class="pos">n. A1</span> — <span class="tr">banyo; küvet</span></summary>
+    <ol>
+      <li>The baby needs a bath.</li>
+      <li>I took a warm bath.</li>
+      <li>Please clean the bath after use.</li>
+      <li>A quick bath will wake you up.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">bathroom</span> <span class="pos">n. A1</span> — <span class="tr">banyo; tuvalet</span></summary>
+    <ol>
+      <li>The bathroom is upstairs.</li>
+      <li>She cleaned the bathroom today.</li>
+      <li>There is no window in the bathroom.</li>
+      <li>Please knock before using the bathroom.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">battery</span> <span class="pos">n. B1</span> — <span class="tr">pil, akü</span></summary>
+    <ol>
+      <li>My phone battery is dead.</li>
+      <li>Charge the battery overnight.</li>
+      <li>The toy needs two AA batteries.</li>
+      <li>Battery life lasts about a day.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">battle</span> <span class="pos">n. B1; v. B2</span> — <span class="tr">savaş, mücadele; mücadele etmek</span></summary>
+    <ol>
+      <li>The battle lasted all night.</li>
+      <li>Every day is a battle for them.</li>
+      <li>The team battled through the storm.</li>
+      <li>She battles anxiety with therapy.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">be</span> <span class="pos">v., auxiliary v. A1</span> — <span class="tr">olmak, bulunmak</span></summary>
+    <ol>
+      <li>I am happy today.</li>
+      <li>Are you ready for class?</li>
+      <li>He is a doctor in Ankara.</li>
+      <li>They were at home yesterday.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">beach</span> <span class="pos">n. A1</span> — <span class="tr">plaj, sahil</span></summary>
+    <ol>
+      <li>We walked along the beach.</li>
+      <li>The beach was crowded.</li>
+      <li>Let’s watch the sunset on the beach.</li>
+      <li>The beach sand is very soft.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">bean</span> <span class="pos">n. A2</span> — <span class="tr">fasulye; tanecik (kahve vb.)</span></summary>
+    <ol>
+      <li>We cooked beans for dinner.</li>
+      <li>She grows green beans in the garden.</li>
+      <li>Fresh coffee beans smell amazing.</li>
+      <li>Add some beans to the salad.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">bear (deal with)</span> <span class="pos">v. B2</span> — <span class="tr">katlanmak, tahammül etmek</span></summary>
+    <ol>
+      <li>I can’t bear the noise anymore.</li>
+      <li>She bore the pain bravely.</li>
+      <li>He can’t bear being late.</li>
+      <li>We must bear the cost together.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">bear (animal)</span> <span class="pos">n. A2</span> — <span class="tr">ayı</span></summary>
+    <ol>
+      <li>A bear walked across the road.</li>
+      <li>Polar bears live in the Arctic.</li>
+      <li>We saw a brown bear at the zoo.</li>
+      <li>Never feed wild bears.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">beat</span> <span class="pos">v. A2; n. B2</span> — <span class="tr">yenmek, dövmek; ritim</span></summary>
+    <ol>
+      <li>Our team beat them 2–1.</li>
+      <li>She beats the eggs with a fork.</li>
+      <li>The drums kept a steady beat.</li>
+      <li>He paused for a beat before speaking.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">beautiful</span> <span class="pos">adj. A1</span> — <span class="tr">güzel</span></summary>
+    <ol>
+      <li>What a beautiful view!</li>
+      <li>She wore a beautiful dress.</li>
+      <li>The garden looks beautiful in spring.</li>
+      <li>It’s a beautiful piece of music.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">beauty</span> <span class="pos">n. B1</span> — <span class="tr">güzellik</span></summary>
+    <ol>
+      <li>The beauty of the lake is unforgettable.</li>
+      <li>Inner beauty matters most.</li>
+      <li>She works in the beauty industry.</li>
+      <li>They admired the beauty of the painting.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">because</span> <span class="pos">conj. A1</span> — <span class="tr">çünkü</span></summary>
+    <ol>
+      <li>I stayed home because it rained.</li>
+      <li>She left early because of the traffic.</li>
+      <li>We’re late because the bus broke down.</li>
+      <li>He smiled because he won.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">become</span> <span class="pos">v. A1</span> — <span class="tr">olmak, haline gelmek</span></summary>
+    <ol>
+      <li>She became a nurse last year.</li>
+      <li>It’s becoming cold outside.</li>
+      <li>He became famous after the show.</li>
+      <li>Water becomes ice below 0°C.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">bed</span> <span class="pos">n. A1</span> — <span class="tr">yatak</span></summary>
+    <ol>
+      <li>The kids are already in bed.</li>
+      <li>I bought a new bed last week.</li>
+      <li>Make your bed every morning.</li>
+      <li>He stayed in bed with the flu.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">bedroom</span> <span class="pos">n. A1</span> — <span class="tr">yatak odası</span></summary>
+    <ol>
+      <li>Our bedroom is small but cozy.</li>
+      <li>She painted the bedroom blue.</li>
+      <li>The apartment has two bedrooms.</li>
+      <li>Please keep your bedroom tidy.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">bee</span> <span class="pos">n. B1</span> — <span class="tr">arı</span></summary>
+    <ol>
+      <li>A bee landed on the flower.</li>
+      <li>Bees make honey in hives.</li>
+      <li>Don’t disturb a bee nest.</li>
+      <li>Bees are important for pollination.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">beef</span> <span class="pos">n. A2</span> — <span class="tr">sığır eti</span></summary>
+    <ol>
+      <li>We cooked beef with vegetables.</li>
+      <li>She ordered a beef burger.</li>
+      <li>Beef is rich in protein.</li>
+      <li>They slow-cooked the beef for hours.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><span class="en">beer</span> <span class="pos">n. A1</span> — <span class="tr">bira</span></summary>
+    <ol>
+      <li>He ordered a cold beer.</li>
+      <li>They brew their own beer at home.</li>
+      <li>This beer tastes light and fresh.</li>
+      <li>Beer is served in glass bottles or cans.</li>
+    </ol>
+  </details>
+
+</div>
 </body>
 </html>
