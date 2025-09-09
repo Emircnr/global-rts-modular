@@ -1,22 +1,24 @@
 <!doctype html>
 <html lang="tr">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MEXC Spot ↔ Perp Fark (Çoklu Sembol, CORS Fix)</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MEXC Spot ↔ Perp Fark (Tek Dosya, WS, Protobuf decode)</title>
 <style>
-  :root{--bg:#0b1220;--card:#0f172a;--txt:#e6ecff;--muted:#93a1c8;--acc:#7c5cff;--ok:#22c55e;--bad:#ef476f;--warn:#ffd166;--border:#1b2643}
+  :root{
+    --bg:#0b1220;--card:#0f172a;--txt:#e8eeff;--muted:#9aa7c7;--acc:#7c5cff;
+    --ok:#22c55e;--bad:#ef476f;--warn:#ffd166;--border:#1b2643
+  }
   *{box-sizing:border-box}
-  body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:
-    radial-gradient(1200px 800px at 130% -10%, rgba(124,92,255,.12), transparent 60%),
-    linear-gradient(180deg,#0b1220,#0b1220);color:var(--txt)}
+  body{margin:0;background:radial-gradient(1200px 800px at 120% -10%,rgba(124,92,255,.12),transparent 60%),#0b1220;color:var(--txt);font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial}
   header{position:sticky;top:0;z-index:10;background:rgba(11,18,32,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
-  .wrap{max-width:1200px;margin:0 auto;padding:14px}
-  h1{font-size:18px;margin:0} .sub{font-size:12px;color:var(--muted)}
-  main{max-width:1200px;margin:0 auto;padding:16px}
+  main,.wrap{max-width:1200px;margin:0 auto}
+  .wrap{padding:14px}
+  h1{font-size:18px;margin:0}
+  .sub{font-size:12px;color:var(--muted)}
+  main{padding:16px}
   .card{background:linear-gradient(180deg,rgba(255,255,255,.02),transparent 120%),var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  .row>*{flex:1}
   label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
   input,button{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:#0e1526;color:var(--txt);font-size:14px}
   input:focus{border-color:#4b58ff;box-shadow:0 0 0 3px rgba(75,88,255,.15)}
@@ -30,13 +32,14 @@
   tbody tr:hover{background:#0e1526}
   .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)} .muted{color:var(--muted)}
   .tiny{font-size:11px}
+  .sym{font-weight:700}
 </style>
 </head>
 <body>
 <header>
   <div class="wrap">
-    <h1>MEXC Spot ↔ Perp Fark Programı</h1>
-    <div class="sub">CORS çözümü: Cloudflare Worker üzerinden — Çoklu sembol, anlık fark</div>
+    <h1>MEXC Spot ↔ Perp Fark Programı (WS + PB)</h1>
+    <div class="sub">CORS’suz gerçek zamanlı: Spot (Protobuf) + Perp (JSON) — bookTicker & depth</div>
   </div>
 </header>
 
@@ -48,10 +51,10 @@
         <input id="symbols" placeholder="BTCUSDT, ETHUSDT, XRPUSDT">
       </div>
       <div>
-        <label>Yenileme (ms)</label>
-        <input id="refresh" type="number" min="200" step="50" value="800">
+        <label>Auto Yenileme Ping (sn)</label>
+        <input id="ping" type="number" min="5" step="5" value="15">
       </div>
-      <div style="flex:0 0 240px">
+      <div style="flex:0 0 260px">
         <label>&nbsp;</label>
         <div class="row">
           <button id="btnAdd">Ekle</button>
@@ -60,10 +63,10 @@
       </div>
     </div>
     <div class="row" style="margin-top:8px">
-      <div class="pill tiny">Durum: <span id="status">Hazır</span></div>
+      <div class="pill tiny">Spot WS: <span id="spotState">—</span></div>
+      <div class="pill tiny">Perp WS: <span id="perpState">—</span></div>
       <div class="pill tiny">Sembol sayısı: <span id="count">0</span></div>
       <div class="pill tiny">Son güncelleme: <span id="last">—</span></div>
-      <div class="pill tiny">Proxy: <span id="proxyShown">—</span></div>
     </div>
   </section>
 
@@ -75,10 +78,10 @@
             <th>Sembol</th>
             <th>Spot Bid</th><th>Bid Qty</th>
             <th>Spot Ask</th><th>Ask Qty</th>
-            <th>Perp Bid</th><th>Bid Qty (base)</th>
-            <th>Perp Ask</th><th>Ask Qty (base)</th>
-            <th>Long % <div class="tiny muted">(Perp Bid − Spot Ask) / Spot Ask)</div></th>
-            <th>Short % <div class="tiny muted">(Spot Bid − Perp Ask) / Spot Bid)</div></th>
+            <th>Perp Bid</th><th>Bid Vol (contracts)</th>
+            <th>Perp Ask</th><th>Ask Vol (contracts)</th>
+            <th>Long % <div class="tiny muted">(Perp Bid − Spot Ask) / Spot Ask</div></th>
+            <th>Short % <div class="tiny muted">(Spot Bid − Perp Ask) / Spot Bid</div></th>
             <th>Güncel</th>
             <th>Sil</th>
           </tr>
@@ -89,139 +92,339 @@
   </section>
 </main>
 
+<!-- Protobuf.js (tarayıcı) -->
+<script src="https://unpkg.com/protobufjs/dist/protobuf.min.js"></script>
 <script>
 (() => {
-  // ==== SENİN PROXY ADRESİN ====
-  const proxyBase = "https://<YOUR-WORKER-SUBDOMAIN>.workers.dev"; // <- BURAYA Worker URL'ni yaz
-  document.getElementById('proxyShown').textContent = proxyBase;
-
-  const el = {
-    symbols: document.getElementById('symbols'),
-    refresh: document.getElementById('refresh'),
-    btnAdd:  document.getElementById('btnAdd'),
-    btnClear:document.getElementById('btnClear'),
-    status:  document.getElementById('status'),
-    count:   document.getElementById('count'),
-    last:    document.getElementById('last'),
-    tbody:   document.getElementById('tbody'),
+  // ====== Yardımcılar
+  const $ = sel => document.querySelector(sel);
+  const els = {
+    symbols: $('#symbols'), ping: $('#ping'),
+    btnAdd: $('#btnAdd'), btnClear: $('#btnClear'),
+    spotState: $('#spotState'), perpState: $('#perpState'),
+    count: $('#count'), last: $('#last'), tbody: $('#tbody')
+  };
+  const LS_KEY = "mexc_fark_syms_ws_v1";
+  const nowStr = () => new Date().toLocaleTimeString();
+  const f = (n, p=6) => (Number.isFinite(n) ? Number(n).toLocaleString(undefined,{maximumFractionDigits:p}) : '—');
+  const setClassFor = (td, val) => { td.classList.remove('ok','bad','warn');
+    if (!Number.isFinite(val)) return;
+    if (val > 0) td.classList.add('ok'); else if (val < 0) td.classList.add('bad'); else td.classList.add('warn');
   };
 
-  const LS_KEY = "mexc_fark_syms_v2";
-  let list = loadSyms();
-  let timer = null;
-
+  // ====== Data Model
+  let symbols = loadSyms();
   function loadSyms(){ try{ const j=JSON.parse(localStorage.getItem(LS_KEY)||"[]"); return Array.isArray(j)? j:[] }catch(e){ return [] } }
-  function saveSyms(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(list)); }catch(e){} }
-  function nowStr(){ return new Date().toLocaleTimeString(); }
-  function cls(td){ td.classList.remove('ok','bad','warn'); }
-  function color(td,v){ cls(td); if(!isFinite(v))return; if(v>0)td.classList.add('ok'); else if(v<0)td.classList.add('bad'); else td.classList.add('warn'); }
-  function f(n,p=2){ return isFinite(n)? Number(n).toLocaleString(undefined,{maximumFractionDigits:p}):'—' }
+  function saveSyms(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(symbols)); }catch(e){} }
 
-  function toRow(sym){
+  // ====== UI Rows
+  function makeRow(sym){
     const tr = document.createElement('tr');
+    tr.dataset.sym = sym;
     tr.innerHTML = `
-      <td><b class="sym">${sym}</b><br><span class="muted tiny perp">${sym.endsWith('USDT')? sym.slice(0,-4)+'_USDT' : sym}</span></td>
+      <td><span class="sym">${sym}</span><br><span class="tiny muted perp">${sym.endsWith('USDT')? (sym.slice(0,-4)+'_USDT') : sym}</span></td>
       <td class="sBid">—</td><td class="sBidQ">—</td>
       <td class="sAsk">—</td><td class="sAskQ">—</td>
       <td class="pBid">—</td><td class="pBidQ">—</td>
       <td class="pAsk">—</td><td class="pAskQ">—</td>
       <td class="long">—</td><td class="short">—</td>
       <td class="ts tiny muted">—</td>
-      <td><button class="del secondary tiny">Sil</button></td>
+      <td><button class="secondary tiny del">Sil</button></td>
     `;
-    tr.querySelector('.del').onclick = ()=> removeSym(sym);
+    tr.querySelector('.del').onclick = () => removeSymbol(sym);
     return tr;
   }
-
   function ensureRows(){
-    const present = new Set([...el.tbody.querySelectorAll('tr')].map(tr=>tr.querySelector('.sym').textContent));
-    list.forEach(sym=>{
-      if(!present.has(sym)) el.tbody.appendChild(toRow(sym));
-    });
-    // fazla olanları temizle
-    [...el.tbody.querySelectorAll('tr')].forEach(tr=>{
-      const s = tr.querySelector('.sym').textContent;
-      if(!list.includes(s)) tr.remove();
-    });
-    el.count.textContent = String(list.length);
+    const have = new Set([...els.tbody.querySelectorAll('tr')].map(tr=>tr.dataset.sym));
+    symbols.forEach(s => { if(!have.has(s)) els.tbody.appendChild(makeRow(s)); });
+    [...els.tbody.querySelectorAll('tr')].forEach(tr => { if(!symbols.includes(tr.dataset.sym)) tr.remove(); });
+    els.count.textContent = symbols.length;
   }
-
-  function removeSym(sym){
-    list = list.filter(x=>x!==sym);
-    saveSyms();
-    ensureRows();
-  }
-
-  async function tick(){
-    if(!list.length){ el.status.textContent='Boş'; el.last.textContent='—'; return; }
-    el.status.textContent='Çekiliyor…';
-    try{
-      const q = encodeURIComponent(list.join(','));
-      const url = `${proxyBase}/mexc?symbols=${q}&limit=5`;
-      const r = await fetch(url, { cache:'no-store' });
-      const j = await r.json();
-      if(!j.ok) throw new Error(j.error||'proxy error');
-
-      j.data.forEach(rec=>{
-        const sym = rec.spotSymbol;
-        const tr = [...el.tbody.querySelectorAll('tr')].find(x=>x.querySelector('.sym').textContent===sym);
-        if(!tr) return;
-        const ps = rec.perp?.priceScale ?? 2;
-
-        tr.querySelector('.sBid').textContent = f(rec.spot.bid, ps);
-        tr.querySelector('.sAsk').textContent = f(rec.spot.ask, ps);
-        tr.querySelector('.sBidQ').textContent = f(rec.spot.bidQty, 6);
-        tr.querySelector('.sAskQ').textContent = f(rec.spot.askQty, 6);
-
-        tr.querySelector('.pBid').textContent = f(rec.perp.bid, ps);
-        tr.querySelector('.pAsk').textContent = f(rec.perp.ask, ps);
-        tr.querySelector('.pBidQ').textContent = f(rec.perp.bidQtyBase, 6);
-        tr.querySelector('.pAskQ').textContent = f(rec.perp.askQtyBase, 6);
-
-        const long  = rec.diffs.long;
-        const short = rec.diffs.short;
-        const tdL = tr.querySelector('.long');
-        const tdS = tr.querySelector('.short');
-        tdL.textContent = isFinite(long)? (long*100).toFixed(3)+'%':'—';
-        tdS.textContent = isFinite(short)? (short*100).toFixed(3)+'%':'—';
-        color(tdL, long); color(tdS, short);
-
-        tr.querySelector('.ts').textContent = nowStr();
-      });
-
-      el.status.textContent='Tamam';
-      el.last.textContent = nowStr();
-    } catch(e){
-      el.status.textContent='Hata: '+(e?.message||e);
+  function updateRow(sym, patch){
+    const tr = els.tbody.querySelector(`tr[data-sym="${sym}"]`);
+    if(!tr) return;
+    for (const k in patch) {
+      const el = tr.querySelector('.'+k);
+      if(!el) continue;
+      if (k==='long' || k==='short') {
+        const v = patch[k];
+        el.textContent = Number.isFinite(v) ? (v*100).toFixed(3)+'%' : '—';
+        setClassFor(el, v);
+      } else {
+        el.textContent = patch[k];
+      }
     }
+    tr.querySelector('.ts').textContent = nowStr();
+    els.last.textContent = nowStr();
   }
 
-  function start(){
-    if(timer) clearInterval(timer);
-    const ms = Math.max(200, Number(el.refresh.value)||800);
-    timer = setInterval(tick, ms);
-    tick();
+  // ====== Fark hesapları
+  const memo = {}; // sym -> {spotBid,spotAsk,spotBidQ,spotAskQ, perpBid,perpAsk,perpBidQ,perpAskQ}
+  function recalc(sym){
+    const m = memo[sym] || {};
+    if (!m) return;
+    const long = (Number.isFinite(m.perpBid) && Number.isFinite(m.spotAsk)) ? (m.perpBid - m.spotAsk) / m.spotAsk : NaN;
+    const short= (Number.isFinite(m.spotBid) && Number.isFinite(m.perpAsk)) ? (m.spotBid - m.perpAsk) / m.spotBid : NaN;
+    updateRow(sym, {
+      long: long, short: short,
+      sBid: f(m.spotBid, 6), sAsk: f(m.spotAsk, 6),
+      sBidQ: f(m.spotBidQ, 6), sAskQ: f(m.spotAskQ, 6),
+      pBid: f(m.perpBid, 6), pAsk: f(m.perpAsk, 6),
+      pBidQ: f(m.perpBidQ, 6), pAskQ: f(m.perpAskQ, 6)
+    });
   }
 
-  // UI
-  document.getElementById('btnAdd').onclick = ()=>{
-    const raw = (el.symbols.value||'').toUpperCase();
+  // ====== Spot WS (Protobuf)
+  // Kanallar: spot@public.aggre.bookTicker.v3.api.pb@100ms@SYMBOL  (bid/ask + qty)
+  // Base: wss://wbs-api.mexc.com/ws
+  const SpotWS = (() => {
+    const WS_URL = 'wss://wbs-api.mexc.com/ws';
+    let ws = null, alive = false, pingTimer = null;
+    let root = null, types = {};
+    const subs = new Set();
+
+    // Proto’ları GitHub Raw’dan çek ve derle
+    async function initProtos(){
+      if (root) return root;
+      const files = [
+        'https://raw.githubusercontent.com/mexcdevelop/websocket-proto/main/PushDataV3ApiWrapper.proto',
+        'https://raw.githubusercontent.com/mexcdevelop/websocket-proto/main/PublicAggreBookTickerV3Api.proto',
+        'https://raw.githubusercontent.com/mexcdevelop/websocket-proto/main/PublicBookTickerBatchV3Api.proto'
+      ];
+      const texts = await Promise.all(files.map(u=>fetch(u).then(r=>r.text())));
+      // protobufjs: birden fazla .proto içeren tek bir root yarat
+      root = protobuf.parse(texts.join('\n')).root;
+      types.Wrapper = root.lookupType('PushDataV3ApiWrapper');
+      // Aşağıdaki type isimleri dosyada böyle; yoksa lookup başarısızsa alternatifleri deneriz:
+      types.BookAggre = root.lookupType('PublicAggreBookTickerV3Api');
+      try { types.BookSingle = root.lookupType('PublicBookTickerV3Api'); } catch(e){}
+      try { types.BookBatch  = root.lookupType('PublicBookTickerBatchV3Api'); } catch(e){}
+      return root;
+    }
+
+    function connect(){
+      if (ws && (ws.readyState===WebSocket.OPEN || ws.readyState===WebSocket.CONNECTING)) return;
+      ws = new WebSocket(WS_URL);
+      ws.binaryType = 'arraybuffer';
+      ws.onopen = async () => {
+        alive = true;
+        els.spotState.textContent = 'Bağlı';
+        // PING
+        schedulePing();
+
+        // Protobuf hazırla, sonra mevcut sembollere abone ol
+        try { await initProtos(); } catch(e){ els.spotState.textContent='Proto hata: '+(e.message||e); }
+        subs.forEach(sym => subSymbol(sym));
+      };
+      ws.onclose = () => {
+        alive = false;
+        els.spotState.textContent = 'Kapalı (yeniden bağlanıyor...)';
+        clearTimeout(pingTimer);
+        setTimeout(connect, 1200);
+      };
+      ws.onerror = () => { els.spotState.textContent = 'Hata'; };
+      ws.onmessage = onmessage;
+    }
+    function schedulePing(){
+      clearTimeout(pingTimer);
+      const sec = Math.max(5, Number(els.ping.value)||15);
+      pingTimer = setInterval(()=> { try{ ws?.send(JSON.stringify({method:"PING"})); }catch(e){} }, sec*1000);
+    }
+    function subscribe(ch){ try{ ws?.send(JSON.stringify({method:"SUBSCRIPTION", params:[ch]})); }catch(e){} }
+    function unsubscribe(ch){ try{ ws?.send(JSON.stringify({method:"UNSUBSCRIPTION", params:[ch]})); }catch(e){} }
+
+    function channelFor(sym){ return `spot@public.aggre.bookTicker.v3.api.pb@100ms@${sym}`; }
+
+    function subSymbol(sym){
+      if (!alive) return;
+      subscribe(channelFor(sym));
+    }
+    function unsubSymbol(sym){
+      if (!alive) return;
+      unsubscribe(channelFor(sym));
+    }
+
+    async function onmessage(ev){
+      try{
+        if (typeof ev.data === 'string') {
+          // Bazı kontrol mesajları JSON olabilir (abonelik onayı / PONG)
+          const j = JSON.parse(ev.data);
+          if (j?.msg === 'PONG') return;
+          // Eğer beklenmedik JSON bookTicker gelirse:
+          const pb = j?.publicbookticker || j?.publicBookTicker || null;
+          const sym = j?.symbol || null;
+          if (pb && sym) handleBook(sym, pb);
+          return;
+        }
+        // Binary Protobuf
+        await initProtos();
+        const buf = new Uint8Array(ev.data);
+        // Önce wrapper ile dene
+        let obj = null;
+        try { obj = types.Wrapper.decode(buf); }
+        catch(e){
+          // Bazı ortamlarda direkt payload message olabilir
+          try { obj = types.BookAggre.decode(buf); } catch(e2){}
+        }
+        if (!obj) return;
+
+        // Wrapper ise alanları normalize et
+        let sym = obj.symbol || obj.Symbol || '';
+        // Farklı alan adları ihtimaline karşı payload’ı bul
+        let pay = obj.publicbookticker || obj.publicBookTicker || obj.data || obj.body || null;
+        if (!pay && obj.publicBookTickerBatch) pay = obj.publicBookTickerBatch;
+        if (!pay) {
+          // Payload doğrudan top-level olabilir
+          if (obj.bidprice || obj.bidPrice) pay = obj;
+        }
+        if (!sym && obj.channel) {
+          // Kanal stringinden sembolü al (son @ sonrası)
+          const parts = (obj.channel||'').split('@');
+          sym = parts[parts.length-1] || sym;
+        }
+        if (!sym || !pay) return;
+
+        handleBook(sym, pay);
+      } catch(err){
+        // Sessiz geç
+      }
+    }
+
+    function parseNum(x){ const n = Number(x); return Number.isFinite(n)? n: NaN; }
+
+    function handleBook(sym, pb){
+      // Alan isimleri snake/camel/alt olabilir; hepsini deneriz
+      const bidP = parseNum(pb.bidprice ?? pb.bidPrice ?? pb.bid ?? pb.bestBid ?? NaN);
+      const askP = parseNum(pb.askprice ?? pb.askPrice ?? pb.ask ?? pb.bestAsk ?? NaN);
+      const bidQ = parseNum(pb.bidquantity ?? pb.bidQuantity ?? pb.bidQty ?? NaN);
+      const askQ = parseNum(pb.askquantity ?? pb.askQuantity ?? pb.askQty ?? NaN);
+
+      memo[sym] = Object.assign(memo[sym]||{}, {
+        spotBid: bidP, spotAsk: askP, spotBidQ: bidQ, spotAskQ: askQ
+      });
+      recalc(sym);
+    }
+
+    // Dış API
+    return {
+      start(){ connect(); },
+      add(sym){ subs.add(sym); if (alive) subSymbol(sym); },
+      remove(sym){ subs.delete(sym); if (alive) unsubSymbol(sym); }
+    };
+  })();
+
+  // ====== Perp WS (JSON)
+  // Base: wss://contract.mexc.com/edge
+  // Kanallar:
+  //  - sub.depth.full {symbol:"BTC_USDT",limit:5}  → push.depth (bids/asks: [price, vol, ?])  [JSON]
+  //  - Alternatif: sub.ticker {symbol:"BTC_USDT"} → push.ticker (bid1/ask1 fiyat) [JSON]
+  const PerpWS = (() => {
+    const WS_URL = 'wss://contract.mexc.com/edge';
+    let ws = null, alive = false, pingTimer = null;
+    const subs = new Set();
+
+    function connect(){
+      if (ws && (ws.readyState===WebSocket.OPEN || ws.readyState===WebSocket.CONNECTING)) return;
+      ws = new WebSocket(WS_URL);
+      ws.onopen = () => {
+        alive = true;
+        els.perpState.textContent = 'Bağlı';
+        schedulePing();
+        subs.forEach(sym => subDepth(sym));
+      };
+      ws.onclose = () => {
+        alive = false;
+        els.perpState.textContent = 'Kapalı (yeniden bağlanıyor...)';
+        clearTimeout(pingTimer);
+        setTimeout(connect, 1200);
+      };
+      ws.onerror = () => { els.perpState.textContent = 'Hata'; };
+      ws.onmessage = onmessage;
+    }
+    function schedulePing(){
+      clearTimeout(pingTimer);
+      const sec = Math.max(5, Number(els.ping.value)||15);
+      pingTimer = setInterval(()=> { try{ ws?.send(JSON.stringify({method:"ping"})); }catch(e){} }, sec*1000);
+    }
+    function send(obj){ try{ ws?.send(JSON.stringify(obj)); }catch(e){} }
+
+    function perpOf(sym){ return sym.endsWith('USDT') ? sym.slice(0,-4)+'_USDT' : sym; }
+
+    function subDepth(sym){
+      const psym = perpOf(sym);
+      send({method:"sub.depth.full", param:{symbol:psym, limit:5}});
+      // Yedek: ticker (sadece fiyat; qty yok) — gerekirse aç
+      // send({method:"sub.ticker", param:{symbol:psym}});
+    }
+    function unsubDepth(sym){
+      const psym = perpOf(sym);
+      send({method:"usub.depth.full", param:{symbol:psym}});
+      // send({method:"unsub.ticker", param:{symbol:psym}});
+    }
+
+    function onmessage(ev){
+      try{
+        const j = JSON.parse(ev.data);
+        if (j?.channel === 'push.depth') {
+          const sym = (j.symbol||'').replace('_USDT','USDT');
+          const b0 = j?.data?.bids?.[0] || null; // [price, vol, ?]
+          const a0 = j?.data?.asks?.[0] || null;
+          if (!sym || !b0 || !a0) return;
+          const pBid = Number(b0[0]), pBidVol = Number(b0[1]);
+          const pAsk = Number(a0[0]), pAskVol = Number(a0[1]);
+
+          memo[sym] = Object.assign(memo[sym]||{}, {
+            perpBid: pBid, perpAsk: pAsk,
+            perpBidQ: pBidVol, perpAskQ: pAskVol
+          });
+          recalc(sym);
+        }
+        // push.ticker (yedek):
+        if (j?.channel === 'push.ticker') {
+          const sym = (j.symbol||'').replace('_USDT','USDT');
+          const pBid = Number(j?.data?.bid1), pAsk = Number(j?.data?.ask1);
+          if (!Number.isFinite(pBid) || !Number.isFinite(pAsk)) return;
+          memo[sym] = Object.assign(memo[sym]||{}, { perpBid: pBid, perpAsk: pAsk });
+          recalc(sym);
+        }
+      }catch(e){}
+    }
+
+    return {
+      start(){ connect(); },
+      add(sym){ subs.add(sym); if (alive) subDepth(sym); },
+      remove(sym){ subs.delete(sym); if (alive) unsubDepth(sym); }
+    };
+  })();
+
+  // ====== Sembol yönetimi
+  function addSymbolsFromInput(){
+    const raw = (els.symbols.value||'').toUpperCase();
     const arr = raw.split(/[,\s]+/).map(s=>s.trim()).filter(Boolean).filter(s=>s.endsWith('USDT'));
-    arr.forEach(s=>{ if(!list.includes(s)) list.push(s); });
+    arr.forEach(s => { if(!symbols.includes(s)) symbols.push(s); });
+    els.symbols.value='';
     saveSyms();
-    el.symbols.value='';
     ensureRows();
-    tick();
-  };
-  document.getElementById('btnClear').onclick = ()=>{
-    list = []; saveSyms(); ensureRows(); tick();
-  };
-  el.refresh.onchange = start;
+    arr.forEach(s => { SpotWS.add(s); PerpWS.add(s); });
+  }
+  function removeSymbol(sym){
+    symbols = symbols.filter(x=>x!==sym);
+    saveSyms();
+    ensureRows();
+    SpotWS.remove(sym); PerpWS.remove(sym);
+    delete memo[sym];
+  }
 
-  // İlk açılış
-  if(!list.length){ list = ['BTCUSDT','ETHUSDT','XRPUSDT']; saveSyms(); }
+  // ====== Olaylar
+  els.btnAdd.onclick = addSymbolsFromInput;
+  els.btnClear.onclick = () => { const old = symbols.slice(); symbols = []; saveSyms(); ensureRows(); old.forEach(s=>{SpotWS.remove(s);PerpWS.remove(s)}); };
+  els.ping.onchange = () => { /* ping interval UI -> bir sonraki cycle’da alınır */ };
+
+  // ====== Başlat
+  if (!symbols.length) { symbols = ['BTCUSDT','ETHUSDT','XRPUSDT']; saveSyms(); }
   ensureRows();
-  start();
+  SpotWS.start(); PerpWS.start();
+  symbols.forEach(s => { SpotWS.add(s); PerpWS.add(s); });
 })();
 </script>
 </body>
