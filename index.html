@@ -126,12 +126,22 @@
         </div>
         <div class="note" style="margin-top:6px">SPOT ALIŞ filtresi açıkken yalnız Spot ASK &lt; Futures BID durumları listelenir.</div>
       </div>
+      <!-- PROXY AYARLARI -->
+      <div class="card">
+        <label>Proxy (CORS çözümü)</label>
+        <div class="row" style="margin-top:6px">
+          <label class="row"><input type="checkbox" id="useProxy"/> Proxy kullan</label>
+          <input id="proxyUrl" type="text" placeholder="https://<senin-worker>.workers.dev" style="min-width:340px"/>
+          <button id="btnProxyTest" class="btn">Proxy Test</button>
+        </div>
+        <div class="note" style="margin-top:6px">Aktifse tüm <b>REST</b> çağrıları şu şemayla yönlenir: <code>{proxy}/spot/* → api.mexc.com</code>, <code>{proxy}/futures/* → contract.mexc.com</code>. Worker tarafı <b>prefixi</b> strip edip CORS başlıkları eklemelidir.</div>
+      </div>
       <div class="card">
         <label>Bilgi</label>
         <div class="note" style="margin-top:6px">
           Spot: <b>Kırmızı=ASK</b>, Yeşil=BID • Futures: <b>ASK/BID</b> ticker’dan alınır.<br/>
-          Spot en iyi fiyatlar REST <code>/api/v3/ticker/bookTicker</code> ile çekilir (CORS engeli olursa <b>WS index</b> fallback’i kullanılır).<br/>
-          <b>Önemli:</b> <u>Özel (SIGNED) emir uçları</u> tarayıcıda CORS’a takılabilir.
+          Spot en iyi fiyatlar REST <code>/api/v3/ticker/bookTicker</code> ile çekilir (CORS olursa <b>Proxy</b> veya <b>WS index fallback</b> devreye girer).<br/>
+          <b>Önemli:</b> <u>Özel (SIGNED) emir uçları</u> tarayıcıda CORS’a takılacağı için <b>Proxy zorunludur</b>.
         </div>
       </div>
     </div>
@@ -154,7 +164,7 @@
         <label class="row"><input id="botEnable" type="checkbox"/> Bot Aktif</label>
         <label class="row"><input id="dryRun" type="checkbox" checked/> Dry-Run</label>
       </div>
-      <div class="note">⚠️ Emir uçları tarayıcıda CORS’a takılabilir. Aynı anahtar <b>Spot</b> ve <b>Futures</b> için kullanılır (izinleri açık olmalı).</div>
+      <div class="note">⚠️ Emir uçları tarayıcıda CORS’a takılacağından <b>Proxy</b> açık olmalı. Aynı anahtar <b>Spot</b> ve <b>Futures</b> için kullanılır (izinleri açık olmalı).</div>
     </div>
     <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:10px">
       <div><label>Eşik %</label><br><input id="botTh" type="number" step="0.01" value="0.50" style="width:110px"></div>
@@ -207,7 +217,8 @@ const S = {
   lastActionAt:0,
   bot: Object.assign({
     enabled:false,dry:true,th:0.50,lev:10,amt:50,cooldown:60,openType:1,key:'',sec:''
-  }, JSON.parse(localStorage.getItem('mxf:bot')||'{}'))
+  }, JSON.parse(localStorage.getItem('mxf:bot')||'{}')),
+  proxy: Object.assign({use:false,url:''}, JSON.parse(localStorage.getItem('mxf:proxy')||'{}'))
 };
 function saveUI(){
   localStorage.setItem('mxf:speed',S.ui.speed);
@@ -218,6 +229,7 @@ function saveUI(){
 }
 function saveList(){ localStorage.setItem('mxf:list', JSON.stringify([...S.coins])); }
 function saveBot(){ localStorage.setItem('mxf:bot', JSON.stringify(S.bot)); }
+function saveProxy(){ localStorage.setItem('mxf:proxy', JSON.stringify(S.proxy)); }
 
 /* ===== Tema & saat ===== */
 function applyTheme(){ document.body.classList.toggle('light', S.ui.theme==='light'); $('#themeSel').value=S.ui.theme; }
@@ -230,6 +242,19 @@ $('#thresh').value = String(S.ui.thresh);
 $('#toggleTop').checked = !!S.ui.showTop;
 $('#onlySpotAl').checked = !!S.ui.onlySpotAl;
 applyTheme();
+
+// Proxy UI
+$('#useProxy').checked = !!S.proxy.use;
+$('#proxyUrl').value = S.proxy.url || '';
+$('#useProxy').onchange = e=>{ S.proxy.use = e.target.checked; saveProxy(); };
+$('#proxyUrl').onchange = e=>{ S.proxy.url = e.target.value.trim(); saveProxy(); };
+$('#btnProxyTest').onclick = async ()=>{
+  try{
+    const u = effectiveUrl('spot','/api/v3/time');
+    const r = await fetch(u, {method:'GET'});
+    alert('Proxy Test: ' + (r.ok? 'OK':'FAIL ' + r.status));
+  }catch(err){ alert('Proxy Test Hata: '+ err); }
+};
 
 /* coin chipleri */
 function renderChips(){
@@ -279,16 +304,23 @@ $('#fileImport').onchange = async e=>{
   }catch{ alert('Geçersiz dosya'); }
 };
 
+/* ===== REST URL ÇÖZÜMLEME ===== */
+const DIRECT = { spot:'https://api.mexc.com', futures:'https://contract.mexc.com' };
+function effectiveUrl(which, path, query){
+  // which: 'spot' | 'futures'
+  const base = (S.proxy.use && S.proxy.url) ? (S.proxy.url.replace(/\/$/, '') + (which==='spot'? '/spot':'/futures'))
+                                            : DIRECT[which];
+  return base + path + (query? (path.includes('?')? '&':'?') + query : '');
+}
+
 /* ===== WebSocket (Futures + Index) ===== */
 function wsConnect(){
   if(S.ws) try{S.ws.close()}catch{}
   const ws=new WebSocket('wss://contract.mexc.com/edge'); S.ws=ws;
   ws.onopen=()=>{
     ping();
-    // BTC info
     ws.send(JSON.stringify({method:'sub.ticker', param:{symbol:'BTC_USDT'}}));
     ws.send(JSON.stringify({method:'sub.index.price', param:{symbol:'BTC_USDT'}}));
-    // Listede olanlar
     [...S.coins].forEach(sym=>wsSub(sym,true));
   };
   ws.onmessage=(ev)=>{
@@ -310,8 +342,7 @@ function wsConnect(){
         m.index=price; m.indexStr = fmt9(j.data.price);
         m.ts=Date.now(); S.spotIndex.set(s,m);
       }
-    }catch(_){}
-  };
+    }catch(_){}}
   ws.onclose = ()=>setTimeout(wsConnect, 1000);
 }
 function wsSub(sym,on){
@@ -323,12 +354,12 @@ function wsSub(sym,on){
 function ping(){ if(S.ws?.readyState===1){ S.ws.send(JSON.stringify({method:'ping'})); setTimeout(ping,15000);} }
 wsConnect();
 
-/* ===== SPOT bookTicker (REST) — Ask/Bid (CORS olursa fallback: index.price) ===== */
-const SPOT_BASE='https://api.mexc.com';
+/* ===== SPOT bookTicker (REST) — Ask/Bid (Proxy veya Fallback) ===== */
 async function fetchSpotBook(sym){ // sym: "BTC_USDT"
   const symbol = sym.replace('_','');
   try{
-    const r = await fetch(`${SPOT_BASE}/api/v3/ticker/bookTicker?symbol=${symbol}`, {cache:'no-store'});
+    const url = effectiveUrl('spot','/api/v3/ticker/bookTicker', `symbol=${symbol}`);
+    const r = await fetch(url, {cache:'no-store'});
     if(!r.ok) throw new Error('HTTP '+r.status);
     const j = await r.json();
     const bidStr = fmt9(j.bidPrice);
@@ -368,14 +399,15 @@ function computeRows(){
     const spotAsk=sb.ask, spotBid=sb.bid;
 
     let best = null;
-    // SPOT AL (ASK) vs FUTURES SAT (BID)  ==> hedefimiz bu
+    // SPOT AL (ASK) vs FUTURES SAT (BID)
     if(isFinite(spotAsk) && isFinite(futBid) && futBid > spotAsk){
       const pct1 = (futBid - spotAsk) / spotAsk * 100;
       if(pct1 >= thr){
         best = {
           sym, low:spotAsk, high:futBid, pct:pct1,
           lowSrc:'spot', highSrc:'fut',
-          lowStr: sb.askStr, highStr: f.bidStr,
+          lowStr: sb.askStr + (sb.fallback?' (IDX)':'') ,
+          highStr: f.bidStr,
           action: 'FUTURES SHORT',
           futPrice: f.bidStr, spotPrice: sb.askStr
         };
@@ -388,9 +420,10 @@ function computeRows(){
         const alt = {
           sym, low:futAsk, high:spotBid, pct:pct2,
           lowSrc:'fut', highSrc:'spot',
-          lowStr: f.askStr, highStr: sb.bidStr,
+          lowStr: f.askStr,
+          highStr: (S.spotBook.get(sym)?.bidStr||'—') + (S.spotBook.get(sym)?.fallback?' (IDX)':''),
           action: 'FUTURES LONG',
-          futPrice: f.askStr, spotPrice: sb.bidStr
+          futPrice: f.askStr, spotPrice: S.spotBook.get(sym)?.bidStr
         };
         if(!best || alt.pct > best.pct) best = alt;
       }
@@ -407,7 +440,6 @@ function computeRows(){
 function draw(){
   const rows=computeRows();
 
-  // Top card
   const top=$('#topCard');
   if(!S.ui.showTop || rows.length===0){ top.classList.add('hidden'); }
   else{
@@ -420,7 +452,6 @@ function draw(){
     top.classList.add('blink'); setTimeout(()=>top.classList.remove('blink'), 250);
   }
 
-  // Tablo
   const tb=$('#tbody');
   const frag=document.createDocumentFragment();
   for(const r of rows){
@@ -457,7 +488,6 @@ function bindBot(){
     saveBot();
   };
   ['botEnable','dryRun','botTh','leverage','amount','cooldown','openType','apiKey','apiSecret'].forEach(id=> g(id).addEventListener('change', update));
-  // init UI
   g('botEnable').checked = !!S.bot.enabled;
   g('dryRun').checked    = !!S.bot.dry;
   g('botTh').value       = S.bot.th;
@@ -471,7 +501,6 @@ function bindBot(){
 bindBot();
 
 /* ===== HMAC & SIGNED çağrılar ===== */
-const FUT_BASE = 'https://contract.mexc.com';
 async function hmacHex(key, str){
   const cryptoKey = await crypto.subtle.importKey('raw', enc.encode(key), {name:'HMAC', hash:'SHA-256'}, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(str));
@@ -485,7 +514,8 @@ async function mexcFuturesSigned(path, method='POST', bodyObj=null){
   const query = '';
   const toSign = `${reqTime}${method}${path}${body}${query}`;
   const signature = await hmacHex(S.bot.sec, toSign);
-  const res = await fetch(`${FUT_BASE}${path}`, {
+  const url = effectiveUrl('futures', path);
+  const res = await fetch(url, {
     method,
     headers:{ 'Content-Type':'application/json', 'ApiKey': S.bot.key, 'Request-Time': reqTime, 'Signature': signature },
     body: body || undefined
@@ -498,12 +528,12 @@ async function mexcFuturesSigned(path, method='POST', bodyObj=null){
 async function mexcSpotSigned(path, method='POST', paramsObj={}){
   const ts = Date.now();
   const baseParams = Object.assign({ recvWindow: 5000, timestamp: ts }, paramsObj);
-  // Key=val & join (stringify in stable order for okunabilirlik)
   const keys = Object.keys(baseParams);
   const qs = keys.map(k=> `${encodeURIComponent(k)}=${encodeURIComponent(baseParams[k])}`).join('&');
-  const signature = await hmacHex(S.bot.sec, qs); // spot v3: HMAC-SHA256(lowercase hex)
+  const signature = await hmacHex(S.bot.sec, qs);
   const bodyStr = qs + `&signature=${signature}`;
-  const res = await fetch(`${SPOT_BASE}${path}`, {
+  const url = effectiveUrl('spot', path);
+  const res = await fetch(url, {
     method,
     headers: { 'Content-Type':'application/x-www-form-urlencoded', 'X-MEXC-APIKEY': S.bot.key },
     body: bodyStr
@@ -515,7 +545,8 @@ async function mexcSpotSigned(path, method='POST', paramsObj={}){
 /* ===== Futures sözleşme detayları (kontrat büyüklüğü) ===== */
 async function contractDetail(sym){
   try{
-    const r = await fetch(`${FUT_BASE}/api/v1/contract/detail?symbol=${encodeURIComponent(sym)}`, {cache:'no-store'});
+    const url = effectiveUrl('futures','/api/v1/contract/detail', `symbol=${encodeURIComponent(sym)}`);
+    const r = await fetch(url, {cache:'no-store'});
     const j = await r.json();
     const d = j.data && (Array.isArray(j.data)? j.data.find(x=>x.symbol===sym) : j.data);
     if(d) return { contractSize: d.contractSize||0.0001, volUnit:d.volUnit||1, minVol:d.minVol||1 };
@@ -524,30 +555,21 @@ async function contractDetail(sym){
 }
 
 /* ===== Emir yardımcıları ===== */
-// Spot MARKET BUY (quoteOrderQty=USDT)
 async function placeSpotMarketBuy(symbolNoUnderscore, quoteUSDT){
-  const p = {
-    symbol: symbolNoUnderscore,
-    side: 'BUY',
-    type: 'MARKET',
-    quoteOrderQty: quoteUSDT
-  };
+  const p = { symbol: symbolNoUnderscore, side: 'BUY', type: 'MARKET', quoteOrderQty: quoteUSDT };
   return mexcSpotSigned('/api/v3/order', 'POST', p);
 }
 
-// Futures MARKET SHORT (type=5), fiyat alanı zorunlu olduğundan son fiyattan gönder
 async function placeFuturesMarketShort(contractSym, usdtAmt, lastPx, openType, lev){
   const det = await contractDetail(contractSym);
   const coinQty = usdtAmt / lastPx;
   let vol = Math.floor( (coinQty / det.contractSize) / det.volUnit ) * det.volUnit;
   if(vol < det.minVol) vol = det.minVol;
 
-  // Kaldıraç (pozisyon yoksa sembol + positionType ile)
   await mexcFuturesSigned('/api/v1/private/position/change_leverage', 'POST', {
     openType: openType, leverage: lev, symbol: contractSym, positionType: 2 // short
   });
 
-  // Piyasa emri: type=5 (market)
   return mexcFuturesSigned('/api/v1/private/order/submit', 'POST', {
     symbol: contractSym,
     price: lastPx,
@@ -563,6 +585,7 @@ async function placeFuturesMarketShort(contractSym, usdtAmt, lastPx, openType, l
 async function maybeBot(){
   if(!S.bot.enabled) return;
   if(!S.bot.key || !S.bot.sec) return;
+  if(!(S.proxy.use && S.proxy.url)) { console.warn('Proxy kapalı: emir atılamaz.'); return; }
   const nowms = Date.now();
   if(nowms - S.lastActionAt < (S.bot.cooldown*1000)) return;
 
@@ -570,8 +593,6 @@ async function maybeBot(){
   if(rows.length===0) return;
 
   const r = rows[0];
-
-  // Sadece istenen strateji: Spot ASK < Fut BID  ⇒ Spot BUY + Futures SHORT
   if(!(r.lowSrc==='spot' && r.highSrc==='fut' && r.action==='FUTURES SHORT')) return;
   if(r.pct < S.bot.th) return;
 
@@ -580,24 +601,20 @@ async function maybeBot(){
   const last = num(S.fut.get(symFut)?.last ?? S.fut.get(symFut)?.bid1 ?? S.fut.get(symFut)?.ask1);
 
   if(S.bot.dry){
-    // Sadece logla
     console.log(`[DRY] ${symSpot}: Spot MARKET BUY ${S.bot.amt} USDT + Futures MARKET SHORT @ ~${last}`);
     S.lastActionAt = nowms;
     return;
   }
 
   try{
-    // 1) Spot MARKET BUY (quoteOrderQty = USDT)
     const spotRes = await placeSpotMarketBuy(symSpot, S.bot.amt);
-
-    // 2) Futures MARKET SHORT (aynı büyüklükle)
     const futRes  = await placeFuturesMarketShort(symFut, S.bot.amt, last, S.bot.openType, S.bot.lev);
-
     S.lastActionAt = nowms;
-    alert(`Emirler gönderildi:\nSpot BUY ${symSpot} ~${S.bot.amt} USDT (orderId=${spotRes?.orderId||'?'})\nFutures SHORT ${symFut} (orderId=${futRes?.data||'?'})`);
+    alert(`Emirler gönderildi:
+Spot BUY ${symSpot} ~${S.bot.amt} USDT (orderId=${spotRes?.orderId||'?'})
+Futures SHORT ${symFut} (orderId=${futRes?.data||'?'})`);
   }catch(err){
-    console.error('Emir hatası (muhtemel CORS veya parametre):', err);
-    // İsteğe bağlı: burada geri alma (hedge kapatma) akışı uygulanabilir.
+    console.error('Emir hatası (CORS/proxy/parametre?):', err);
   }
 }
 
