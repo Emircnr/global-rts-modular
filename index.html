@@ -3,39 +3,44 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>MEXC Futures ↔ Spot — En İyi Tahta Farkı + Otomatik Bot (Proxy Destekli)</title>
+<title>MEXC Futures ↔ Spot — En İyi Tahta Farkı (Proxy Yok, Tek Dosya)</title>
 <style>
   :root{
-    --bg:#0a0f1c; --fg:#e6edf7; --muted:#9fb0c9; --panel:#0e1527; --panel2:#111a2e; --border:#1a2a4a;
-    --accent:#22c55e; --accent2:#06b6d4; --warn:#f59e0b; --danger:#ef4444;
-    --spot:#16a34a; --fut:#f59e0b;
-    --fontRow:18px; --padY:12px; --padX:12px; --gap:10px; --radius:14px; --maxW:1240px;
-    --shadow:0 10px 25px rgba(0,0,0,.25);
+    --bg:#0b1220; --fg:#e6edf7; --muted:#9fb0c9; --panel:#0f1629; --panel2:#101a30; --border:#1a2a4a;
+    --acc:#7c3aed; --spot:#16a34a; --fut:#f59e0b; --danger:#ef4444; --ok:#22c55e;
+    --fontRow:18px; --padY:12px; --padX:12px; --gap:8px; --radius:14px; --maxW:1280px;
+    --shadow:0 10px 30px rgba(0,0,0,.25);
   }
   body.light{
-    --bg:#ffffff; --fg:#0b1220; --muted:#556176; --panel:#f3f6fb; --panel2:#ffffff; --border:#d8e1ef;
-    --spot:#16a34a; --fut:#d97706; --shadow:0 8px 18px rgba(0,0,0,.08)
+    --bg:#ffffff; --fg:#0b1220; --muted:#5b667d; --panel:#f3f6fb; --panel2:#ffffff; --border:#d8e1ef;
+    --acc:#6d28d9; --spot:#16a34a; --fut:#d97706; --danger:#dc2626; --ok:#16a34a;
+    --shadow:0 10px 22px rgba(2,6,23,.10);
   }
   *{box-sizing:border-box}
-  body{margin:0;background:radial-gradient(1200px 600px at 20% -10%, #10204344, transparent),var(--bg);color:var(--fg);font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
-  header{position:sticky;top:0;z-index:5;padding:14px 16px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,var(--panel),transparent);backdrop-filter:saturate(1.2) blur(4px)}
-  .wrap{max-width:var(--maxW);margin:0 auto}
+  body{margin:0;background:radial-gradient(1200px 600px at 20% -50%, rgba(124,58,237,.15), transparent 60%), var(--bg);color:var(--fg);
+       font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+  header{border-bottom:1px solid var(--border);background:linear-gradient(180deg,var(--panel),transparent)}
+  .wrap{max-width:var(--maxW);margin:0 auto;padding:14px 14px}
   .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
   h1{margin:0;font-size:20px;letter-spacing:.2px}
-  .legend{display:flex;gap:10px;align-items:center}
+  .brand{display:flex;align-items:center;gap:10px}
+  .badge{font-size:12px;color:var(--muted)}
+  .legend{display:flex;gap:12px;align-items:center;border:1px solid var(--border);padding:6px 10px;border-radius:999px;background:var(--panel2)}
   .dot{width:10px;height:10px;border-radius:50%}
   .spot{background:var(--spot)} .fut{background:var(--fut)}
-  .chip{background:var(--panel2);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-size:12px;color:var(--muted);display:inline-flex;gap:8px;align-items:center}
-  .btn{border:1px solid var(--border);background:var(--panel2);color:var(--fg);padding:10px 14px;border-radius:12px;cursor:pointer;box-shadow:var(--shadow);transition:.2s border,.2s transform}
-  .btn:hover{border-color:var(--accent);transform:translateY(-1px)}
-  .btn.primary{background:linear-gradient(180deg,#22c55e,#16a34a);border-color:#16a34a;color:#06120a;font-weight:700}
-  .btn.ghost{background:transparent}
-  .btn.warn{background:linear-gradient(180deg,#f59e0b,#d97706);border-color:#d97706;color:#160b06;font-weight:700}
+  .chip{background:var(--panel2);border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted);display:inline-flex;gap:8px;align-items:center}
+  .btn{border:1px solid var(--border);background:linear-gradient(180deg,var(--panel2),rgba(255,255,255,.02));
+       color:var(--fg);padding:10px 14px;border-radius:12px;cursor:pointer;box-shadow:var(--shadow);transition:.15s}
+  .btn:hover{border-color:var(--acc);transform:translateY(-1px)}
+  .btn.acc{background:linear-gradient(180deg,rgba(124,58,237,.25),transparent);border-color:rgba(124,58,237,.45)}
+  .btn.stop{background:linear-gradient(180deg,rgba(239,68,68,.18),transparent);border-color:rgba(239,68,68,.5)}
   input,select{background:var(--panel2);border:1px solid var(--border);color:var(--fg);border-radius:12px;padding:10px 12px}
   label{font-size:12px;color:var(--muted)}
-  .controls{display:grid;grid-template-columns:repeat(6,minmax(200px,1fr));gap:12px;margin-top:12px}
-  .card{background:var(--panel2);border:1px solid var(--border);border-radius:16px;padding:12px;box-shadow:var(--shadow)}
-  #topCard{margin:12px 0;padding:14px 16px;border-radius:18px;background:linear-gradient(180deg,var(--panel2),#0a1223);border:1px solid var(--border);display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+  .grid{display:grid;gap:12px}
+  .g-6{grid-template-columns:repeat(6,minmax(180px,1fr))}
+  .card{background:linear-gradient(180deg,var(--panel2),rgba(255,255,255,.02));border:1px solid var(--border);
+        border-radius:16px;padding:12px;box-shadow:var(--shadow)}
+  #topCard{margin:14px 0;padding:14px;border-radius:18px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
   #topCard.hidden{display:none}
   #topAction{font-weight:900}
   .mono{font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -47,28 +52,31 @@
   .alCell,.satCell,.pctCell{text-align:center;font-weight:800}
   .src-spot{background:var(--spot) !important;color:#091220}
   .src-fut{background:var(--fut) !important;color:#111}
-  .pctPos{color:#22c55e;font-weight:800} .pctNeg{color:#ef4444;font-weight:800}
-  .blink{animation:blink 1s ease-in-out 1} @keyframes blink{50%{opacity:.55}}
+  .pctPos{color:var(--ok);font-weight:900}
+  .pctNeg{color:var(--danger);font-weight:900}
+  .blink{animation:blink .9s ease-in-out 1}
+  @keyframes blink{50%{opacity:.55}}
   .note{color:var(--muted);font-size:12px}
   .chips{display:flex;flex-wrap:wrap;gap:8px}
   .chipx{background:var(--panel2);border:1px solid var(--border);border-radius:999px;padding:6px 10px;display:inline-flex;gap:8px;align-items:center}
   .chipx b{letter-spacing:.3px}
   .chipx button{all:unset;cursor:pointer;color:var(--muted)}
-  .good{color:#22c55e;font-weight:900} .bad{color:#ef4444;font-weight:900}
-  .status{font-weight:700}
-  .status.idle{color:#ddd}
-  .status.run{color:#05210f;background:linear-gradient(180deg,#22c55e,#16a34a);border-color:#16a34a}
+  .statusDot{width:10px;height:10px;border-radius:50%;background:#999}
+  .on{background:var(--ok)} .off{background:#9ca3af}
 </style>
 </head>
 <body>
 <header>
   <div class="wrap">
-    <div class="row">
-      <h1>MEXC Futures ↔ Spot (Tahta 1) Fark (USDT)</h1>
-      <div class="legend chip"><span class="dot spot"></span>SPOT (Kırmızı=ASK, Yeşil=BID) <span class="dot fut"></span>FUTURES (Kırmızı=ASK, Yeşil=BID)</div>
-      <div class="chip">BTC Futures (bid/ask): <b id="btc" class="mono">—</b></div>
-      <div class="chip">Saat: <span id="clock" class="mono">—:—:—</span></div>
-      <div style="margin-left:auto" class="row">
+    <div class="row" style="justify-content:space-between">
+      <div class="brand row">
+        <h1>MEXC Futures ↔ Spot (Tahta 1) Fark (USDT)</h1>
+        <span class="badge">Canlı akış · tek dosya · proxy-ready</span>
+        <div class="legend"><span class="dot spot"></span>SPOT (Kırmızı=ASK, Yeşil=BID) <span class="dot fut"></span>FUTURES (Kırmızı=ASK, Yeşil=BID)</div>
+      </div>
+      <div class="row">
+        <div class="chip">BTC Futures (bid/ask): <b id="btc" class="mono">—</b></div>
+        <div class="chip">Saat: <span id="clock" class="mono">—:—:—</span></div>
         <label>Tema</label>
         <select id="themeSel"><option value="dark">Koyu</option><option value="light">Beyaz</option></select>
       </div>
@@ -80,27 +88,28 @@
       <span id="topAction" class="mono">—</span>
       <span id="topPrice" class="mono" style="font-weight:700">—</span>
       <span id="topPct" class="mono" style="font-weight:800">—</span>
-      <span class="note">Kural: Spot ASK ↔ Futures BID/ASK. BID&gt;ASK ⇒ <b>FUTURES SHORT</b> • ASK&lt;BID ⇒ <b>FUTURES LONG</b>.</span>
+      <span class="note">Kural: <b>Spot ASK</b> ↔ <b>Futures BID</b>. <b>BID &gt; ASK</b> ⇒ <b>FUTURES SHORT + SPOT BUY</b>.</span>
     </div>
 
     <!-- Kontroller -->
-    <div class="controls">
-      <!-- Sembol listesi -->
+    <div class="grid g-6">
+      <!-- İzlenecek coinler -->
       <div class="card">
-        <label for="addSym">Coin ekle (örn: <b>ETH</b> ya da <b>ETH_USDT</b>)</label>
+        <label>Coin ekle (örn: <b>ETH</b> ya da <b>ETH_USDT</b>)</label>
         <div class="row" style="margin-top:6px">
           <input id="addSym" type="text" placeholder="Sembol"/>
           <button id="btnAdd" class="btn">Ekle</button>
-          <button id="btnClear" class="btn ghost">Tümünü Sil</button>
+          <button id="btnClear" class="btn">Tümünü Sil</button>
         </div>
         <div id="chipWrap" class="chips" style="margin-top:8px"></div>
-        <div class="note" style="margin-top:6px">Sadece eklediklerin izlenir; liste kayıtlı kalır.</div>
+        <div class="note" style="margin-top:6px">Sadece eklediklerin izlenir; liste yerelde kayıtlıdır.</div>
       </div>
 
-      <!-- Görsel yenileme & tablo eşiği -->
+      <!-- Görsel yenileme -->
       <div class="card">
-        <label for="speed">Görsel yenileme</label>
-        <select id="speed" style="width:100%">
+        <label>Görsel yenileme</label>
+        <select id="speed" style="margin-top:6px">
+          <option value="10">0.01 sn</option>
           <option value="25">0.025 sn</option>
           <option value="50">0.05 sn</option>
           <option value="100">0.1 sn</option>
@@ -111,111 +120,116 @@
         <div class="note" style="margin-top:6px">WS sürekli akar; bu sadece DOM güncelleme hızıdır.</div>
       </div>
 
-      <div class="card">
-        <label for="thresh">Tablo eşiği (%)</label>
-        <input id="thresh" type="number" step="0.01" value="0.10"/>
-        <div class="note" style="margin-top:6px">Bu yüzdeyi aşan farklar listelenir (AL taban fiyatına göre).</div>
-      </div>
-
       <!-- Görünüm -->
       <div class="card">
         <label>Görünüm</label>
-        <div style="margin-top:6px" class="row">
+        <div class="row" style="margin-top:6px">
           <label class="row"><input type="checkbox" id="toggleTop" checked/> En yüksek fark kartı</label>
           <label class="row"><input type="checkbox" id="onlySpotAl"/> Sadece <b>SPOT ALIŞ</b> olanlar</label>
         </div>
-        <div class="note" style="margin-top:6px">SPOT ALIŞ filtresi açıkken yalnız Spot ASK &lt; Futures BID durumları listelenir.</div>
+        <div class="note" style="margin-top:6px">SPOT ALIŞ filtresi: sadece <b>Spot ASK &lt; Futures BID</b> durumlarını listeler.</div>
       </div>
 
-      <!-- PROXY AYARLARI -->
-      <div class="card">
+      <!-- Bot (minimum ayarlar + start/stop) -->
+      <div class="card" style="grid-column:span 3">
+        <div class="row" style="justify-content:space-between">
+          <div class="row">
+            <div class="statusDot off" id="botDot"></div>
+            <b>Bot Durumu:</b> <span id="botState">Kapalı</span>
+          </div>
+          <div class="row">
+            <button id="btnStart" class="btn acc">Başlat</button>
+            <button id="btnStop" class="btn stop">Durdur</button>
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:12px">
+          <div><label>Tutar (USDT)</label><br><input id="amount" type="number" min="5" step="1" value="50" style="width:140px"></div>
+          <div><label>Eşik %</label><br><input id="botTh" type="number" step="0.01" value="0.50" style="width:120px"></div>
+          <div><label>Kaldıraç</label><br><input id="leverage" type="number" min="1" max="125" step="1" value="10" style="width:120px"></div>
+          <div><label>Marjin</label><br>
+            <select id="openType" style="width:140px">
+              <option value="1" selected>Isolated</option>
+              <option value="2">Cross</option>
+            </select>
+          </div>
+          <div><label>Dry-Run</label><br><select id="dryRun" style="width:120px"><option value="false" selected>Kapalı</option><option value="true">Açık</option></select></div>
+          <div><label>Cooldown (sn)</label><br><input id="cooldown" type="number" min="0" step="1" value="60" style="width:120px"></div>
+        </div>
+        <div class="note" style="margin-top:6px">Koşul: <b>Spot ASK</b> &lt; <b>Futures BID</b> ve fark ≥ Eşik % ⇒ eşzamanlı <b>Spot MARKET BUY</b> + <b>Futures MARKET SHORT</b>.</div>
+      </div>
+
+      <!-- Proxy (CORS çözümü) -->
+      <div class="card" style="grid-column:span 3">
         <label>Proxy (CORS çözümü)</label>
         <div class="row" style="margin-top:6px">
           <label class="row"><input type="checkbox" id="useProxy"/> Proxy kullan</label>
-          <input id="proxyUrl" type="text" placeholder="https://&lt;senin-worker&gt;.workers.dev" style="min-width:280px"/>
+          <input id="proxyUrl" type="text" placeholder="https://<senin-worker>.workers.dev" style="min-width:340px"/>
           <button id="btnProxyTest" class="btn">Proxy Test</button>
         </div>
-        <div class="note" style="margin-top:6px">Aktifse tüm <b>REST</b> çağrıları şu şemayla yönlenir: <code>{proxy}/spot/* → api.mexc.com</code>, <code>{proxy}/futures/* → contract.mexc.com</code>. Worker tarafı <b>prefixi</b> strip edip CORS başlıkları eklemelidir.</div>
-      </div>
-
-      <!-- LİSTE DIŞA/İÇE AKTAR -->
-      <div class="card">
-        <label>Listeyi dışa/içe aktar</label>
-        <div class="row" style="margin-top:6px">
-          <button id="btnExport" class="btn">Dışa aktar</button>
-          <button id="btnImport" class="btn">İçe al</button>
-          <input id="fileImport" type="file" accept="application/json" style="display:none"/>
+        <div class="note" style="margin-top:6px">
+          Aktifse tüm <b>REST</b> çağrıları şu şemayla yönlenir:
+          <code>{proxy}/spot/* → api.mexc.com</code>, <code>{proxy}/futures/* → contract.mexc.com</code>.<br/>
+          Worker tarafı <b>prefix</b>’i strip edip CORS başlıkları eklemelidir. Emir uçları için tarayıcıda <b>Proxy zorunludur</b>.
         </div>
-      </div>
-
-      <!-- BOT AYARLARI (minimal) -->
-      <div class="card" style="grid-column:span 2">
-        <div class="row" style="justify-content:space-between">
-          <div class="row" style="gap:8px">
-            <button id="btnStart" class="btn primary">Botu Başlat</button>
-            <button id="btnStop" class="btn warn">Durdur</button>
-          </div>
-          <span id="botStatus" class="chip status idle">Durum: Kapalı</span>
-        </div>
-        <div class="row" style="margin-top:10px;gap:12px;flex-wrap:wrap">
-          <div style="min-width:180px"><label>İşlem Tutarı (USDT)</label><br><input id="amount" type="number" min="5" step="1" value="50" style="width:180px"></div>
-          <div style="min-width:180px"><label>Bot Eşiği (%)</label><br><input id="botTh" type="number" step="0.01" value="0.50" style="width:180px"></div>
-          <div style="min-width:160px"><label>Kaldıraç</label><br><input id="leverage" type="number" min="1" max="125" step="1" value="10" style="width:160px"></div>
-          <div style="min-width:160px"><label>Marjin</label><br>
-            <label class="row" style="gap:6px"><input id="isolated" type="checkbox" checked/> Isolated (kapalıysa Cross)</label>
-          </div>
-        </div>
-        <div class="row" style="margin-top:10px;gap:12px;flex-wrap:wrap">
+        <div class="row" style="margin-top:10px">
           <div><label>MEXC API Key</label><br><input id="apiKey" type="text" placeholder="..." style="min-width:280px"></div>
           <div><label>MEXC API Secret</label><br><input id="apiSecret" type="password" placeholder="..." style="min-width:280px"></div>
         </div>
-        <div class="note" style="margin-top:8px">Şart: <b>Spot ucuz</b> (ASK) & <b>Futures pahalı</b> (BID) ve fark <b>Bot Eşiği</b> üstündeyse → <b>eşzamanlı</b> Spot MARKET BUY (ASK civarı) + Futures MARKET SHORT (BID civarı). Spot fiyatı <u>index fallback</u> ise bot emir atmaz.</div>
+      </div>
+
+      <!-- Bilgi -->
+      <div class="card" style="grid-column:span 6">
+        <label>Bilgi</label>
+        <div class="note" style="margin-top:6px">
+          Spot en iyi fiyatlar REST <code>/api/v3/ticker/bookTicker</code> ile çekilir (CORS olursa Proxy kullanılır; olmadı WS index fallback).<br/>
+          Futures bid/ask ve index WS’tan akıyor. Net kârlılık komisyon, slipaj, funding vb. kalemlere bağlıdır.
+        </div>
       </div>
     </div>
   </div>
 </header>
 
-<main class="wrap" style="padding:14px 0 24px">
+<main class="wrap" style="padding:12px 0">
   <table>
     <thead>
       <tr><th>Coin</th><th>AL (Ucuz)</th><th>SAT (Pahalı)</th><th>% Fark</th></tr>
     </thead>
     <tbody id="tbody"></tbody>
   </table>
-  <p class="note" style="margin:10px 2px">Net kârlılık komisyon, slipaj, funding vb. faktörlere bağlıdır.</p>
+  <p class="note" style="margin:10px 2px">Not: Fiyatlar hızlı değişir. Emirler <b>MARKET</b> gönderilir; beklenenden farklı fill olabilir.</p>
 </main>
 
 <script>
-/* ===== Yardımcılar ===== */
-const $ = s=>document.querySelector(s);
-const now=()=>new Date().toLocaleTimeString('tr-TR',{hour12:false});
+/* ===== Kısa yardımcılar ===== */
+const $ = s => document.querySelector(s);
+const now = () => new Date().toLocaleTimeString('tr-TR',{hour12:false});
 const enc = new TextEncoder();
 const num = v => (typeof v === 'number') ? v : parseFloat(v);
-
-function fmt9(v){ const n = (typeof v === 'string') ? parseFloat(v) : v; return isFinite(n)? n.toFixed(9) : '—'; }
+function fmt9(v){ const n = (typeof v === 'string') ? parseFloat(v) : v; if(!isFinite(n)) return '—'; return n.toFixed(9); }
 function pct(p){ return isFinite(p) ? ((p>=0?'+':'') + p.toFixed(3) + '%') : '—'; }
 
 /* ===== Durum ===== */
 const S = {
-  coins: new Set(JSON.parse(localStorage.getItem('mxf:list')||'[]')),
-  spotBook: new Map(),   // {bid, ask, bidStr, askStr, ts, fallback}
-  spotIndex: new Map(),
-  fut: new Map(),        // {bid1, ask1, bidStr, askStr, last, lastStr, ts}
+  coins: new Set(JSON.parse(localStorage.getItem('mxf:list')||'[]')), // "BTC_USDT"
+  spotBook: new Map(),   // key: "BTC_USDT" -> {bid, ask, bidStr, askStr, ts, fallback?}
+  spotIndex: new Map(),  // WS index fallback
+  fut: new Map(),        // key: "BTC_USDT" -> {bid1, ask1, bidStr, askStr, last, lastStr, ts}
   ui: {
     speed:+(localStorage.getItem('mxf:speed')||250),
-    thresh:+(localStorage.getItem('mxf:thresh')||0.10),
     theme: localStorage.getItem('mxf:theme') || 'dark',
     showTop: JSON.parse(localStorage.getItem('mxf:showTop')||'true'),
     onlySpotAl: JSON.parse(localStorage.getItem('mxf:onlySpotAl')||'false')
   },
   timers:{ render:null, clock:null, spot:null },
   ws:null,
+  lastActionAt:0,
   bot: Object.assign({
-    enabled:false, busy:false, th:0.50, lev:10, amt:50, openType:1, key:'', sec:''
+    enabled:false,dry:false,th:0.50,lev:10,amt:50,cooldown:60,openType:1,key:'',sec:''
   }, JSON.parse(localStorage.getItem('mxf:bot')||'{}')),
   proxy: Object.assign({use:false,url:''}, JSON.parse(localStorage.getItem('mxf:proxy')||'{}'))
 };
-function saveUI(){ localStorage.setItem('mxf:speed',S.ui.speed); localStorage.setItem('mxf:thresh',S.ui.thresh); localStorage.setItem('mxf:theme',S.ui.theme); localStorage.setItem('mxf:showTop',S.ui.showTop); localStorage.setItem('mxf:onlySpotAl',S.ui.onlySpotAl); }
+function saveUI(){ localStorage.setItem('mxf:speed',S.ui.speed); localStorage.setItem('mxf:theme',S.ui.theme);
+  localStorage.setItem('mxf:showTop',S.ui.showTop); localStorage.setItem('mxf:onlySpotAl',S.ui.onlySpotAl); }
 function saveList(){ localStorage.setItem('mxf:list', JSON.stringify([...S.coins])); }
 function saveBot(){ localStorage.setItem('mxf:bot', JSON.stringify(S.bot)); }
 function saveProxy(){ localStorage.setItem('mxf:proxy', JSON.stringify(S.proxy)); }
@@ -223,11 +237,10 @@ function saveProxy(){ localStorage.setItem('mxf:proxy', JSON.stringify(S.proxy))
 /* ===== Tema & saat ===== */
 function applyTheme(){ document.body.classList.toggle('light', S.ui.theme==='light'); $('#themeSel').value=S.ui.theme; }
 $('#themeSel').onchange = e=>{ S.ui.theme=e.target.value; saveUI(); applyTheme(); };
-S.timers.clock=setInterval(()=>$('#clock').textContent=now(), 1000);
+S.timers.clock = setInterval(()=>$('#clock').textContent=now(), 1000);
 
 /* ===== UI bağlama ===== */
 $('#speed').value = String(S.ui.speed);
-$('#thresh').value = String(S.ui.thresh);
 $('#toggleTop').checked = !!S.ui.showTop;
 $('#onlySpotAl').checked = !!S.ui.onlySpotAl;
 applyTheme();
@@ -237,136 +250,384 @@ $('#useProxy').checked = !!S.proxy.use;
 $('#proxyUrl').value = S.proxy.url || '';
 $('#useProxy').onchange = e=>{ S.proxy.use = e.target.checked; saveProxy(); };
 $('#proxyUrl').onchange = e=>{ S.proxy.url = e.target.value.trim(); saveProxy(); };
-$('#btnProxyTest').onclick = async ()=>{ try{ const u = effectiveUrl('spot','/api/v3/time'); const r = await fetch(u); alert('Proxy Test: ' + (r.ok? 'OK':'FAIL '+r.status)); }catch(err){ alert('Proxy Test Hata: '+err); } };
+$('#btnProxyTest').onclick = async ()=>{
+  try{
+    const u = effectiveUrl('spot','/api/v3/time');
+    const r = await fetch(u, {method:'GET'});
+    alert('Proxy Test: ' + (r.ok? 'OK':'FAIL ' + r.status));
+  }catch(err){
+    alert('Proxy Test Hata: '+ err);
+  }
+};
 
-// Bot minimal UI
-$('#amount').value = S.bot.amt;
-$('#botTh').value = S.bot.th;
-$('#leverage').value = S.bot.lev;
-$('#isolated').checked = (S.bot.openType===1);
-
-$('#btnStart').onclick = ()=>{ S.bot.enabled=true; saveBot(); setStatus(true); };
-$('#btnStop').onclick = ()=>{ S.bot.enabled=false; saveBot(); setStatus(false); };
-
-['amount','botTh','leverage','isolated','apiKey','apiSecret'].forEach(id=>{
-  const el = document.getElementById(id);
-  el.addEventListener('change', ()=>{
-    S.bot.amt = parseFloat($('#amount').value||'0')||0;
-    S.bot.th  = parseFloat($('#botTh').value||'0')||0;
-    S.bot.lev = parseInt($('#leverage').value||'1')||1;
-    S.bot.openType = $('#isolated').checked ? 1 : 2;
-    S.bot.key = $('#apiKey').value.trim();
-    S.bot.sec = $('#apiSecret').value.trim();
-    saveBot();
+// Coin chipleri
+function renderChips(){
+  const wrap = $('#chipWrap'); wrap.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  [...S.coins].forEach(sym=>{
+    const d = document.createElement('div');
+    d.className='chipx';
+    const b = document.createElement('b');
+    b.textContent = sym.replace('_','');
+    const x = document.createElement('button');
+    x.textContent='✕';
+    x.onclick=()=>{ S.coins.delete(sym); saveList(); renderChips(); draw(); wsSub(sym,false); };
+    d.appendChild(b); d.appendChild(x); frag.appendChild(d);
   });
-});
-
-function setStatus(run){ const st=$('#botStatus'); st.textContent = 'Durum: ' + (run? 'Çalışıyor':'Kapalı'); st.classList.toggle('run', !!run); st.classList.toggle('idle', !run); }
-setStatus(S.bot.enabled);
-
-/* coin chipleri */
-function renderChips(){ const wrap = $('#chipWrap'); wrap.innerHTML = ''; const frag = document.createDocumentFragment();
-  [...S.coins].forEach(sym=>{ const d = document.createElement('div'); d.className='chipx'; const b = document.createElement('b'); b.textContent = sym.replace('_',''); const x = document.createElement('button'); x.textContent='✕'; x.onclick=()=>{ S.coins.delete(sym); saveList(); renderChips(); draw(); wsSub(sym,false); }; d.appendChild(b); d.appendChild(x); frag.appendChild(d); }); wrap.appendChild(frag); }
+  wrap.appendChild(frag);
+}
 renderChips();
 
-$('#btnAdd').onclick = ()=>{ const raw=$('#addSym').value.trim().toUpperCase(); if(!raw) return; let sym = raw.includes('_')? raw : raw.replace('USDT','_USDT'); sym = sym.replace(/[^A-Z0-9_]/g,''); if(!sym.endsWith('_USDT')) return alert('Sadece *_USDT sembolleri.'); if(!S.coins.has(sym)){ S.coins.add(sym); saveList(); renderChips(); wsSub(sym,true); } $('#addSym').value=''; draw(); };
-$('#btnClear').onclick = ()=>{ if(confirm('Tüm coinleri sil?')){ [...S.coins].forEach(s=>wsSub(s,false)); S.coins.clear(); saveList(); renderChips(); draw(); } };
+$('#btnAdd').onclick = ()=>{
+  const raw=$('#addSym').value.trim().toUpperCase();
+  if(!raw) return;
+  let sym = raw.includes('_')? raw : raw.replace('USDT','_USDT');
+  sym = sym.replace(/[^A-Z0-9_]/g,'');
+  if(!sym.endsWith('_USDT')) return alert('Sadece *_USDT sembolleri.');
+  if(!S.coins.has(sym)){ S.coins.add(sym); saveList(); renderChips(); wsSub(sym,true); }
+  $('#addSym').value=''; draw();
+};
+$('#btnClear').onclick = ()=>{
+  if(confirm('Tüm coinleri sil?')){
+    [...S.coins].forEach(s=>wsSub(s,false));
+    S.coins.clear(); saveList(); renderChips(); draw();
+  }
+};
+
 $('#speed').onchange = e=>{ S.ui.speed=+e.target.value; saveUI(); tickRender(); };
-$('#thresh').onchange = e=>{ S.ui.thresh=+e.target.value; saveUI(); draw(); };
 $('#toggleTop').onchange = e=>{ S.ui.showTop = e.target.checked; saveUI(); draw(); };
 $('#onlySpotAl').onchange = e=>{ S.ui.onlySpotAl = e.target.checked; saveUI(); draw(); };
 
-// Dışa/içe aktar
-$('#btnExport').onclick = ()=>{ const data = JSON.stringify({coins:[...S.coins]}, null, 2); const blob = new Blob([data], {type:'application/json'}); const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='mexc-list.json'; a.click(); URL.revokeObjectURL(a.href); };
-$('#btnImport').onclick = ()=> $('#fileImport').click();
-$('#fileImport').onchange = async e=>{ const f=e.target.files?.[0]; if(!f) return; try{ const txt=await f.text(); const obj=JSON.parse(txt); if(Array.isArray(obj.coins)) obj.coins.forEach(s=>{ if(!S.coins.has(s)) S.coins.add(s); }); saveList(); renderChips(); draw(); }catch{ alert('Geçersiz dosya'); } };
-
 /* ===== REST URL ÇÖZÜMLEME ===== */
 const DIRECT = { spot:'https://api.mexc.com', futures:'https://contract.mexc.com' };
-function effectiveUrl(which, path, query){ const base = (S.proxy.use && S.proxy.url) ? (S.proxy.url.replace(/\/$/, '') + (which==='spot'? '/spot':'/futures')) : DIRECT[which]; return base + path + (query? (path.includes('?')? '&':'?') + query : ''); }
+function effectiveUrl(which, path, query){
+  const base = (S.proxy.use && S.proxy.url)
+    ? (S.proxy.url.replace(/\/$/,'') + (which==='spot'? '/spot':'/futures'))
+    : DIRECT[which];
+  return base + path + (query? (path.includes('?')? '&':'?') + query : '');
+}
 
 /* ===== WebSocket (Futures + Index) ===== */
-function wsConnect(){ if(S.ws) try{S.ws.close()}catch{}; const ws=new WebSocket('wss://contract.mexc.com/edge'); S.ws=ws; ws.onopen=()=>{ ping(); ws.send(JSON.stringify({method:'sub.ticker', param:{symbol:'BTC_USDT'}})); ws.send(JSON.stringify({method:'sub.index.price', param:{symbol:'BTC_USDT'}})); [...S.coins].forEach(sym=>wsSub(sym,true)); };
-  ws.onmessage=(ev)=>{ try{ const j=JSON.parse(ev.data); if(j.channel==='push.ticker' && j.data){ const s=j.symbol; const d=j.data; const last=num(d.lastPrice), bid1=num(d.bid1), ask1=num(d.ask1); const m=S.fut.get(s)||{}; m.last=last; m.lastStr=fmt9(d.lastPrice); m.bid1=bid1; m.bidStr=fmt9(d.bid1); m.ask1=ask1; m.askStr=fmt9(d.ask1); m.ts=Date.now(); S.fut.set(s,m); if(s==='BTC_USDT') $('#btc').textContent = `${m.bidStr || '—'} / ${m.askStr || '—'} USDT`; }
-    if(j.channel==='push.index.price' && j.data){ const s=j.symbol; const price=num(j.data.price); const m=S.spotIndex.get(s)||{}; m.index=price; m.indexStr=fmt9(j.data.price); m.ts=Date.now(); S.spotIndex.set(s,m); } }catch(_){}};
-  ws.onclose = ()=>setTimeout(wsConnect, 1200);
+function wsConnect(){
+  if(S.ws) try{S.ws.close()}catch{}
+  const ws=new WebSocket('wss://contract.mexc.com/edge');
+  S.ws=ws;
+  ws.onopen=()=>{
+    ping();
+    ws.send(JSON.stringify({method:'sub.ticker', param:{symbol:'BTC_USDT'}}));
+    ws.send(JSON.stringify({method:'sub.index.price', param:{symbol:'BTC_USDT'}}));
+    [...S.coins].forEach(sym=>wsSub(sym,true));
+  };
+  ws.onmessage=(ev)=>{
+    try{
+      const j=JSON.parse(ev.data);
+      if(j.channel==='push.ticker' && j.data){
+        const s=j.symbol, d=j.data;
+        const last=num(d.lastPrice), bid1=num(d.bid1), ask1=num(d.ask1);
+        const m=S.fut.get(s)||{};
+        m.last=last; m.lastStr=fmt9(d.lastPrice);
+        m.bid1=bid1; m.bidStr=fmt9(d.bid1);
+        m.ask1=ask1; m.askStr=fmt9(d.ask1);
+        m.ts=Date.now();
+        S.fut.set(s,m);
+        if(s==='BTC_USDT') $('#btc').textContent = `${m.bidStr || '—'} / ${m.askStr || '—'} USDT`;
+      }
+      if(j.channel==='push.index.price' && j.data){
+        const s=j.symbol; const price=num(j.data.price);
+        const m=S.spotIndex.get(s)||{};
+        m.index=price; m.indexStr = fmt9(j.data.price); m.ts=Date.now();
+        S.spotIndex.set(s,m);
+      }
+    }catch(_){}
+  };
+  ws.onclose = ()=>setTimeout(wsConnect, 1000);
 }
-function wsSub(sym,on){ if(!S.ws || S.ws.readyState!==1) return; const method = on?'sub':'unsub'; S.ws.send(JSON.stringify({method:method+'.ticker', param:{symbol:sym}})); S.ws.send(JSON.stringify({method:method+'.index.price', param:{symbol:sym}})); }
+function wsSub(sym,on){
+  if(!S.ws || S.ws.readyState!==1) return;
+  const method = on?'sub':'unsub';
+  S.ws.send(JSON.stringify({method:method+'.ticker', param:{symbol:sym}}));
+  S.ws.send(JSON.stringify({method:method+'.index.price', param:{symbol:sym}}));
+}
 function ping(){ if(S.ws?.readyState===1){ S.ws.send(JSON.stringify({method:'ping'})); setTimeout(ping,15000);} }
 wsConnect();
 
 /* ===== SPOT bookTicker (REST) — Ask/Bid (Proxy veya Fallback) ===== */
-async function fetchSpotBook(sym){ const symbol = sym.replace('_',''); try{ const url = effectiveUrl('spot','/api/v3/ticker/bookTicker', `symbol=${symbol}`); const r = await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); const j = await r.json(); const bidStr = fmt9(j.bidPrice); const askStr = fmt9(j.askPrice); S.spotBook.set(sym, { bid: num(j.bidPrice), ask: num(j.askPrice), bidStr, askStr, ts: Date.now(), fallback:false }); }catch(e){ const idx = S.spotIndex.get(sym); if(idx?.index){ S.spotBook.set(sym, { bid: idx.index, ask: idx.index, bidStr: fmt9(idx.index), askStr: fmt9(idx.index), ts: Date.now(), fallback:true }); } } }
-async function spotPollLoop(){ if(S.coins.size===0) return; for(const sym of S.coins){ await fetchSpotBook(sym); await new Promise(r=>setTimeout(r, 60)); } }
+async function fetchSpotBook(sym){
+  // sym: "BTC_USDT"
+  const symbol = sym.replace('_','');
+  try{
+    const url = effectiveUrl('spot','/api/v3/ticker/bookTicker', `symbol=${symbol}`);
+    const r = await fetch(url, {cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const j = await r.json();
+    const bidStr = fmt9(j.bidPrice);
+    const askStr = fmt9(j.askPrice);
+    S.spotBook.set(sym, { bid: num(j.bidPrice), ask: num(j.askPrice), bidStr, askStr, ts: Date.now() });
+  }catch(e){
+    const idx = S.spotIndex.get(sym);
+    if(idx?.index){
+      S.spotBook.set(sym, { bid: idx.index, ask: idx.index, bidStr: fmt9(idx.index), askStr: fmt9(idx.index), ts: Date.now(), fallback:true });
+    }
+  }
+}
+async function spotPollLoop(){
+  if(S.coins.size===0) return;
+  for(const sym of S.coins){
+    await fetchSpotBook(sym);
+    await new Promise(r=>setTimeout(r, 60));
+  }
+}
 S.timers.spot = setInterval(spotPollLoop, 800);
 
-/* ===== Hesaplama (AL taban fiyatına göre %) ===== */
-function computeRows(){ const thr = Number(S.ui.thresh)||0; const rows=[]; for(const sym of S.coins){ const f=S.fut.get(sym); const sb=S.spotBook.get(sym); if(!f || !(sb && isFinite(sb.ask) && isFinite(sb.bid))) continue; const futBid=f.bid1, futAsk=f.ask1; if(!isFinite(futBid)||!isFinite(futAsk)) continue; const spotAsk=sb.ask, spotBid=sb.bid; let best = null; if(isFinite(spotAsk) && isFinite(futBid) && futBid > spotAsk){ const pct1 = (futBid - spotAsk) / spotAsk * 100; if(pct1 >= thr){ best = { sym, low:spotAsk, high:futBid, pct:pct1, lowSrc:'spot', highSrc:'fut', lowStr: sb.askStr + (sb.fallback?' (IDX)':'') , highStr: f.bidStr, action: 'FUTURES SHORT', futPrice: f.bid1, spotPrice: spotAsk }; } }
-    if(isFinite(futAsk) && isFinite(spotBid) && spotBid > futAsk){ const pct2 = (spotBid - futAsk) / futAsk * 100; if(pct2 >= thr){ const alt = { sym, low:futAsk, high:spotBid, pct:pct2, lowSrc:'fut', highSrc:'spot', lowStr: f.askStr, highStr: (sb?.bidStr||'—') + (sb?.fallback?' (IDX)':''), action: 'FUTURES LONG', futPrice: f.ask1, spotPrice: spotBid }; if(!best || alt.pct > best.pct) best = alt; } }
-    if(!best) continue; if(S.ui.onlySpotAl && best.lowSrc!=='spot') continue; rows.push(best); }
-  rows.sort((a,b)=> b.pct - a.pct); return rows; }
+/* ===== Hesaplama (Spot ASK vs Futures BID) ===== */
+function computeRows(){
+  const thr = Number($('#botTh').value||S.bot.th)||0;
+  const rows=[];
+  for(const sym of S.coins){
+    const f=S.fut.get(sym);
+    const sb=S.spotBook.get(sym);
+    if(!f || !(sb && isFinite(sb.ask) && isFinite(sb.bid))) continue;
+    const futBid=f.bid1, futAsk=f.ask1;
+    if(!isFinite(futBid)||!isFinite(futAsk)) continue;
+    const spotAsk=sb.ask, spotBid=sb.bid;
+
+    let best = null;
+
+    // SPOT AL (ASK) vs FUTURES SAT (BID)
+    if(isFinite(spotAsk) && isFinite(futBid) && futBid > spotAsk){
+      const pct1 = (futBid - spotAsk) / spotAsk * 100;
+      if(pct1 >= thr){
+        best = {
+          sym, low:spotAsk, high:futBid, pct:pct1,
+          lowSrc:'spot', highSrc:'fut',
+          lowStr: sb.askStr + (sb.fallback?' (IDX)':''),
+          highStr: f.bidStr,
+          action: 'FUTURES SHORT',
+          futPrice: f.bidStr, // referans
+          spotPrice: sb.askStr,
+          noFallback: !sb.fallback
+        };
+      }
+    }
+
+    // (İsteğe bağlı ikinci yön: FUTURES LONG) — görünüm için, bot sadece SHORT koşulunu kullanır
+    if(best){
+      if(S.ui.onlySpotAl && best.lowSrc!=='spot') continue;
+      rows.push(best);
+    }
+  }
+  rows.sort((a,b)=> b.pct - a.pct);
+  return rows;
+}
 
 /* ===== Çizim ===== */
-function draw(){ const rows=computeRows(); const top=$('#topCard'); if(!S.ui.showTop || rows.length===0){ top.classList.add('hidden'); } else { top.classList.remove('hidden'); const r=rows[0]; $('#topSym').textContent = r.sym.replace('_',''); $('#topAction').innerHTML = r.action.includes('LONG') ? '<span class="good">FUTURES LONG</span>' : '<span class="bad">FUTURES SHORT</span>'; $('#topPrice').textContent = `${fmt9(r.futPrice)} USDT`; $('#topPct').textContent = pct(r.pct); top.classList.add('blink'); setTimeout(()=>top.classList.remove('blink'), 250); }
-  const tb=$('#tbody'); const frag=document.createDocumentFragment(); for(const r of rows){ const tr=document.createElement('tr'); const tdC=document.createElement('td'); tdC.textContent=r.sym.replace('_',''); tdC.style.fontWeight='800'; const tdL=document.createElement('td'); tdL.className='alCell mono ' + (r.lowSrc==='spot'?'src-spot':'src-fut'); tdL.textContent=(r.lowSrc==='spot'?fmt9(r.spotPrice):fmt9(r.futPrice)) + ( (r.lowSrc==='spot' && S.spotBook.get(r.sym)?.fallback)?' (IDX)':'' ); const tdH=document.createElement('td'); tdH.className='satCell mono ' + (r.highSrc==='spot'?'src-spot':'src-fut'); tdH.textContent=(r.highSrc==='spot'?fmt9(r.spotPrice):fmt9(r.futPrice)); const tdP=document.createElement('td'); tdP.className='pctCell mono'; tdP.innerHTML=`<span class="${r.pct>=0?'pctPos':'pctNeg'}">${pct(r.pct)}</span>`; tr.append(tdC,tdL,tdH,tdP); frag.appendChild(tr); } tb.replaceChildren(frag); $('#clock').textContent = now(); }
-function tickRender(){ clearInterval(S.timers.render); const ms = Math.max(25, Math.min(1000, S.ui.speed|0)); S.timers.render = setInterval(()=>{ draw(); maybeBot(); }, ms); }
+function draw(){
+  const rows=computeRows();
+  const top=$('#topCard');
+  if(!S.ui.showTop || rows.length===0){
+    top.classList.add('hidden');
+  } else{
+    top.classList.remove('hidden');
+    const r=rows[0];
+    $('#topSym').textContent = r.sym.replace('_','');
+    $('#topAction').innerHTML = r.action.includes('LONG')
+      ? '<span style="color:#22c55e">FUTURES LONG</span>'
+      : '<span style="color:#ef4444">FUTURES SHORT</span>';
+    $('#topPrice').textContent = `${r.futPrice} USDT`;
+    $('#topPct').textContent = pct(r.pct);
+    top.classList.add('blink'); setTimeout(()=>top.classList.remove('blink'), 250);
+  }
+
+  const tb=$('#tbody');
+  const frag=document.createDocumentFragment();
+  for(const r of rows){
+    const tr=document.createElement('tr');
+
+    const tdC=document.createElement('td');
+    tdC.textContent=r.sym.replace('_',''); tdC.style.fontWeight='800';
+
+    const tdL=document.createElement('td');
+    tdL.className='alCell mono ' + (r.lowSrc==='spot'?'src-spot':'src-fut');
+    tdL.textContent=r.lowStr;
+
+    const tdH=document.createElement('td');
+    tdH.className='satCell mono ' + (r.highSrc==='spot'?'src-spot':'src-fut');
+    tdH.textContent=r.highStr;
+
+    const tdP=document.createElement('td');
+    tdP.className='pctCell mono';
+    tdP.innerHTML = `<span class="${r.pct>=0?'pctPos':'pctNeg'}">${pct(r.pct)}</span>`;
+
+    tr.append(tdC,tdL,tdH,tdP); frag.appendChild(tr);
+  }
+  tb.replaceChildren(frag);
+  $('#clock').textContent = now();
+}
+function tickRender(){
+  clearInterval(S.timers.render);
+  const ms = Math.max(10, Math.min(1000, S.ui.speed|0));
+  S.timers.render = setInterval(()=>{ draw(); maybeBot(); }, ms);
+}
 tickRender();
 
+/* ===== Bot UI bağlama ===== */
+function setBotStateTxt(){
+  $('#botState').textContent = S.bot.enabled ? 'Çalışıyor' : 'Kapalı';
+  const dot = $('#botDot'); dot.classList.remove('on','off'); dot.classList.add(S.bot.enabled?'on':'off');
+}
+function pullBotInputs(){
+  S.bot.th = parseFloat($('#botTh').value||'0.5')||0.5;
+  S.bot.lev = parseInt($('#leverage').value||'10')||10;
+  S.bot.amt = parseFloat($('#amount').value||'50')||50;
+  S.bot.cooldown = parseInt($('#cooldown').value||'60')||60;
+  S.bot.openType = parseInt($('#openType').value||'1')||1;
+  S.bot.dry = ($('#dryRun').value === 'true');
+  S.bot.key = $('#apiKey').value.trim();
+  S.bot.sec = $('#apiSecret').value.trim();
+  saveBot();
+}
+['botTh','leverage','amount','cooldown','openType','dryRun','apiKey','apiSecret'].forEach(id=>{
+  const el = document.getElementById(id); if(el) el.addEventListener('change', pullBotInputs);
+});
+$('#amount').value = S.bot.amt;
+$('#botTh').value = S.bot.th;
+$('#leverage').value = S.bot.lev;
+$('#cooldown').value = S.bot.cooldown;
+$('#openType').value = S.bot.openType;
+$('#dryRun').value = String(!!S.bot.dry);
+$('#apiKey').value = S.bot.key;
+$('#apiSecret').value = S.bot.sec;
+setBotStateTxt();
+
+$('#btnStart').onclick = ()=>{ pullBotInputs(); S.bot.enabled=true; saveBot(); setBotStateTxt(); };
+$('#btnStop').onclick  = ()=>{ S.bot.enabled=false; saveBot(); setBotStateTxt(); };
+
 /* ===== HMAC & SIGNED çağrılar ===== */
-async function hmacHex(key, str){ const cryptoKey = await crypto.subtle.importKey('raw', enc.encode(key), {name:'HMAC', hash:'SHA-256'}, false, ['sign']); const sig = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(str)); return [...new Uint8Array(sig)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
+async function hmacHex(key, str){
+  const cryptoKey = await crypto.subtle.importKey('raw', enc.encode(key), {name:'HMAC', hash:'SHA-256'}, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(str));
+  return [...new Uint8Array(sig)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+// Futures – header imzalı
+async function mexcFuturesSigned(path, method='POST', bodyObj=null){
+  const reqTime = Date.now().toString();
+  const body = bodyObj ? JSON.stringify(bodyObj) : '';
+  const query = '';
+  const toSign = `${reqTime}${method}${path}${body}${query}`;
+  const signature = await hmacHex(S.bot.sec, toSign);
+  const url = effectiveUrl('futures', path);
+  const res = await fetch(url, {
+    method,
+    headers:{ 'Content-Type':'application/json', 'ApiKey': S.bot.key, 'Request-Time': reqTime, 'Signature': signature },
+    body: body || undefined
+  });
+  if(!res.ok) throw new Error(`Futures HTTP ${res.status}`);
+  return res.json();
+}
+// Spot – X-MEXC-APIKEY + body/query imzalı
+async function mexcSpotSigned(path, method='POST', paramsObj={}){
+  const ts = Date.now();
+  const baseParams = Object.assign({ recvWindow: 5000, timestamp: ts }, paramsObj);
+  const keys = Object.keys(baseParams);
+  const qs = keys.map(k=> `${encodeURIComponent(k)}=${encodeURIComponent(baseParams[k])}`).join('&');
+  const signature = await hmacHex(S.bot.sec, qs);
+  const bodyStr = qs + `&signature=${signature}`;
+  const url = effectiveUrl('spot', path);
+  const res = await fetch(url, { method, headers: { 'Content-Type':'application/x-www-form-urlencoded', 'X-MEXC-APIKEY': S.bot.key }, body: bodyStr });
+  if(!res.ok) throw new Error(`Spot HTTP ${res.status}`);
+  return res.json();
+}
 
-// Futures (contracts)
-async function mexcFuturesSigned(path, method='POST', bodyObj=null){ const reqTime = Date.now().toString(); const body = bodyObj ? JSON.stringify(bodyObj) : ''; const toSign = `${reqTime}${method}${path}${body}`; const signature = await hmacHex(S.bot.sec, toSign); const url = effectiveUrl('futures', path); const res = await fetch(url, { method, headers:{ 'Content-Type':'application/json', 'ApiKey': S.bot.key, 'Request-Time': reqTime, 'Signature': signature }, body: body || undefined }); if(!res.ok) throw new Error(`Futures HTTP ${res.status}`); return res.json(); }
-
-// Spot
-async function mexcSpotSigned(path, method='POST', paramsObj={}){ const ts = Date.now(); const baseParams = Object.assign({ recvWindow: 5000, timestamp: ts }, paramsObj); const keys = Object.keys(baseParams); const qs = keys.map(k=> `${encodeURIComponent(k)}=${encodeURIComponent(baseParams[k])}`).join('&'); const signature = await hmacHex(S.bot.sec, qs); const bodyStr = qs + `&signature=${signature}`; const url = effectiveUrl('spot', path); const res = await fetch(url, { method, headers: { 'Content-Type':'application/x-www-form-urlencoded', 'X-MEXC-APIKEY': S.bot.key }, body: bodyStr }); if(!res.ok) throw new Error(`Spot HTTP ${res.status}`); return res.json(); }
-
-/* ===== Futures sözleşme detayları (kontrat büyüklüğü) ===== */
-async function contractDetail(sym){ try{ const url = effectiveUrl('futures','/api/v1/contract/detail', `symbol=${encodeURIComponent(sym)}`); const r = await fetch(url, {cache:'no-store'}); const j = await r.json(); const d = j.data && (Array.isArray(j.data)? j.data.find(x=>x.symbol===sym) : j.data); if(d) return { contractSize: d.contractSize||0.0001, volUnit:d.volUnit||1, minVol:d.minVol||1 }; }catch(e){} return { contractSize: 0.0001, volUnit:1, minVol:1 }; }
+/* ===== Futures sözleşme detayı (kontrat büyüklüğü) ===== */
+async function contractDetail(sym){
+  try{
+    const url = effectiveUrl('futures','/api/v1/contract/detail', `symbol=${encodeURIComponent(sym)}`);
+    const r = await fetch(url, {cache:'no-store'});
+    const j = await r.json();
+    const d = j.data && (Array.isArray(j.data)? j.data.find(x=>x.symbol===sym) : j.data);
+    if(d) return { contractSize: d.contractSize||0.0001, volUnit:d.volUnit||1, minVol:d.minVol||1 };
+  }catch(e){}
+  return { contractSize: 0.0001, volUnit:1, minVol:1 };
+}
 
 /* ===== Emir yardımcıları ===== */
-// Spot MARKET BUY (quoteOrderQty = USDT)
-async function placeSpotMarketBuy(symbolNoUnderscore, quoteUSDT){ const p = { symbol: symbolNoUnderscore, side: 'BUY', type: 'MARKET', quoteOrderQty: quoteUSDT }; return mexcSpotSigned('/api/v3/order', 'POST', p); }
+async function placeSpotMarketBuy(symbolNoUnderscore, quoteUSDT){
+  const p = { symbol: symbolNoUnderscore, side: 'BUY', type: 'MARKET', quoteOrderQty: quoteUSDT };
+  return mexcSpotSigned('/api/v3/order', 'POST', p);
+}
+async function placeFuturesMarketShort(contractSym, usdtAmt, refPx, openType, lev){
+  const det = await contractDetail(contractSym);
+  const coinQty = usdtAmt / refPx;
+  let vol = Math.floor( (coinQty / det.contractSize) / det.volUnit ) * det.volUnit;
+  if(vol < det.minVol) vol = det.minVol;
 
-// Futures MARKET SHORT (type=5); fiyat alanını bid1 ile dolduruyoruz (bazı API sürümlerinde zorunlu)
-async function placeFuturesMarketShort(contractSym, coinQty, bidPx, openType, lev){ const det = await contractDetail(contractSym); let vol = Math.floor( (coinQty / det.contractSize) / det.volUnit ) * det.volUnit; if(vol < det.minVol) vol = det.minVol; await mexcFuturesSigned('/api/v1/private/position/change_leverage', 'POST', { openType: openType, leverage: lev, symbol: contractSym, positionType: 2 }); return mexcFuturesSigned('/api/v1/private/order/submit', 'POST', { symbol: contractSym, price: bidPx, vol, leverage: lev, side: 3, type: 5, openType: openType }); }
+  // Kaldıraç ayarla
+  await mexcFuturesSigned('/api/v1/private/position/change_leverage', 'POST', {
+    openType: openType, leverage: lev, symbol: contractSym, positionType: 2 // short
+  });
 
-/* ===== BOT (Spot ucuz + Futures pahalı → eşzamanlı işlemler) ===== */
+  // MARKET SHORT
+  return mexcFuturesSigned('/api/v1/private/order/submit', 'POST', {
+    symbol: contractSym, price: refPx, vol: vol, leverage: lev, side: 3, type: 5, openType: openType
+  });
+}
+
+/* ===== BOT: sadece SPOT AL + FUTURES SHORT ===== */
+function botGuardReady(){
+  if(!S.bot.enabled) return 'kapalı';
+  if(!(S.proxy.use && S.proxy.url)) return 'proxy_yok';
+  if(!S.bot.key || !S.bot.sec) return 'anahtar_yok';
+  return 'ok';
+}
 async function maybeBot(){
-  if(!S.bot.enabled) return; if(S.bot.busy) return; if(!S.bot.key || !S.bot.sec) return; if(!(S.proxy.use && S.proxy.url)) return; // proxy şart
+  if(botGuardReady()!=='ok') return;
+  const nowms = Date.now();
+  if(nowms - S.lastActionAt < (S.bot.cooldown*1000)) return;
 
-  const rows = computeRows(); if(rows.length===0) return; const r = rows[0];
-  // Yalnız istenen strateji
+  const rows = computeRows();
+  if(rows.length===0) return;
+  const r = rows[0];
+
+  // Yalnızca hedef yön: Spot ASK < Futures BID
   if(!(r.lowSrc==='spot' && r.highSrc==='fut' && r.action==='FUTURES SHORT')) return;
-  if(r.pct < S.bot.th) return;
+  if(r.pct < (S.bot.th||0)) return;
+  if(!r.noFallback) { console.warn('Index fallback aktifken işlem atlanıyor.'); return; }
 
-  const symFut = r.sym;              // "BTC_USDT"
+  const symFut = r.sym;           // "BTC_USDT"
   const symSpot = symFut.replace('_',''); // "BTCUSDT"
-  const sb = S.spotBook.get(symFut);
-  const f  = S.fut.get(symFut);
-  if(!sb || sb.fallback) return; // gerçek spot book olmadan işlem yok
+  const futBidNow = S.fut.get(symFut)?.bid1;
+  const spotAskNow = S.spotBook.get(symFut)?.ask;
 
-  const spotAsk = sb.ask;      // Spot BUY → ask
-  const futBid  = f.bid1;      // Futures SHORT → bid
-  if(!(isFinite(spotAsk) && isFinite(futBid))) return;
+  // Fark halen var mı? (hızlı kontrol)
+  if(!(isFinite(futBidNow) && isFinite(spotAskNow) && futBidNow > spotAskNow)) return;
 
-  const coinQty = S.bot.amt / spotAsk; // eşdeğer coin miktarı
+  const refFut = futBidNow; // SHORT referans (farkı veren)
+  const refSpot= spotAskNow; // BUY referans
+
+  if(S.bot.dry){
+    console.log(`[DRY] ${symSpot}: Spot MARKET BUY ~${S.bot.amt} USDT @ ~${refSpot}; Futures MARKET SHORT @ ~${refFut}`);
+    S.lastActionAt = nowms;
+    return;
+  }
 
   try{
-    S.bot.busy = true; setStatus(true);
-    // Eşzamanlı başlat
-    const spotP = placeSpotMarketBuy(symSpot, S.bot.amt);
-    const futP  = placeFuturesMarketShort(symFut, coinQty, futBid, S.bot.openType, S.bot.lev);
-    const [spotRes, futRes] = await Promise.all([spotP, futP]);
-    console.log('OK Spot', spotRes);
-    console.log('OK Futures', futRes);
-    alert(`Emirler gönderildi:\n• Spot BUY ${symSpot} ≈ ${S.bot.amt} USDT\n• Futures SHORT ${symFut} ≈ ${coinQty.toFixed(6)} coin`);
-  }catch(err){ console.error('Emir hatası:', err); }
-  finally{ S.bot.busy = false; }
+    // Eşzamanlı gönder (kaldıraç ayarı futures’ta önce yapılır)
+    const futPromise = placeFuturesMarketShort(symFut, S.bot.amt, refFut, S.bot.openType, S.bot.lev);
+    const spotPromise = placeSpotMarketBuy(symSpot, S.bot.amt);
+    const [futRes, spotRes] = await Promise.all([futPromise, spotPromise]);
+
+    S.lastActionAt = nowms;
+    alert(`Emirler gönderildi:\n• Spot BUY ${symSpot} ~${S.bot.amt} USDT (orderId=${spotRes?.orderId||'?'})\n• Futures SHORT ${symFut} (orderId=${futRes?.data||'?'})`);
+  }catch(err){
+    console.error('Emir hatası (Proxy/izin/parametre?):', err);
+  }
 }
 
 /* ===== Başlat ===== */
-function start(){ setInterval(()=>$('#clock').textContent=now(), 1000); tickRender(); draw(); spotPollLoop(); }
+function start(){
+  setInterval(()=>$('#clock').textContent=now(), 1000);
+  tickRender(); draw(); spotPollLoop();
+}
 start();
 </script>
 </body>
