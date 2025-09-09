@@ -1,187 +1,600 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="tr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MEXC Spot ↔ Perp Arbitraj Farkı — Tek Dosya</title>
-  <style>
-    :root{
-      --bg: #0b0f14;
-      --panel: #111720;
-      --card: #0f1520;
-      --muted: #94a3b8;
-      --text: #e6edf3;
-      --good: #22c55e;
-      --bad:  #ef4444;
-      --warn: #f59e0b;
-      --accent: #60a5fa;
-      --border: #1f2937;
-      --shadow: 0 10px 30px rgba(0,0,0,.35);
-      --radius: 16px;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0; background: radial-gradient(1200px 800px at 80% -10%, rgba(96,165,250,.12), transparent 60%) , var(--bg);
-      color: var(--text); font: 500 15px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
-      letter-spacing:.1px;
-    }
-    header{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:22px clamp(14px,4vw,34px)}
-    .brand{display:flex; align-items:center; gap:14px;}
-    .logo{
-      width:38px;height:38px;border-radius:12px;
-      background: conic-gradient(from 200deg,#1f2937,#0ea5e9,#22d3ee,#1f2937); box-shadow: inset 0 0 0 2px #0b1220, var(--shadow);
-    }
-    h1{margin:0; font-size:18px; font-weight:700; letter-spacing:.4px}
-    .grid{display:grid; gap:18px; padding:0 clamp(14px,4vw,34px) 28px; grid-template-columns: 320px 1fr}
-    @media (max-width: 980px){ .grid{grid-template-columns: 1fr} }
-    .panel{background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.005)); border:1px solid var(--border);
-      border-radius: var(--radius); box-shadow: var(--shadow); padding:16px}
-    .panel h2{margin:6px 6px 12px; font-size:14px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.14em}
-    .row{display:grid; grid-template-columns: 1fr 1fr; gap:10px}
-    .row3{display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px}
-    label{display:block; font-size:12px; color:var(--muted); margin:8px 6px 6px}
-    input, select, button{
-      width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--border); background:#0c121a; color:var(--text);
-      outline:none; transition: .15s border, .15s transform, .15s background;
-    }
-    input:focus, select:focus{border-color:#334155}
-    .muted{color:var(--muted)}
-    .small{font-size:12px}
-    .ghost{background:#0b1119}
-    .btn{cursor:pointer; background: linear-gradient(180deg,#1f6feb,#1b4ed4); border:none}
-    .btn:hover{transform: translateY(-1px)}
-    .btn.stop{background: linear-gradient(180deg,#ef4444,#b91c1c)}
-    .cards{display:grid; grid-template-columns: repeat(2, minmax(260px,1fr)); gap:14px}
-    @media (max-width: 760px){ .cards{grid-template-columns:1fr} }
-    .card{background: linear-gradient(180deg, rgba(15,21,32,.8), rgba(10,14,22,.8)); border:1px solid var(--border);
-      border-radius: var(--radius); padding:14px 14px 12px; box-shadow: var(--shadow)}
-    .card h3{margin:0 0 10px; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.14em}
-    .ticker{display:flex; align-items:baseline; gap:10px}
-    .price{font-size:28px; font-weight:800; letter-spacing:.3px}
-    .pill{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; background:#0c121a; border:1px solid var(--border);
-      border-radius:999px; font-size:12px; color:var(--muted)}
-    .flex{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
-    .kv{display:grid; grid-template-columns: auto 1fr; gap:6px 12px; font-size:13px; margin-top:8px}
-    .kv .k{color:var(--muted); text-align:right}
-    .delta.up{color: var(--good)} .delta.down{color:var(--bad)}
-    .spread{display:grid; gap:14px}
-    .spread .box{padding:14px; border-radius:16px; border:1px solid var(--border); background:linear-gradient(180deg,#0c121a,#0b0f14)}
-    .spread .title{display:flex; align-items:center; justify-content:space-between}
-    .spread .big{
-      font-size:26px; font-weight:900; letter-spacing:.3px
-    }
-    .ok{color:var(--good)} .ko{color:var(--bad)} .warn{color:var(--warn)}
-    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace}
-    footer{padding:10px 24px 26px; color:var(--muted); text-align:center}
-    .hint{font-size:12px; color:var(--muted); margin:8px 6px}
-    .link{color:var(--accent); text-decoration:none}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MEXC Spot ↔ Perp Arbitraj Fark Programı</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#101725; --muted:#7a89a6; --txt:#e6ecff; --accent:#7c5cff;
+    --good:#20c997; --bad:#ef476f; --warn:#ffd166; --border:#1c2740;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    background: radial-gradient(1200px 1200px at 120% -10%, rgba(124,92,255,0.15), transparent 60%),
+                linear-gradient(180deg, #0b1220 0%, #0b1220 100%);
+    color:var(--txt);
+  }
+  header{
+    padding:18px 20px; border-bottom:1px solid var(--border);
+    position:sticky; top:0; background:rgba(11,18,32,0.85); backdrop-filter: blur(8px); z-index:10;
+  }
+  .brand{display:flex;gap:12px;align-items:center}
+  .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 20px var(--accent)}
+  .brand h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px}
+  .sub{color:var(--muted);font-size:12px}
+  main{padding:22px; max-width:1200px; margin:0 auto}
+  .grid{display:grid; gap:14px}
+  .g-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .g-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .g-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  @media (max-width:1100px){ .g-4{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  @media (max-width:720px){ .g-2,.g-3,.g-4{grid-template-columns:1fr} header{position:static} }
+  .card{
+    background:linear-gradient(180deg,rgba(124,92,255,0.06),transparent 120%), var(--card);
+    border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 8px 30px rgba(0,0,0,.25);
+  }
+  .card h3{margin:0 0 8px 0; font-size:14px; letter-spacing:.3px}
+  .muted{color:var(--muted);font-size:12px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .row > *{flex:1}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  input,select,button{
+    width:100%; padding:10px 12px; background:#0e1524; border:1px solid var(--border); color:var(--txt);
+    border-radius:12px; outline:none; transition:.15s; font-size:14px;
+  }
+  input::placeholder{color:#99a4bb}
+  input:focus,select:focus{border-color:#3b49ff; box-shadow:0 0 0 3px rgba(59,73,255,.15)}
+  button{cursor:pointer; background:linear-gradient(180deg,#8b6bff,#6d53ff); border:none; font-weight:700}
+  button.secondary{background:#121a2c}
+  .pill{padding:6px 10px;border-radius:999px;background:#0f1628;border:1px solid var(--border);font-size:12px}
+  .kpi{
+    display:flex;flex-direction:column; gap:6px; border-radius:16px; padding:12px 12px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent 100%);
+    border:1px solid var(--border);
+  }
+  .kpi .title{font-size:12px;color:var(--muted)}
+  .kpi .val{font-size:22px;font-weight:800}
+  .green{color:var(--good)} .red{color:var(--bad)} .yellow{color:var(--warn)}
+  .mono{font-variant-numeric:tabular-nums}
+  .sep{height:1px;background:var(--border);margin:8px 0 12px}
+  .small{font-size:12px}
+  .hint{font-size:12px;color:#a4b1d3}
+  .badge{display:inline-flex;gap:8px;align-items:center}
+  .dot-sm{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .dot-spot{background:#4cc9f0;box-shadow:0 0 10px #4cc9f0}
+  .dot-perp{background:#f72585;box-shadow:0 0 10px #f72585}
+  .status{display:flex;gap:8px;align-items:center}
+  .footer{color:var(--muted);font-size:11px; margin-top:10px}
+  .warnbox{background:#251d10;border:1px solid #3e2d0b;color:#ffe8a6;padding:10px 12px;border-radius:12px}
+  .ok{color:var(--good)} .err{color:var(--bad)}
+  .hl{color:#b3c5ff}
+</style>
 </head>
 <body>
   <header>
     <div class="brand">
-      <div class="logo" aria-hidden="true"></div>
-      <div>
-        <h1>MEXC Spot ↔ Perp Arbitraj Farkı</h1>
-        <div class="small muted">Anlık en iyi fiyatlar · Maker/Taker ücretleri dahil net fark</div>
-      </div>
-    </div>
-    <div class="flex">
-      <button id="startBtn" class="btn">Başlat</button>
-      <button id="stopBtn" class="btn stop ghost">Durdur</button>
+      <div class="dot"></div>
+      <h1>MEXC Spot ↔ Perp Arbitraj Fark Programı</h1>
+      <div class="sub">taker-VWAP & maker fark, komisyon ve funding dahil</div>
     </div>
   </header>
 
-  <main class="grid">
+  <main class="grid g-2">
     <!-- Sol: Ayarlar -->
-    <section class="panel" aria-label="Ayarlar">
-      <h2>Ayarlar</h2>
-
-      <label for="spotSymbol">Spot Sembol (MEXC):</label>
-      <input id="spotSymbol" value="BTCUSDT" class="mono" />
-
-      <div class="hint small">Perp sembolünü otomatik <code>BTC_USDT</code> formatına çevirir; gerekirse düzenleyin.</div>
-
-      <label for="perpSymbol">Perp Sembol (MEXC Futures):</label>
-      <input id="perpSymbol" value="BTC_USDT" class="mono" />
-
-      <div class="row">
+    <section class="card">
+      <h3>Ayarlar</h3>
+      <div class="grid g-2">
         <div>
-          <label for="qtyMode">Miktar Modu:</label>
+          <label>Sembol (Spot)</label>
+          <div class="row">
+            <input id="symbolSpot" value="BTCUSDT" spellcheck="false"/>
+            <div class="pill small">Perp sembolü otomatik: <span id="symbolPerp" class="mono">BTC_USDT</span></div>
+          </div>
+        </div>
+        <div>
+          <label>Yenileme (ms)</label>
+          <input id="refreshMs" type="number" value="1000" min="250" step="50"/>
+        </div>
+      </div>
+
+      <div class="grid g-2" style="margin-top:10px">
+        <div>
+          <label>Miktar modu</label>
           <select id="qtyMode">
-            <option value="base">Baz (BTC, ETH...)</option>
-            <option value="quote">Notional (USDT)</option>
+            <option value="quote">USDT (tutar)</option>
+            <option value="base">BASE (adet)</option>
           </select>
         </div>
         <div>
-          <label for="qty">Miktar:</label>
-          <input id="qty" type="number" step="any" value="0.01" />
+          <label>
+            <span class="badge"><span class="dot-sm dot-spot"></span>Spot miktarı</span>
+            <span class="hint">(moda göre)</span>
+          </label>
+          <input id="qtyInput" type="number" value="1000" step="0.0001"/>
         </div>
       </div>
 
-      <div class="row">
+      <div class="grid g-3" style="margin-top:10px">
         <div>
-          <label for="pollMs">Spot REST Sıklığı (ms):</label>
-          <input id="pollMs" type="number" min="150" step="50" value="600" />
+          <label>Spot taker fee</label>
+          <input id="feeSpotT" type="number" step="0.0001" value="0.001"/>
         </div>
         <div>
-          <label for="decimals">Yuvarlama (görüntü):</label>
-          <input id="decimals" type="number" min="0" max="8" value="2" />
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label for="spotSide">Spot Emir Tipi:</label>
-          <select id="spotSide">
-            <option value="taker">Taker</option>
-            <option value="maker">Maker</option>
-          </select>
+          <label>Spot maker fee</label>
+          <input id="feeSpotM" type="number" step="0.0001" value="0.0002"/>
         </div>
         <div>
-          <label for="perpSide">Perp Emir Tipi:</label>
-          <select id="perpSide">
-            <option value="taker">Taker</option>
-            <option value="maker">Maker</option>
-          </select>
+          <label>Slipaj tamponu (bps)</label>
+          <input id="slipBps" type="number" step="0.01" value="2.0"/>
         </div>
       </div>
 
-      <div class="row">
+      <div class="grid g-3" style="margin-top:10px">
         <div>
-          <label for="spotTakerFee">Spot Taker Ücreti (oran):</label>
-          <input id="spotTakerFee" type="number" step="0.0001" value="0.0010" />
+          <label>Perp taker fee</label>
+          <input id="feePerpT" type="number" step="0.0001" value="0.0006"/>
         </div>
         <div>
-          <label for="spotMakerFee">Spot Maker Ücreti (oran):</label>
-          <input id="spotMakerFee" type="number" step="0.0001" value="0.0010" />
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label for="perpTakerFee">Perp Taker Ücreti (oran):</label>
-          <input id="perpTakerFee" type="number" step="0.0001" value="0.0006" />
+          <label>Perp maker fee</label>
+          <input id="feePerpM" type="number" step="0.0001" value="0.0002"/>
         </div>
         <div>
-          <label for="perpMakerFee">Perp Maker Ücreti (oran):</label>
-          <input id="perpMakerFee" type="number" step="0.0001" value="0.0002" />
+          <label>Funding tutma süresi (saat)</label>
+          <input id="holdHrs" type="number" value="0" step="0.5"/>
         </div>
       </div>
 
-      <div class="row">
-        <button id="applyFeesBtn" class="ghost">Perp ücretlerini API’den çek</button>
-        <div class="hint small">Bazı semboller için <em>contract detail</em> ile maker/taker otomatik dolacaktır.</div>
+      <div class="row" style="margin-top:12px">
+        <button id="btnStart">Başlat</button>
+        <button id="btnStop" class="secondary">Durdur</button>
+        <div class="pill status"><span class="dot-sm" id="dotRun" style="background:#777"></span> <span id="runTxt">Bekliyor</span></div>
       </div>
 
-      <div class="hint small">UYARI: Demo amaçlıdır. Emir göndermeyecek, sadece hesap yapacaktır.</div>
+      <div class="footer">
+        <div>Spot REST: <span class="hl">/api/v3/depth</span>, <span class="hl">/api/v3/ticker/bookTicker</span></div>
+        <div>Futures REST: <span class="hl">/contract/depth</span>, <span class="hl">/fair_price</span>, <span class="hl">/index_price</span>, <span class="hl">/funding_rate</span>, <span class="hl">/contract/detail</span></div>
+      </div>
     </section>
 
-    <!-- Sağ: Canlı kartlar ve hesaplamalar -->
-    <section class="panel">
-      <h2>Canlı Veriler & Hesap</h2>
+    <!-- Sağ: Canlı veriler -->
+    <section class="card">
+      <h3>Canlı Fiyatlar ve Derinlik</h3>
+      <div class="grid g-2">
+        <div class="kpi">
+          <div class="title">Spot Best Bid / Ask</div>
+          <div class="val mono"><span id="spotBid">—</span> / <span id="spotAsk">—</span></div>
+          <div class="muted small">Mid: <span class="mono" id="spotMid">—</span></div>
+        </div>
+        <div class="kpi">
+          <div class="title">Perp Best Bid / Ask</div>
+          <div class="val mono"><span id="perpBid">—</span> / <span id="perpAsk">—</span></div>
+          <div class="muted small">Mark(Index/Fair): <span class="mono" id="markInfo">—</span></div>
+        </div>
+      </div>
 
-      <div class="cards">
-        <div class="card">
-          <h3>Spot — <span id="spotName" class="mono
+      <div class="grid g-2" style="margin-top:8px">
+        <div class="kpi">
+          <div class="title">Funding (8h / yıllıklaştırılmış)</div>
+          <div class="val mono"><span id="fund8h">—</span> <span class="muted small">/ APR: <span id="fundApr">—</span></span></div>
+          <div class="muted small">Sonraki: <span id="fundNext">—</span></div>
+        </div>
+        <div class="kpi">
+          <div class="title">Gecikme ve Hız</div>
+          <div class="val mono"><span id="latency">—</span></div>
+          <div class="muted small">Son güncelleme: <span id="lastTs">—</span></div>
+        </div>
+      </div>
+
+      <div class="warnbox" style="margin-top:10px">
+        Bu panel yalnızca **fark ölçer**; emir göndermez. Maker ölçümleri “potansiyel”, taker ölçümleri “anında uygulanabilir” senaryoyu temsil eder. Piyasa koşulları, slipaj ve likidite sonucu değiştirebilir.
+      </div>
+    </section>
+
+    <!-- Alt satır: 4 senaryo -->
+    <section class="card" style="grid-column:1/-1">
+      <h3>Arbitraj Metrikleri (spot ↔ perp)</h3>
+      <div class="grid g-4">
+        <div class="kpi">
+          <div class="title">Taker Long (Spot AL + Perp SAT)</div>
+          <div class="val mono"><span id="basisTL" class="">—</span></div>
+          <div class="muted small">Net (fees+slip+fund): <span id="netTL" class="mono">—</span></div>
+          <div class="muted small">Giriş PnL (kapanış 0% varsayımı): <span id="pnlTL" class="mono">—</span></div>
+        </div>
+        <div class="kpi">
+          <div class="title">Maker Long (Spot BID + Perp ASK)</div>
+          <div class="val mono"><span id="basisML">—</span></div>
+          <div class="muted small">Net (fees+slip+fund): <span id="netML" class="mono">—</span></div>
+          <div class="muted small">Giriş PnL (0% varsayımı): <span id="pnlML" class="mono">—</span></div>
+        </div>
+        <div class="kpi">
+          <div class="title">Taker Short (Spot SAT + Perp AL)</div>
+          <div class="val mono"><span id="basisTS">—</span></div>
+          <div class="muted small">Net (fees+slip+fund): <span id="netTS" class="mono">—</span></div>
+          <div class="muted small">Giriş PnL (0% varsayımı): <span id="pnlTS" class="mono">—</span></div>
+        </div>
+        <div class="kpi">
+          <div class="title">Maker Short (Spot ASK + Perp BID)</div>
+          <div class="val mono"><span id="basisMS">—</span></div>
+          <div class="muted small">Net (fees+slip+fund): <span id="netMS" class="mono">—</span></div>
+          <div class="muted small">Giriş PnL (0% varsayımı): <span id="pnlMS" class="mono">—</span></div>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+      <div class="grid g-3">
+        <div>
+          <div class="title">VWAP (Spot AL / Ask tarafı)</div>
+          <div class="mono small" id="vwapSpotBuy">—</div>
+        </div>
+        <div>
+          <div class="title">VWAP (Spot SAT / Bid tarafı)</div>
+          <div class="mono small" id="vwapSpotSell">—</div>
+        </div>
+        <div>
+          <div class="title">VWAP (Perp AL / Ask tarafı) — kontrat boyu dahil</div>
+          <div class="mono small" id="vwapPerpBuy">—</div>
+        </div>
+        <div>
+          <div class="title">VWAP (Perp SAT / Bid tarafı) — kontrat boyu dahil</div>
+          <div class="mono small" id="vwapPerpSell">—</div>
+        </div>
+        <div>
+          <div class="title">Spot Depth (ilk 5) [fiyat × adet]</div>
+          <div class="mono small" id="depthSpot">—</div>
+        </div>
+        <div>
+          <div class="title">Perp Depth (ilk 5) [fiyat × kontrat]</div>
+          <div class="mono small" id="depthPerp">—</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+<script>
+(() => {
+  // ----------------- Yardımcılar -----------------
+  const $ = sel => document.querySelector(sel);
+  const fmt = (n, p=2) => (isFinite(n)? Number(n).toFixed(p): '—');
+  const fnum = (n, p=2) => isFinite(n)? Number(n).toLocaleString(undefined,{maximumFractionDigits:p}) : '—';
+  const bps = x => (x*10000);
+  const clamp = (x,a,b)=>Math.min(Math.max(x,a),b);
+
+  // API taban URL'leri
+  const SPOT = 'https://api.mexc.com';
+  const PERP = 'https://contract.mexc.com';
+
+  // Durum
+  let timer = null;
+  let contractSize = null;         // perp contractSize (ör: BTC_USDT için 0.0001)
+  let perpScales = { priceScale: 2 }; // gösterim için
+  let lastLatencyMs = 0;
+
+  // DOM
+  const el = {
+    symbolSpot: $('#symbolSpot'),
+    symbolPerp: $('#symbolPerp'),
+    refreshMs: $('#refreshMs'),
+    qtyMode: $('#qtyMode'),
+    qtyInput: $('#qtyInput'),
+    feeSpotT: $('#feeSpotT'), feeSpotM: $('#feeSpotM'),
+    feePerpT: $('#feePerpT'), feePerpM: $('#feePerpM'),
+    slipBps: $('#slipBps'), holdHrs: $('#holdHrs'),
+    btnStart: $('#btnStart'), btnStop: $('#btnStop'),
+    dotRun: $('#dotRun'), runTxt: $('#runTxt'),
+    spotBid: $('#spotBid'), spotAsk: $('#spotAsk'), spotMid: $('#spotMid'),
+    perpBid: $('#perpBid'), perpAsk: $('#perpAsk'), markInfo: $('#markInfo'),
+    fund8h: $('#fund8h'), fundApr: $('#fundApr'), fundNext: $('#fundNext'),
+    latency: $('#latency'), lastTs: $('#lastTs'),
+    basisTL: $('#basisTL'), basisML: $('#basisML'), basisTS: $('#basisTS'), basisMS: $('#basisMS'),
+    netTL: $('#netTL'), netML: $('#netML'), netTS: $('#netTS'), netMS: $('#netMS'),
+    pnlTL: $('#pnlTL'), pnlML: $('#pnlML'), pnlTS: $('#pnlTS'), pnlMS: $('#pnlMS'),
+    vwapSpotBuy: $('#vwapSpotBuy'), vwapSpotSell: $('#vwapSpotSell'),
+    vwapPerpBuy: $('#vwapPerpBuy'), vwapPerpSell: $('#vwapPerpSell'),
+    depthSpot: $('#depthSpot'), depthPerp: $('#depthPerp'),
+  };
+
+  // Spot->Perp sembol dönüşümü (USDT-M)
+  function toPerpSymbol(spotSymbol){
+    if (!spotSymbol) return '';
+    if (!spotSymbol.endsWith('USDT')) return spotSymbol; // basit senaryo
+    const base = spotSymbol.slice(0, -4);
+    return `${base}_USDT`;
+  }
+  function toSpotSymbol(perpSymbol){
+    return perpSymbol.replace('_USDT','USDT');
+  }
+
+  // API çağrıları
+  async function getSpotBook(symbol){
+    const r = await fetch(`${SPOT}/api/v3/ticker/bookTicker?symbol=${symbol}`, {cache:'no-store'});
+    if (!r.ok) throw new Error('spot bookTicker error');
+    return r.json();
+  }
+  async function getSpotDepth(symbol, limit=50){
+    const r = await fetch(`${SPOT}/api/v3/depth?symbol=${symbol}&limit=${limit}`, {cache:'no-store'});
+    if (!r.ok) throw new Error('spot depth error');
+    return r.json(); // {bids:[[p,qty],...], asks:[[p,qty],...]}
+  }
+  async function getPerpDepth(symbol, limit){ // symbol: BTC_USDT
+    const url = `${PERP}/api/v1/contract/depth/${symbol}` + (limit?`?limit=${limit}`:'');
+    const r = await fetch(url, {cache:'no-store'});
+    if (!r.ok) throw new Error('perp depth error');
+    return r.json(); // {bids:[[price, volume, ?count],...], asks:[[price, volume, ?],...]}
+  }
+  async function getPerpMark(symbol){
+    const [fair, idx] = await Promise.all([
+      fetch(`${PERP}/api/v1/contract/fair_price/${symbol}`,{cache:'no-store'}).then(r=>r.json()),
+      fetch(`${PERP}/api/v1/contract/index_price/${symbol}`,{cache:'no-store'}).then(r=>r.json())
+    ]);
+    return {
+      fair: fair?.data?.fairPrice ?? null,
+      index: idx?.data?.indexPrice ?? null
+    };
+  }
+  async function getPerpFunding(symbol){
+    const r = await fetch(`${PERP}/api/v1/contract/funding_rate/${symbol}`, {cache:'no-store'});
+    if (!r.ok) throw new Error('funding error');
+    return r.json(); // {data:{fundingRate, collectCycle(8), nextSettleTime}}
+  }
+  async function getPerpDetail(symbol){
+    const r = await fetch(`${PERP}/api/v1/contract/detail?symbol=${symbol}`, {cache:'no-store'});
+    if (!r.ok) throw new Error('contract detail error');
+    const j = await r.json();
+    const d = (j?.data || []).find(x=>x.symbol===symbol) || (j?.data?.[0]);
+    return d || null;
+  }
+
+  // VWAP hesapları (Spot)
+  // side = 'buy' -> asks tüketilir; 'sell' -> bids tüketilir
+  function vwapSpot(side, depth, desiredBase, desiredQuote){
+    const isBuy = side==='buy';
+    const levels = isBuy ? (depth.asks||[]) : (depth.bids||[]);
+    if (!levels.length) return { price: NaN, baseFilled: 0, quoteFilled: 0 };
+
+    let remainBase = desiredBase ?? 0;
+    let remainQuote = desiredQuote ?? 0;
+    const useBase = isFinite(remainBase) && remainBase>0;
+    const useQuote = isFinite(remainQuote) && remainQuote>0;
+
+    let base=0, quote=0;
+
+    const iter = isBuy ? (i=>i) : (i=>i); // levels zaten uygun sırada (spot: asks düşükten, bids yüksekten)
+    for (let i=0;i<levels.length;i++){
+      const [pStr, qStr] = levels[i];
+      const price = Number(pStr), qty = Number(qStr);
+      if (price<=0 || qty<=0) continue;
+
+      if (useBase){
+        const take = Math.min(qty, remainBase);
+        base += take;
+        quote += take*price;
+        remainBase -= take;
+        if (remainBase<=1e-12) break;
+      } else if (useQuote){
+        const maxQty = remainQuote/price;
+        const take = Math.min(qty, maxQty);
+        base += take;
+        quote += take*price;
+        remainQuote -= take*price;
+        if (remainQuote<=1e-8) break;
+      } else {
+        break;
+      }
+    }
+    const price = base>0 ? (quote/base) : NaN;
+    return { price, baseFilled: base, quoteFilled: quote };
+  }
+
+  // VWAP hesapları (Perp) — amount kontrat adedi; baseQty = amount * contractSize
+  function vwapPerp(side, depth, desiredBase){
+    if (!contractSize || !depth) return { price: NaN, baseFilled: 0, quoteFilled: 0 };
+    const isBuy = side==='buy';
+    const levels = isBuy ? (depth.asks||[]) : (depth.bids||[]); // [[price, volume, count], ...]
+    if (!levels.length) return { price: NaN, baseFilled: 0, quoteFilled: 0 };
+
+    let remainBase = desiredBase ?? 0;
+    let base=0, quote=0;
+    for (let i=0;i<levels.length;i++){
+      const [p, vol] = levels[i];
+      const price = Number(p);
+      const amountContracts = Number(vol);
+      if (price<=0 || amountContracts<=0) continue;
+      const levelBase = amountContracts * contractSize; // BTC/ETH adedi
+      const take = Math.min(levelBase, remainBase);
+      base += take;
+      quote += take*price;
+      remainBase -= take;
+      if (remainBase<=1e-12) break;
+    }
+    const price = base>0 ? (quote/base) : NaN;
+    return { price, baseFilled: base, quoteFilled: quote };
+  }
+
+  // Net basis: basis - fees - slip + funding (yöne göre işaret)
+  function computeNet(basis, params){
+    const { fee, slip, funding } = params;
+    return basis - fee - slip + funding;
+  }
+
+  // PnL tahmini: spread 0’a kapanırsa ~ baseQty * spotMid * basis (USDT)
+  const pnlFromBasis = (basis, baseQty, spotMid) => basis * baseQty * spotMid;
+
+  // Ana döngü
+  async function tick(){
+    const t0 = performance.now();
+    const spotSym = el.symbolSpot.value.trim().toUpperCase();
+    const perpSym = toPerpSymbol(spotSym);
+    el.symbolPerp.textContent = perpSym;
+
+    // Parametreler
+    const qtyMode = el.qtyMode.value; // 'quote'|'base'
+    const qtyVal = Number(el.qtyInput.value);
+    const feeSpotT = Number(el.feeSpotT.value||0);
+    const feeSpotM = Number(el.feeSpotM.value||0);
+    const feePerpT = Number(el.feePerpT.value||0);
+    const feePerpM = Number(el.feePerpM.value||0);
+    const slip = Number(el.slipBps.value||0)/10000; // bps → oran
+    const holdHrs = Number(el.holdHrs.value||0);
+
+    try{
+      // Eşzamanlı çağrılar
+      const [bookS, depthS, depthP, markP, fundP] = await Promise.all([
+        getSpotBook(spotSym),
+        getSpotDepth(spotSym, 50),
+        getPerpDepth(perpSym, 50),
+        getPerpMark(perpSym),
+        getPerpFunding(perpSym)
+      ]);
+
+      // İlk kez veya sembol değiştiyse contract detail çek
+      if (contractSize==null || el.symbolPerp.textContent !== perpSym){
+        const detail = await getPerpDetail(perpSym);
+        if (detail){
+          contractSize = Number(detail.contractSize) || 0.0001;
+          perpScales.priceScale = Number(detail.priceScale)||2;
+        }
+      }
+
+      // Spot best/ mid
+      const spotBid = Number(bookS.bidPrice), spotAsk = Number(bookS.askPrice);
+      const spotMid = (spotBid + spotAsk)/2;
+
+      // Perp best
+      // Perp depth dizilerinden en üst seviyeyi al
+      const perpBid = Number(depthP?.bids?.[0]?.[0] ?? NaN);
+      const perpAsk = Number(depthP?.asks?.[0]?.[0] ?? NaN);
+
+      // Funding bilgisi
+      const fr8h = Number(fundP?.data?.fundingRate ?? 0); // 8 saatlik
+      const nextTs = Number(fundP?.data?.nextSettleTime ?? 0);
+      const fundApr = fr8h * 3 * 365; // ~ 3 per day * 365
+      const fundPerHour = fr8h/8;
+      // Long/Short'a göre işaret uygulayacağız (long perp +fr öder, short perp +fr alır)
+
+      // Kullanıcı miktarını baz miktara çevir
+      let baseForLong, baseForShort; // her iki yön için de aynı baz miktarı hedefliyoruz
+      if (qtyMode==='base'){
+        baseForLong = baseForShort = Math.max(0, qtyVal);
+      } else {
+        // Taker long'da spot AL (ask) tüketilecek ⇒ base ≈ quote/ask
+        // Taker short'ta spot SAT (bid) ⇒ base ≈ quote/bid
+        baseForLong  = Math.max(0, qtyVal / spotAsk);
+        baseForShort = Math.max(0, qtyVal / spotBid);
+      }
+
+      // VWAP'ler
+      const vSpotBuy  = vwapSpot('buy',  depthS, baseForLong,  qtyMode==='quote'?qtyVal:undefined);
+      const vSpotSell = vwapSpot('sell', depthS, baseForShort, qtyMode==='quote'?qtyVal:undefined);
+
+      const vPerpBuy  = vwapPerp('buy',  depthP, baseForShort); // short senaryoda perp long için
+      const vPerpSell = vwapPerp('sell', depthP, baseForLong);  // long senaryoda perp short için
+
+      // Basis (normalize: / spotMid)
+      const basisTL = (vPerpSell.price - vSpotBuy.price)/spotMid;  // taker long
+      const basisML = (perpAsk - spotBid)/spotMid;                  // maker long
+      const basisTS = (vSpotSell.price - vPerpBuy.price)/spotMid;   // taker short
+      const basisMS = (spotAsk - perpBid)/spotMid;                  // maker short
+
+      // Ücret ve funding etkisi
+      // Taker long: spot buy (taker) + perp sell (taker)
+      const feeTL = feeSpotT + feePerpT;
+      const feeTS = feeSpotT + feePerpT;
+      const feeML = feeSpotM + feePerpM;
+      const feeMS = feeSpotM + feePerpM;
+
+      // Funding saatine göre; long perp +fr öder; short perp +fr alır
+      const fundHrs = holdHrs>0 ? holdHrs : 0;
+      const fundLongPerp  = fundPerHour * fundHrs * (-1); // long perp ise negatif (öder)
+      const fundShortPerp = fundPerHour * fundHrs * (+1); // short perp ise pozitif (alır)
+
+      const netTL = computeNet(basisTL, {fee:feeTL, slip:slip, funding:fundShortPerp}); // perp short
+      const netML = computeNet(basisML, {fee:feeML, slip:slip*0.5, funding:fundShortPerp});
+      const netTS = computeNet(basisTS, {fee:feeTS, slip:slip, funding:fundLongPerp});  // perp long
+      const netMS = computeNet(basisMS, {fee:feeMS, slip:slip*0.5, funding:fundLongPerp});
+
+      // PnL tahmini (0% kapanış)
+      const pnlTL = pnlFromBasis(basisTL, vSpotBuy.baseFilled, spotMid);
+      const pnlML = pnlFromBasis(basisML, vSpotBuy.baseFilled, spotMid);
+      const pnlTS = pnlFromBasis(basisTS, vSpotSell.baseFilled, spotMid);
+      const pnlMS = pnlFromBasis(basisMS, vSpotSell.baseFilled, spotMid);
+
+      // ---- UI doldur ----
+      el.spotBid.textContent = fnum(spotBid, perpScales.priceScale);
+      el.spotAsk.textContent = fnum(spotAsk, perpScales.priceScale);
+      el.spotMid.textContent = fnum(spotMid, perpScales.priceScale);
+
+      el.perpBid.textContent = isFinite(perpBid)? fnum(perpBid, perpScales.priceScale): '—';
+      el.perpAsk.textContent = isFinite(perpAsk)? fnum(perpAsk, perpScales.priceScale): '—';
+      el.markInfo.textContent = (isFinite(markP.index)? fnum(markP.index, perpScales.priceScale):'—') + ' / ' + (isFinite(markP.fair)? fnum(markP.fair, perpScales.priceScale):'—');
+
+      el.fund8h.textContent = isFinite(fr8h)? (fr8h*100).toFixed(4)+'%':'—';
+      el.fundApr.textContent = isFinite(fundApr)? (fundApr*100).toFixed(2)+'%':'—';
+      el.fundNext.textContent = nextTs? new Date(nextTs).toLocaleString():'—';
+
+      const paint = (elx, val)=>{ elx.textContent = (val*100).toFixed(3)+'%'; elx.className = 'mono ' + (val>0?'green':(val<0?'red':'')); }
+      paint(el.basisTL, basisTL); paint(el.basisML, basisML); paint(el.basisTS, basisTS); paint(el.basisMS, basisMS);
+
+      const paintNet = (elx, val)=>{ elx.textContent = (val*100).toFixed(3)+'%'; elx.className = 'mono ' + (val>0?'green':(val<0?'red':'yellow')); }
+      paintNet(el.netTL, netTL); paintNet(el.netML, netML); paintNet(el.netTS, netTS); paintNet(el.netMS, netMS);
+
+      el.pnlTL.textContent = (isFinite(pnlTL)? fnum(pnlTL,2)+' USDT':'—');
+      el.pnlML.textContent = (isFinite(pnlML)? fnum(pnlML,2)+' USDT':'—');
+      el.pnlTS.textContent = (isFinite(pnlTS)? fnum(pnlTS,2)+' USDT':'—');
+      el.pnlMS.textContent = (isFinite(pnlMS)? fnum(pnlMS,2)+' USDT':'—');
+
+      el.vwapSpotBuy.textContent  = isFinite(vSpotBuy.price)?  `${fnum(vSpotBuy.price,perpScales.priceScale)} @ ${fnum(vSpotBuy.baseFilled,6)} base / ${fnum(vSpotBuy.quoteFilled,2)} USDT` : '—';
+      el.vwapSpotSell.textContent = isFinite(vSpotSell.price)? `${fnum(vSpotSell.price,perpScales.priceScale)} @ ${fnum(vSpotSell.baseFilled,6)} base / ${fnum(vSpotSell.quoteFilled,2)} USDT` : '—';
+      el.vwapPerpBuy.textContent  = isFinite(vPerpBuy.price)?  `${fnum(vPerpBuy.price,perpScales.priceScale)} @ ${fnum(vPerpBuy.baseFilled,6)} base` : '—';
+      el.vwapPerpSell.textContent = isFinite(vPerpSell.price)? `${fnum(vPerpSell.price,perpScales.priceScale)} @ ${fnum(vPerpSell.baseFilled,6)} base` : '—';
+
+      // Depth özet (ilk 5)
+      const fmtDepth = (levels, isSpot=true) => (levels||[]).slice(0,5).map(x=>`${fnum(Number(x[0]), isSpot?perpScales.priceScale:perpScales.priceScale)} × ${fnum(Number(x[1]), isSpot?6:0)}`).join(' | ');
+      el.depthSpot.textContent = `Bids: ${fmtDepth(depthS.bids,true)}  ||  Asks: ${fmtDepth(depthS.asks,true)}`;
+      el.depthPerp.textContent = `Bids: ${fmtDepth(depthP.bids,false)}  ||  Asks: ${fmtDepth(depthP.asks,false)}`;
+
+      // Latency
+      lastLatencyMs = Math.round(performance.now() - t0);
+      el.latency.textContent = lastLatencyMs+' ms';
+      el.lastTs.textContent = new Date().toLocaleTimeString();
+
+    } catch(err){
+      console.error(err);
+      el.runTxt.textContent = 'Hata: ' + (err.message||'');
+      el.dotRun.style.background = '#ef476f';
+    }
+  }
+
+  // Başlat/Durdur
+  async function start(){
+    if (timer) clearInterval(timer);
+    el.dotRun.style.background = '#20c997';
+    el.runTxt.textContent = 'Çalışıyor';
+
+    // sembol değişimi => perp contractSize güncelle
+    const detail = await getPerpDetail(toPerpSymbol(el.symbolSpot.value.trim().toUpperCase()));
+    if (detail){
+      contractSize = Number(detail.contractSize) || 0.0001;
+      perpScales.priceScale = Number(detail.priceScale)||2;
+    }
+
+    await tick();
+    const iv = Math.max(250, Number(el.refreshMs.value)||1000);
+    timer = setInterval(tick, iv);
+  }
+  function stop(){
+    if (timer){ clearInterval(timer); timer=null; }
+    el.dotRun.style.background = '#777';
+    el.runTxt.textContent = 'Bekliyor';
+  }
+
+  // Olaylar
+  el.btnStart.addEventListener('click', start);
+  el.btnStop.addEventListener('click', stop);
+  el.symbolSpot.addEventListener('input', ()=>{ el.symbolPerp.textContent = toPerpSymbol(el.symbolSpot.value.trim().toUpperCase()); contractSize=null; });
+})();
+</script>
+</body>
+</html>
