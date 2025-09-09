@@ -170,35 +170,18 @@
 </main>
 
 <script>
-/* ===== Küçük yardımcılar (dinamik basamak, hızlı DOM) ===== */
+/* ===== Küçük yardımcılar (basamak KESİNLİKLE korunur) ===== */
 const $ = s=>document.querySelector(s);
 const now=()=>new Date().toLocaleTimeString('tr-TR',{hour12:false});
 const enc = new TextEncoder();
 const num = v => (typeof v === 'number') ? v : parseFloat(v);
 
-/* Bilimsel gösterim riskine karşı: kaynaktan gelen string varsa AYNEN göster.
-   Yoksa sayıyı yuvarlamadan/dijit azaltmadan düz metin olarak yaz. */
-function toPlainString(x, preferStr){
-  if (typeof preferStr === 'string') return preferStr;        // Kaynaktaki tam metni KORU
-  if (!isFinite(x)) return '—';
-  const s = String(x);
-  if (!/e/i.test(s)) return s;                                // Bilimsel değilse olduğu gibi
-  // Bilimsel gösterimi düz ondalığa çevir (yuvarlama yapmadan)
-  try{
-    const [mant, eStr] = s.toLowerCase().split('e');
-    const exp = parseInt(eStr, 10);
-    const [ip, fp=''] = mant.split('.');
-    if (exp >= 0){
-      const padded = fp.padEnd(exp, '0');
-      const whole = ip + padded.slice(0, exp);
-      const rest = padded.slice(exp);
-      return rest ? whole + '.' + rest : whole;
-    } else {
-      const k = Math.abs(exp) - 1;
-      const digits = (ip.replace(/^0+/, '') + fp) || '0';
-      return '0.' + '0'.repeat(Math.max(0, k)) + digits;
-    }
-  }catch(_){ return s; }
+/* Kaynaktan gelen string varsa AYNEN yaz. Yoksa sayıyı grup ayırmadan, e-notasyon olmadan stringe çevir. */
+function keepStr(v){
+  if (typeof v === 'string') return v;               // tam geldiği gibi
+  if (!isFinite(v)) return '—';
+  // e-notasyona düşmeden, var olan kadar ondalığı göster (maks 20)
+  return Number(v).toLocaleString('en-US', {useGrouping:false, maximumFractionDigits:20});
 }
 function pct(p){ return isFinite(p) ? ((p>=0?'+':'') + p.toFixed(3) + '%') : '—'; }
 
@@ -311,16 +294,17 @@ function wsConnect(){
         const s=j.symbol; const d=j.data;
         const last=num(d.lastPrice), bid1=num(d.bid1), ask1=num(d.ask1);
         const m=S.fut.get(s)||{};
-        m.last=last; m.lastStr=toPlainString(d.lastPrice,String(d.lastPrice));
-        m.bid1=bid1; m.bidStr=toPlainString(d.bid1,String(d.bid1));
-        m.ask1=ask1; m.askStr=toPlainString(d.ask1,String(d.ask1));
+        // SAYISAL ve METİN ayrı ayrı sakla: metin olarak ASLA kısaltma/yuvarlama yapma
+        m.last=last; m.lastStr=keepStr(d.lastPrice);
+        m.bid1=bid1; m.bidStr=keepStr(d.bid1);
+        m.ask1=ask1; m.askStr=keepStr(d.ask1);
         m.ts=Date.now(); S.fut.set(s,m);
         if(s==='BTC_USDT') $('#btc').textContent = `${m.bidStr || '—'} / ${m.askStr || '—'} USDT`;
       }
       if(j.channel==='push.index.price' && j.data){
         const s=j.symbol; const price=num(j.data.price);
         const m=S.spotIndex.get(s)||{};
-        m.index=price; m.indexStr = toPlainString(j.data.price,String(j.data.price));
+        m.index=price; m.indexStr = keepStr(j.data.price);
         m.ts=Date.now(); S.spotIndex.set(s,m);
       }
     }catch(_){}
@@ -336,7 +320,7 @@ function wsSub(sym,on){
 function ping(){ if(S.ws?.readyState===1){ S.ws.send(JSON.stringify({method:'ping'})); setTimeout(ping,15000);} }
 wsConnect();
 
-/* ===== SPOT bookTicker (REST) — Ask/Bid (CORS engeli olursa fallback: index.price) ===== */
+/* ===== SPOT bookTicker (REST) — Ask/Bid (CORS olursa fallback: index.price) ===== */
 const SPOT_BASE='https://api.mexc.com';
 async function fetchSpotBook(sym){ // sym: "BTC_USDT"
   const symbol = sym.replace('_','');
@@ -344,15 +328,16 @@ async function fetchSpotBook(sym){ // sym: "BTC_USDT"
     const r = await fetch(`${SPOT_BASE}/api/v3/ticker/bookTicker?symbol=${symbol}`, {cache:'no-store'});
     if(!r.ok) throw new Error('HTTP '+r.status);
     const j = await r.json();
-    const bidStr = String(j.bidPrice), askStr = String(j.askPrice);
+    // API'nin döndürdüğü metni HİÇ değiştirme
+    const bidStr = keepStr(j.bidPrice);
+    const askStr = keepStr(j.askPrice);
     S.spotBook.set(sym, {
       bid: num(bidStr), ask: num(askStr),
-      bidStr: toPlainString(j.bidPrice,bidStr),
-      askStr: toPlainString(j.askPrice,askStr),
+      bidStr, askStr,
       ts: Date.now()
     });
   }catch(e){
-    // Fallback: kullan indeks
+    // Fallback: indeks (metin olarak aynı şekilde koru)
     const idx = S.spotIndex.get(sym);
     if(idx?.index){
       S.spotBook.set(sym, {
@@ -364,18 +349,14 @@ async function fetchSpotBook(sym){ // sym: "BTC_USDT"
 }
 async function spotPollLoop(){
   if(S.coins.size===0) return;
-  // Çok hızlı vurmayalım; sırayla dolaş
   for(const sym of S.coins){
     await fetchSpotBook(sym);
     await new Promise(r=>setTimeout(r, 60)); // semboller arası mini bekleme
   }
 }
-S.timers.spot = setInterval(spotPollLoop, 800); // hızlı ve hafif: ~0.8sn döngü
+S.timers.spot = setInterval(spotPollLoop, 800);
 
-/* ===== Hesaplama (tam doğru, AL taban fiyatına göre %) =====
-   - Yön 1: Spot ASK (kırmızı)  vs Futures BID (yeşil)  => SPOT AL, FUTURES SAT (SHORT)
-   - Yön 2: Futures ASK (kırmızı) vs Spot BID (yeşil)   => FUTURES AL (LONG), SPOT SAT
-*/
+/* ===== Hesaplama (AL taban fiyatına göre %) ===== */
 function computeRows(){
   const thr = Number(S.ui.thresh)||0;
   const rows=[];
@@ -385,8 +366,8 @@ function computeRows(){
     const futBid=f.bid1, futAsk=f.ask1; if(!isFinite(futBid)||!isFinite(futAsk)) continue;
     const spotAsk=sb.ask, spotBid=sb.bid;
 
-    // Yön 1: SPOT AL (ASK) vs FUTURES SAT (BID)
     let best = null;
+    // SPOT AL (ASK) vs FUTURES SAT (BID)
     if(isFinite(spotAsk) && isFinite(futBid) && futBid > spotAsk){
       const pct1 = (futBid - spotAsk) / spotAsk * 100;
       if(pct1 >= thr){
@@ -399,7 +380,7 @@ function computeRows(){
         };
       }
     }
-    // Yön 2: FUTURES AL (ASK) vs SPOT SAT (BID)
+    // FUTURES AL (ASK) vs SPOT SAT (BID)
     if(isFinite(futAsk) && isFinite(spotBid) && spotBid > futAsk){
       const pct2 = (spotBid - futAsk) / futAsk * 100;
       if(pct2 >= thr){
@@ -410,21 +391,18 @@ function computeRows(){
           action: 'FUTURES LONG',
           futPrice: f.askStr, spotPrice: sb.bidStr
         };
-        // Hangisi daha iyiyse onu al
         if(!best || alt.pct > best.pct) best = alt;
       }
     }
-
     if(!best) continue;
-    if(S.ui.onlySpotAl && best.lowSrc!=='spot') continue; // filtre
-
+    if(S.ui.onlySpotAl && best.lowSrc!=='spot') continue;
     rows.push(best);
   }
   rows.sort((a,b)=> b.pct - a.pct);
   return rows;
 }
 
-/* ===== Çizim (daha hızlı, minimum DOM) ===== */
+/* ===== Çizim ===== */
 function draw(){
   const rows=computeRows();
 
@@ -436,8 +414,7 @@ function draw(){
     const r=rows[0];
     $('#topSym').textContent = r.sym.replace('_','');
     $('#topAction').innerHTML = r.action.includes('LONG') ? '<span class="good">FUTURES LONG</span>' : '<span class="bad">FUTURES SHORT</span>';
-    // Kartta futures tarafı göster
-    $('#topPrice').textContent = `${r.futPrice} USDT`;
+    $('#topPrice').textContent = `${r.futPrice} USDT`;   // FUTURES fiyatı METİN olarak
     $('#topPct').textContent = pct(r.pct);
     top.classList.add('blink'); setTimeout(()=>top.classList.remove('blink'), 250);
   }
