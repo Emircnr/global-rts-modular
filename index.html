@@ -92,6 +92,10 @@
       <div class="card">
         <label for="speed">Görsel yenileme</label>
         <select id="speed">
+          <option value="1">0.001 sn</option>
+          <option value="5">0.005 sn</option>
+          <option value="10">0.01 sn</option>
+          <option value="25">0.025 sn</option>
           <option value="50">0.05 sn</option>
           <option value="100">0.1 sn</option>
           <option value="250" selected>0.25 sn</option>
@@ -429,7 +433,11 @@ function draw(){
   tb.replaceChildren(frag);
   $('#clock').textContent = now();
 }
-function tickRender(){ clearInterval(S.timers.render); const ms=Math.max(30,Math.min(2000,S.ui.speed|0)); S.timers.render=setInterval(()=>{ draw(); maybeBot(); }, ms); }
+function tickRender(){
+  clearInterval(S.timers.render);
+  const ms = Math.max(1, Math.min(2000, S.ui.speed|0)); // 1ms ile 2000ms arası (tarayıcı clamp yapabilir)
+  S.timers.render = setInterval(()=>{ draw(); maybeBot(); }, ms);
+}
 tickRender();
 
 /* ===== BOT ayarlarını bağla (opsiyonel) ===== */
