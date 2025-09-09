@@ -176,14 +176,29 @@ const now=()=>new Date().toLocaleTimeString('tr-TR',{hour12:false});
 const enc = new TextEncoder();
 const num = v => (typeof v === 'number') ? v : parseFloat(v);
 
-/* Bilimsel gösterim riskine karşı basamak koruyan yazdırma */
+/* Bilimsel gösterim riskine karşı: kaynaktan gelen string varsa AYNEN göster.
+   Yoksa sayıyı yuvarlamadan/dijit azaltmadan düz metin olarak yaz. */
 function toPlainString(x, preferStr){
-  if (preferStr && typeof preferStr === 'string') return preferStr; // kaynaktan gelen stringi aynen göster
+  if (typeof preferStr === 'string') return preferStr;        // Kaynaktaki tam metni KORU
   if (!isFinite(x)) return '—';
-  let s = String(x);
-  if (!/e/i.test(s)) return s.replace(/\.?0+$/,''); // sondaki sıfırları sil
-  // e-notation -> 12 ondalığa sabitle, sonra sıfırları kırp
-  return x.toFixed(12).replace(/\.?0+$/,'');
+  const s = String(x);
+  if (!/e/i.test(s)) return s;                                // Bilimsel değilse olduğu gibi
+  // Bilimsel gösterimi düz ondalığa çevir (yuvarlama yapmadan)
+  try{
+    const [mant, eStr] = s.toLowerCase().split('e');
+    const exp = parseInt(eStr, 10);
+    const [ip, fp=''] = mant.split('.');
+    if (exp >= 0){
+      const padded = fp.padEnd(exp, '0');
+      const whole = ip + padded.slice(0, exp);
+      const rest = padded.slice(exp);
+      return rest ? whole + '.' + rest : whole;
+    } else {
+      const k = Math.abs(exp) - 1;
+      const digits = (ip.replace(/^0+/, '') + fp) || '0';
+      return '0.' + '0'.repeat(Math.max(0, k)) + digits;
+    }
+  }catch(_){ return s; }
 }
 function pct(p){ return isFinite(p) ? ((p>=0?'+':'') + p.toFixed(3) + '%') : '—'; }
 
