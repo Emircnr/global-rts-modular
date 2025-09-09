@@ -170,18 +170,17 @@
 </main>
 
 <script>
-/* ===== Küçük yardımcılar (basamak KESİNLİKLE korunur) ===== */
+/* ===== Yardımcılar ===== */
 const $ = s=>document.querySelector(s);
 const now=()=>new Date().toLocaleTimeString('tr-TR',{hour12:false});
 const enc = new TextEncoder();
 const num = v => (typeof v === 'number') ? v : parseFloat(v);
 
-/* Kaynaktan gelen string varsa AYNEN yaz. Yoksa sayıyı grup ayırmadan, e-notasyon olmadan stringe çevir. */
-function keepStr(v){
-  if (typeof v === 'string') return v;               // tam geldiği gibi
-  if (!isFinite(v)) return '—';
-  // e-notasyona düşmeden, var olan kadar ondalığı göster (maks 20)
-  return Number(v).toLocaleString('en-US', {useGrouping:false, maximumFractionDigits:20});
+/* Tam olarak 9 ondalık basamak göster (daima). */
+function fmt9(v){
+  const n = (typeof v === 'string') ? parseFloat(v) : v;
+  if (!isFinite(n)) return '—';
+  return n.toFixed(9); // örn: 1.081400000
 }
 function pct(p){ return isFinite(p) ? ((p>=0?'+':'') + p.toFixed(3) + '%') : '—'; }
 
@@ -294,17 +293,16 @@ function wsConnect(){
         const s=j.symbol; const d=j.data;
         const last=num(d.lastPrice), bid1=num(d.bid1), ask1=num(d.ask1);
         const m=S.fut.get(s)||{};
-        // SAYISAL ve METİN ayrı ayrı sakla: metin olarak ASLA kısaltma/yuvarlama yapma
-        m.last=last; m.lastStr=keepStr(d.lastPrice);
-        m.bid1=bid1; m.bidStr=keepStr(d.bid1);
-        m.ask1=ask1; m.askStr=keepStr(d.ask1);
+        m.last=last; m.lastStr=fmt9(d.lastPrice);
+        m.bid1=bid1; m.bidStr=fmt9(d.bid1);
+        m.ask1=ask1; m.askStr=fmt9(d.ask1);
         m.ts=Date.now(); S.fut.set(s,m);
         if(s==='BTC_USDT') $('#btc').textContent = `${m.bidStr || '—'} / ${m.askStr || '—'} USDT`;
       }
       if(j.channel==='push.index.price' && j.data){
         const s=j.symbol; const price=num(j.data.price);
         const m=S.spotIndex.get(s)||{};
-        m.index=price; m.indexStr = keepStr(j.data.price);
+        m.index=price; m.indexStr = fmt9(j.data.price);
         m.ts=Date.now(); S.spotIndex.set(s,m);
       }
     }catch(_){}
@@ -328,21 +326,19 @@ async function fetchSpotBook(sym){ // sym: "BTC_USDT"
     const r = await fetch(`${SPOT_BASE}/api/v3/ticker/bookTicker?symbol=${symbol}`, {cache:'no-store'});
     if(!r.ok) throw new Error('HTTP '+r.status);
     const j = await r.json();
-    // API'nin döndürdüğü metni HİÇ değiştirme
-    const bidStr = keepStr(j.bidPrice);
-    const askStr = keepStr(j.askPrice);
+    const bidStr = fmt9(j.bidPrice);
+    const askStr = fmt9(j.askPrice);
     S.spotBook.set(sym, {
-      bid: num(bidStr), ask: num(askStr),
+      bid: num(j.bidPrice), ask: num(j.askPrice),
       bidStr, askStr,
       ts: Date.now()
     });
   }catch(e){
-    // Fallback: indeks (metin olarak aynı şekilde koru)
     const idx = S.spotIndex.get(sym);
     if(idx?.index){
       S.spotBook.set(sym, {
         bid: idx.index, ask: idx.index,
-        bidStr: idx.indexStr, askStr: idx.indexStr, ts: Date.now(), fallback:true
+        bidStr: fmt9(idx.index), askStr: fmt9(idx.index), ts: Date.now(), fallback:true
       });
     }
   }
@@ -414,7 +410,7 @@ function draw(){
     const r=rows[0];
     $('#topSym').textContent = r.sym.replace('_','');
     $('#topAction').innerHTML = r.action.includes('LONG') ? '<span class="good">FUTURES LONG</span>' : '<span class="bad">FUTURES SHORT</span>';
-    $('#topPrice').textContent = `${r.futPrice} USDT`;   // FUTURES fiyatı METİN olarak
+    $('#topPrice').textContent = `${r.futPrice} USDT`;
     $('#topPct').textContent = pct(r.pct);
     top.classList.add('blink'); setTimeout(()=>top.classList.remove('blink'), 250);
   }
