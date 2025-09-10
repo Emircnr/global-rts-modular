@@ -6,14 +6,12 @@
 <title>Gate.io Futures ↔ Spot — Anlık Fark (Ultra Hızlı + Bot)</title>
 <!--
   Gate API v4 imzalama ve uç noktalar (referans):
-  - Genel imza formatı: METHOD \n PATH \n QUERY \n HEX(SHA512(BODY)) \n TIMESTAMP
-    https://eu.gate.com/docs/developers/apiv4/en/   (Spot: /spot/orders)
-  - Futures USDT base URL: https://fx-api.gateio.ws (REST) | WS: wss://fx-ws.gateio.ws/v4/ws/usdt
-    (Futures market order: "price": "0" ve "tif":"ioc")
-    https://www.gate.com/docs/developers/futures/ws/en/  (price=0 => market, size>0 bid / size<0 ask)
-  - Minimum spot API sipariş tutarı genelde 10 USDT (API): (topluluk cevabı) https://www.reddit.com/r/GateioExchange/comments/1b77u4x/so_cant_make_order_less_than_10_anymore_with_api/
-
-  ⚠ Güvenlik: API anahtarlarını istemciye koymak risklidir. Üretimde sunucu/worker üzerinden imzalama önerilir.
+  - Sign string: METHOD \n /api/v4 + PATH \n QUERY \n HEX(SHA512(BODY)) \n TIMESTAMP
+  - Spot REST base:    https://api.gateio.ws
+  - Futures REST base: https://fx-api.gateio.ws
+  - WS: spot: wss://api.gateio.ws/ws/v4/  | futures: wss://fx-ws.gateio.ws/v4/ws/usdt
+  - Futures market order: { price:"0", tif:"ioc", size<0 => short }
+  ⚠ Güvenlik: API anahtarlarını tarayıcıda tutmak risklidir; üretimde imzalamayı sunucu/worker’a taşıyın.
 -->
 <style>
   :root{
@@ -44,7 +42,6 @@
   .center{display:flex; justify-content:center}
   h1{margin:0; font-size:22px; letter-spacing:.2px}
   .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
-  .right{margin-left:auto}
   .btn{
     border:1px solid var(--border); background:linear-gradient(180deg,var(--panel),var(--panel2));
     color:var(--fg); padding:10px 14px; border-radius:12px; cursor:pointer
@@ -224,7 +221,7 @@
         </div>
 
         <div class="grp">
-          <label class="lbl">API Bilgileri (yerelde tutulmaz)</label>
+          <label class="lbl">API & Proxy</label>
           <div class="row" style="gap:12px; flex-wrap:wrap">
             <input id="spotKey" placeholder="Spot API KEY" style="flex:1 1 220px"/>
             <input id="spotSec" placeholder="Spot API SECRET" type="password" style="flex:1 1 220px"/>
@@ -234,9 +231,10 @@
             <input id="futSec" placeholder="Futures API SECRET" type="password" style="flex:1 1 220px"/>
           </div>
           <div class="row" style="gap:12px; flex-wrap:wrap; margin-top:8px">
-            <input id="proxyUrl" placeholder="Proxy URL (opsiyonel, Cloudflare Worker vb.)" style="flex:1 1 320px"/>
+            <input id="proxyUrl" value="http://localhost:8787/" placeholder="Proxy URL (örn: http://localhost:8787/ veya Cloudflare/Vercel)" style="flex:1 1 320px"/>
+            <input id="proxyToken" placeholder="Proxy Token (opsiyonel)" style="flex:1 1 220px"/>
           </div>
-          <div class="warn">⚠ Tarayıcıdan direkt REST çağrılarında CORS engeli olabilir. Üretimde anahtarları tarayıcıda tutmayın.</div>
+          <div class="warn">⚠ Tarayıcıdan direkt REST çağrılarında CORS engeli olur. Yerel proxy veya Worker/Vercel adresinizi yukarıya girin.</div>
         </div>
 
         <div class="grp">
@@ -248,7 +246,7 @@
   </div>
 
 <script>
-/* ====== Kısa yardımcılar ====== */
+/* ====== Yardımcılar ====== */
 const $ = s=>document.querySelector(s);
 const $$ = s=>document.querySelectorAll(s);
 const now = ()=>new Date().toLocaleTimeString('tr-TR',{hour12:false});
@@ -278,7 +276,9 @@ const S = {
     thresh:0.20, notional:20, lev:5, margin:'isolated',
     cooldown:5, busy:false, lastExecBySym:new Map(),
     // API creds (RAM only)
-    spotKey:'', spotSec:'', futKey:'', futSec:'', proxy:'',
+    spotKey:'', spotSec:'', futKey:'', futSec:'',
+    // Proxy varsayılanı: yerel Node/Express (CORS çözümü)
+    proxy:'http://localhost:8787/', proxyToken:'',
     // futures settings applied cache
     futSetup:new Set()
   }
@@ -309,6 +309,24 @@ $('#thresh').onchange = e=>{ S.ui.thresh=+e.target.value; saveUI(); scheduleDraw
 $('#toggleTop').onchange = e=>{ S.ui.showTop=e.target.checked; saveUI(); scheduleDraw(); };
 $('#themeSel').onchange = e=>{ S.ui.theme=e.target.value; saveUI(); applyTheme(); };
 
+/* ====== Bot UI bağlama ====== */
+function botLog(line){ const ta=$('#botLog'); ta.value += `[${now()}] ${line}\n`; ta.scrollTop = ta.scrollHeight; }
+$('#botEnable').onchange = e=>{ S.bot.enabled = e.target.checked; botLog(S.bot.enabled?'Bot AÇIK':'Bot KAPALI'); };
+$('#botDry').onchange = e=>{ S.bot.dry = e.target.checked; };
+$('#botUseTableThresh').onchange = e=>{ S.bot.useTableThresh = e.target.checked; };
+$('#botThresh').onchange = e=>{ S.bot.thresh = +e.target.value; };
+$('#botNotional').onchange = e=>{ S.bot.notional = Math.max(10, +e.target.value||0); }; // min 10
+$('#botLev').onchange = e=>{ S.bot.lev = clamp(+e.target.value||1, 1, 125); };
+$('#botMargin').onchange = e=>{ S.bot.margin = e.target.value; };
+$('#botCooldown').onchange = e=>{ S.bot.cooldown = Math.max(1, +e.target.value||1); };
+$('#spotKey').oninput = e=>S.bot.spotKey=e.target.value.trim();
+$('#spotSec').oninput = e=>S.bot.spotSec=e.target.value.trim();
+$('#futKey').oninput  = e=>S.bot.futKey = e.target.value.trim();
+$('#futSec').oninput  = e=>S.bot.futSec = e.target.value.trim();
+$('#proxyUrl').oninput= e=>S.bot.proxy = e.target.value.trim();
+$('#proxyToken').oninput= e=>S.bot.proxyToken = e.target.value.trim();
+
+/* ====== Coin list UI ====== */
 function renderChips(){
   const wrap = $('#chipWrap'); wrap.innerHTML = '';
   const frag = document.createDocumentFragment();
@@ -341,25 +359,9 @@ $('#btnClear').onclick = ()=>{
   }
 };
 
-/* ====== BOT UI bağlama ====== */
-function botLog(line){ const ta=$('#botLog'); ta.value += `[${now()}] ${line}\n`; ta.scrollTop = ta.scrollHeight; }
-$('#botEnable').onchange = e=>{ S.bot.enabled = e.target.checked; botLog(S.bot.enabled?'Bot AÇIK':'Bot KAPALI'); };
-$('#botDry').onchange = e=>{ S.bot.dry = e.target.checked; };
-$('#botUseTableThresh').onchange = e=>{ S.bot.useTableThresh = e.target.checked; };
-$('#botThresh').onchange = e=>{ S.bot.thresh = +e.target.value; };
-$('#botNotional').onchange = e=>{ S.bot.notional = Math.max(10, +e.target.value||0); }; // min 10
-$('#botLev').onchange = e=>{ S.bot.lev = clamp(+e.target.value||1, 1, 125); };
-$('#botMargin').onchange = e=>{ S.bot.margin = e.target.value; };
-$('#botCooldown').onchange = e=>{ S.bot.cooldown = Math.max(1, +e.target.value||1); };
-$('#spotKey').oninput = e=>S.bot.spotKey=e.target.value.trim();
-$('#spotSec').oninput = e=>S.bot.spotSec=e.target.value.trim();
-$('#futKey').oninput  = e=>S.bot.futKey = e.target.value.trim();
-$('#futSec').oninput  = e=>S.bot.futSec = e.target.value.trim();
-$('#proxyUrl').oninput= e=>S.bot.proxy = e.target.value.trim();
-
 /* ====== Gate.io WebSocket (ticker) ====== */
-/* Spot:    wss://api.gateio.ws/ws/v4/          channel: spot.book_ticker (payload: ["BTC_USDT"])
-   Futures: wss://fx-ws.gateio.ws/v4/ws/usdt    channel: futures.book_ticker (payload: ["BTC_USDT"]) */
+/* Spot: wss://api.gateio.ws/ws/v4/   channel: spot.book_ticker (payload: ["BTC_USDT"])
+   Fut:  wss://fx-ws.gateio.ws/v4/ws/usdt  channel: futures.book_ticker (payload: ["BTC_USDT"]) */
 function wsConnect(kind){
   const isSpot = kind==='spot';
   try{ S.ws[kind]?.close?.(); }catch{}
@@ -463,7 +465,7 @@ async function draw(){
       rows.push({sym, best, r});
     }
 
-    // ==== BOT TETİK (yalnızca SHORT bacağı) ====
+    // ==== BOT TETİĞİ (yalnızca SHORT bacağı) ====
     await maybeBot(sym, r, showShort);
   }
 
@@ -498,7 +500,7 @@ async function draw(){
   $('#clock').textContent = now();
 }
 
-/* ====== BOT ÇALIŞMASI ====== */
+/* ====== BOT AKIŞI ====== */
 async function maybeBot(sym, r, showShort){
   if(!S.bot.enabled || S.bot.busy) return;
   const pct = r?.shortPct;
@@ -511,13 +513,13 @@ async function maybeBot(sym, r, showShort){
   const last = S.bot.lastExecBySym.get(sym) || 0;
   if(Date.now() - last < S.bot.cooldown*1000) return;
 
-  // Temel kontroller: API, miktar
+  // API kontrolü
   if(!S.bot.dry && (!S.bot.spotKey || !S.bot.spotSec || !S.bot.futKey || !S.bot.futSec)){
     botLog(`❗ ${sym}: API bilgileri eksik (Spot & Futures key/secret gerekli).`);
     return;
   }
 
-  // Miktar (baz birim) — daha temkinli olmak için max(askS, bidF) kullan
+  // Miktar (baz birim)
   const pxRef = Math.max(r.askS||0, r.bidF||0);
   if(!isFinite(pxRef) || pxRef<=0) return;
   const baseQty = +roundTo(S.bot.notional / pxRef, 6);
@@ -531,26 +533,18 @@ async function maybeBot(sym, r, showShort){
     botLog(`⏩ ${sym} | SHORT fark=${pctStr(pct)} | Baz Miktar≈${baseQty}`);
 
     if(S.bot.dry){
-      botLog(`(dry-run) → Spot BUY market ~${baseQty} | Futures SHORT market ~${baseQty} x${S.bot.lev} (${S.bot.margin})`);
+      botLog(`(dry-run) → Spot BUY ~${baseQty} | Futures SHORT ~${baseQty} x${S.bot.lev} (${S.bot.margin})`);
     } else {
-      // Önce futures ayarları (marjin modu & kaldıraç)
+      // Futures ayarları (marjin & kaldıraç)
       await ensureFuturesSettings(sym, S.bot.margin, S.bot.lev);
-
-      // Emirleri arka arkaya (futures short + spot buy)
+      // Emirler
       const futP = placeFuturesShortMarket(sym, baseQty);
       const spotP = placeSpotBuyMarket(sym, baseQty);
-
       const [futRes, spotRes] = await Promise.allSettled([futP, spotP]);
-      if(futRes.status==='fulfilled'){
-        botLog(`✅ Futures SHORT (market) OK: ${futRes.value?.id||'—'}`);
-      } else {
-        botLog(`❌ Futures hata: ${(futRes.reason && (futRes.reason.message||futRes.reason))||futRes.status}`);
-      }
-      if(spotRes.status==='fulfilled'){
-        botLog(`✅ Spot BUY (market) OK: ${spotRes.value?.id||'—'}`);
-      } else {
-        botLog(`❌ Spot hata: ${(spotRes.reason && (spotRes.reason.message||spotRes.reason))||spotRes.status}`);
-      }
+      if(futRes.status==='fulfilled'){ botLog(`✅ Futures SHORT OK: ${futRes.value?.id||'—'}`); }
+      else { botLog(`❌ Futures hata: ${(futRes.reason && (futRes.reason.message||futRes.reason))||futRes.status}`); }
+      if(spotRes.status==='fulfilled'){ botLog(`✅ Spot BUY OK: ${spotRes.value?.id||'—'}`); }
+      else { botLog(`❌ Spot hata: ${(spotRes.reason && (spotRes.reason.message||spotRes.reason))||spotRes.status}`); }
     }
   } catch(err){
     botLog(`💥 Hata: ${err?.message||err}`);
@@ -561,7 +555,7 @@ async function maybeBot(sym, r, showShort){
 
 /* ====== Gate REST — imza & fetch ====== */
 const GATE = {
-  spotHost: 'https://api.gateio.ws',    // bazı bölgelerde https://api.gateeu.com
+  spotHost: 'https://api.gateio.ws',
   futHost:  'https://fx-api.gateio.ws',
   prefix:   '/api/v4'
 };
@@ -584,17 +578,22 @@ async function signHeaders(method, path, query, body, secret, key){
   return { 'Content-Type':'application/json', 'Accept':'application/json', 'KEY':key, 'Timestamp':ts, 'SIGN':sign };
 }
 
-async function gateFetch(host, method, path, {query='', bodyObj=null, key='', secret='', proxy='' }){
+async function gateFetch(host, method, path, {query='', bodyObj=null, key='', secret='', proxy='', token='' }){
   const body = bodyObj ? JSON.stringify(bodyObj) : '';
   const headers = await signHeaders(method, path, query, body, secret, key);
   const url = host + GATE.prefix + path + (query?`?${query}`:'');
   const target = proxy ? (proxy.endsWith('/')? proxy.slice(0,-1):proxy) : null;
 
-  // Eğer proxy verilmişse basit forward beklentisi: POST proxy’ye, headerlarda X-Target-URL
   if(target){
-    const f = await fetch(target, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ url, method, headers, body }) });
-    if(!f.ok) throw new Error(`Proxy ${f.status}`);
-    return f.json();
+    const forwardHeaders = {'Content-Type':'application/json'};
+    if(token) forwardHeaders['x-proxy-token'] = token;
+    const f = await fetch(target, { method:'POST', headers:forwardHeaders, body:JSON.stringify({ url, method, headers, body }) });
+    if(!f.ok){
+      const txt = await f.text().catch(()=>String(f.status));
+      throw new Error(`Proxy ${f.status}: ${txt}`);
+    }
+    const ct = f.headers.get('content-type')||'';
+    return ct.includes('application/json') ? f.json() : f.text();
   } else {
     const f = await fetch(url, { method, headers, body });
     if(!f.ok){
@@ -606,26 +605,24 @@ async function gateFetch(host, method, path, {query='', bodyObj=null, key='', se
   }
 }
 
-/* ====== Futures ayarları (margin mode & leverage) ====== */
+/* ====== Futures ayarları (margin & leverage) ====== */
 async function ensureFuturesSettings(sym, margin, lev){
-  const key = S.bot.futKey, sec = S.bot.futSec, proxy=S.bot.proxy;
+  const key = S.bot.futKey, sec = S.bot.futSec, proxy=S.bot.proxy, token=S.bot.proxyToken;
   if(S.bot.futSetup.has(`${sym}:${margin}:${lev}`)) return;
 
-  // 1) Marjin modu (true=cross, false=isolated)
+  // 1) Cross/Isolated
   const cross = (margin==='cross');
   try{
     await gateFetch(GATE.futHost, 'POST', `/futures/usdt/positions/cross_mode`, {
-      query: `cross=${cross}`,
-      bodyObj: {}, key, secret:sec, proxy
+      query: `cross=${cross}`, bodyObj: {}, key, secret:sec, proxy, token
     });
     botLog(`⚙ Futures cross_mode=${cross}`);
   }catch(e){ botLog(`(uyarı) cross_mode set edilemedi: ${e.message||e}`); }
 
-  // 2) Leverage (sözleşme bazında gerekebilir — burada aktif sembol için uygula)
+  // 2) Leverage (kontrata özel olabilir)
   try{
     await gateFetch(GATE.futHost, 'POST', `/futures/usdt/positions/${sym}/leverage`, {
-      query: `leverage=${lev}`,
-      bodyObj: {}, key, secret:sec, proxy
+      query: `leverage=${lev}`, bodyObj: {}, key, secret:sec, proxy, token
     });
     botLog(`⚙ ${sym} kaldıraç=${lev}x`);
   }catch(e){ botLog(`(uyarı) leverage set edilemedi (${sym}): ${e.message||e}`); }
@@ -635,37 +632,25 @@ async function ensureFuturesSettings(sym, margin, lev){
 
 /* ====== Emir fonksiyonları ====== */
 async function placeSpotBuyMarket(sym, baseQty){
-  const key = S.bot.spotKey, sec=S.bot.spotSec, proxy=S.bot.proxy;
-  const body = {
-    currency_pair: sym,
-    type: 'market',
-    account: 'spot',
-    side: 'buy',
-    amount: String(baseQty)
-  };
-  return gateFetch(GATE.spotHost, 'POST', `/spot/orders`, {
-    bodyObj: body, key, secret:sec, proxy
-  });
+  const key = S.bot.spotKey, sec=S.bot.spotSec, proxy=S.bot.proxy, token=S.bot.proxyToken;
+  const body = { currency_pair: sym, type: 'market', account: 'spot', side: 'buy', amount: String(baseQty) };
+  return gateFetch(GATE.spotHost, 'POST', `/spot/orders`, { bodyObj: body, key, secret:sec, proxy, token });
 }
 
 async function placeFuturesShortMarket(sym, baseQty){
-  const key = S.bot.futKey, sec=S.bot.futSec, proxy=S.bot.proxy;
-  /* Futures market: price:"0" + tif:"ioc", size<0 (ask) => SHORT */
-  const body = {
-    contract: sym,
-    size: -Math.abs(Math.round(baseQty*1e6)), // integer lot? çoğu kontrat bazında base qty integer bekler; 1e-6 hassasiyetle
-    price: "0",
-    tif: "ioc"
-  };
-  return gateFetch(GATE.futHost, 'POST', `/futures/usdt/orders`, {
-    bodyObj: body, key, secret:sec, proxy
-  });
+  const key = S.bot.futKey, sec=S.bot.futSec, proxy=S.bot.proxy, token=S.bot.proxyToken;
+  // Not: size (kontrat adedi) borsanın sözleşme spesine göre integer; basitleştirme olarak 1e6 ile ölçekledik.
+  const body = { contract: sym, size: -Math.abs(Math.round(baseQty*1e6)), price: "0", tif: "ioc" };
+  return gateFetch(GATE.futHost, 'POST', `/futures/usdt/orders`, { bodyObj: body, key, secret:sec, proxy, token });
 }
 
 /* ====== Başlangıç ====== */
 function start(){
-  // Tema seçici senkron
+  // Tema ve UI
   $('#themeSel').value = S.ui.theme;
+  // Proxy alanlarını varsayılanla doldur
+  $('#proxyUrl').value = S.bot.proxy;
+  $('#proxyToken').value = S.bot.proxyToken || '';
 
   // Mevcut coinleri abone et
   S.coins.forEach(sym=>{ ensureRow(sym); sub(sym); });
