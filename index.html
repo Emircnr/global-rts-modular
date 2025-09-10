@@ -106,9 +106,8 @@
 </style>
 </head>
 <body>
-  <button id="mgrBtn" class="btn iconbtn" title="Yönetim">
-    ⚙️
-  </button>
+  <!-- Tek yönetim kutusu (popup) -->
+  <button id="mgrBtn" class="btn iconbtn" title="Yönetim">⚙️</button>
 
   <header class="wrap center">
     <div class="row">
@@ -117,12 +116,12 @@
     </div>
   </header>
 
-  <!-- Top Fark Kartı (ortada) -->
+  <!-- Top Fark Kartı (ortada) — SADECE SHORT gösterecek -->
   <div class="wrap center">
     <div id="topCard" class="card" style="width:100%; max-width:900px;">
       <span id="topSym" class="sym">—</span>
-      <span id="topSide" class="pill">—</span>
-      <span id="topDesc" class="mono">—</span>
+      <span id="topSide" class="pill bad">FUTURES SHORT</span>
+      <span id="topDesc" class="mono">Spot ASK — ↔ Futures BID —</span>
       <span id="topPct" class="mono">—</span>
     </div>
   </div>
@@ -144,13 +143,10 @@
         </thead>
         <tbody id="tbody"></tbody>
       </table>
-      <p id="emptyNote" style="margin:12px 6px 2px; color:var(--muted); font-size:13px; display:none">
-        Eşik üstü <b>pozitif</b> fark yok.
-      </p>
     </div>
   </main>
 
-  <!-- Yönetim Modal (tek kutu) -->
+  <!-- Yönetim Modal -->
   <div id="mgrModal">
     <div class="overlay" data-close="1"></div>
     <div class="panel">
@@ -176,10 +172,10 @@
         </div>
 
         <div class="grp">
-          <label class="lbl">Fark eşiği (%) — sadece bu eşik ÜSTÜ ve POZİTİF farklar listelenir</label>
+          <label class="lbl">Fark eşiği (%) — sadece BU eşik ÜSTÜ ve POZİTİF farklar yazılır (satırlar sabit kalır)</label>
           <div class="row">
             <input id="thresh" type="number" step="0.01" value="0.10" style="width:160px"/>
-            <label class="row" style="margin-left:auto"><input type="checkbox" id="toggleTop" checked/> En yüksek fark kartı</label>
+            <label class="row" style="margin-left:auto"><input type="checkbox" id="toggleTop" checked/> En yüksek (SHORT) kart</label>
           </div>
         </div>
       </div>
@@ -187,15 +183,14 @@
   </div>
 
 <script>
-/* ====== Yardımcılar ====== */
-const $  = s=>document.querySelector(s);
-const $$ = s=>document.querySelectorAll(s);
+/* ========= Yardımcılar ========= */
+const $ = s=>document.querySelector(s);
 const now = ()=>new Date().toLocaleTimeString('tr-TR',{hour12:false});
 const nf = new Intl.NumberFormat('tr-TR',{maximumFractionDigits:9});
 const toNum = v => (typeof v === 'number') ? v : parseFloat(v);
 const pctStr = v => isFinite(v) ? ((v>=0?'+':'') + v.toFixed(3) + '%') : '—';
 
-/* ====== Durum ====== */
+/* ========= Durum ========= */
 const S = {
   coins: new Set(JSON.parse(localStorage.getItem('gate:list')||'["BTC_USDT","ETH_USDT"]')),
   ui: {
@@ -208,30 +203,24 @@ const S = {
   rowEls: new Map(),
   rafScheduled:false,
   ws:{spot:null, fut:null},
+  ping:{spot:null, fut:null},
   lastTop:null
 };
 function saveList(){ localStorage.setItem('gate:list', JSON.stringify([...S.coins])); }
-function saveUI(){
-  localStorage.setItem('gate:thresh', S.ui.thresh);
-  localStorage.setItem('gate:theme', S.ui.theme);
-  localStorage.setItem('gate:showTop', S.ui.showTop);
-}
+function saveUI(){ localStorage.setItem('gate:thresh',S.ui.thresh); localStorage.setItem('gate:theme',S.ui.theme); localStorage.setItem('gate:showTop',S.ui.showTop); }
 
-/* ====== Tema & Saat ====== */
+/* ========= Tema & Saat ========= */
 function applyTheme(){ document.body.classList.toggle('light', S.ui.theme==='light'); $('#themeSel').value=S.ui.theme; }
 applyTheme();
 setInterval(()=>$('#clock').textContent=now(), 1000);
 
-/* ====== Modal ====== */
-const mgr = {
-  open(){ $('#mgrModal').classList.add('open'); $('#addSym').focus(); },
-  close(){ $('#mgrModal').classList.remove('open'); }
-};
+/* ========= Modal ========= */
+const mgr = { open(){ $('#mgrModal').classList.add('open'); $('#addSym').focus(); }, close(){ $('#mgrModal').classList.remove('open'); } };
 $('#mgrBtn').onclick = ()=>mgr.open();
 $('#mgrModal').addEventListener('click', e=>{ if(e.target.dataset.close) mgr.close(); });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') mgr.close(); });
 
-/* ====== Yönetim UI Bağlama ====== */
+/* ========= Yönetim UI ========= */
 $('#thresh').value = String(S.ui.thresh);
 $('#toggleTop').checked = !!S.ui.showTop;
 $('#themeSel').value = S.ui.theme;
@@ -241,13 +230,13 @@ $('#toggleTop').onchange = e=>{ S.ui.showTop=e.target.checked; saveUI(); schedul
 $('#themeSel').onchange = e=>{ S.ui.theme=e.target.value; saveUI(); applyTheme(); };
 
 function renderChips(){
-  const wrap = $('#chipWrap'); wrap.innerHTML = '';
-  const frag = document.createDocumentFragment();
+  const wrap=$('#chipWrap'); wrap.innerHTML='';
+  const frag=document.createDocumentFragment();
   [...S.coins].forEach(sym=>{
-    const d = document.createElement('div'); d.className='chipx';
-    const b = document.createElement('b'); b.textContent = sym.replace('_','');
-    const x = document.createElement('button'); x.textContent='✕';
-    x.onclick=()=>{ S.coins.delete(sym); saveList(); unsub(sym); S.rowEls.get(sym)?.remove(); S.rowEls.delete(sym); scheduleDraw(); };
+    const d=document.createElement('div'); d.className='chipx';
+    const b=document.createElement('b'); b.textContent=sym.replace('_','');
+    const x=document.createElement('button'); x.textContent='✕';
+    x.onclick=()=>{ S.coins.delete(sym); saveList(); unsub(sym); const el=S.rowEls.get(sym); el?.tr.remove(); S.rowEls.delete(sym); };
     d.append(b,x); frag.appendChild(d);
   });
   wrap.appendChild(frag);
@@ -260,20 +249,19 @@ $('#btnAdd').onclick = ()=>{
   sym = sym.replace(/[^A-Z0-9_]/g,'');
   if(!sym.endsWith('_USDT')) return alert('Sadece *_USDT sembolleri.');
   if(!S.coins.has(sym)){
-    S.coins.add(sym); saveList(); renderChips(); sub(sym);
+    S.coins.add(sym); saveList(); renderChips(); ensureRow(sym); sub(sym);
   }
   $('#addSym').value='';
 };
 $('#btnClear').onclick = ()=>{
   if(confirm('Tüm coinleri sil?')){
     [...S.coins].forEach(s=>unsub(s)); S.coins.clear(); saveList();
-    S.rowEls.forEach(el=>el.remove()); S.rowEls.clear();
-    scheduleDraw();
+    S.rowEls.forEach(el=>el.tr.remove()); S.rowEls.clear();
   }
 };
 
-/* ====== Gate.io WebSocket ====== */
-/* Spot:    wss://api.gateio.ws/ws/v4/      channel: spot.book_ticker (payload: ["BTC_USDT"]) */
+/* ========= Gate.io WebSocket ========= */
+/* Spot:    wss://api.gateio.ws/ws/v4/       channel: spot.book_ticker (payload: ["BTC_USDT"]) */
 /* Futures: wss://fx-ws.gateio.ws/v4/ws/usdt channel: futures.book_ticker (payload: ["BTC_USDT"]) */
 function wsConnect(kind){
   const isSpot = kind==='spot';
@@ -282,7 +270,16 @@ function wsConnect(kind){
   const ws = new WebSocket(url); S.ws[kind]=ws;
 
   ws.onopen = ()=>{
+    // clear eski ping
+    if(S.ping[kind]){ clearInterval(S.ping[kind]); S.ping[kind]=null; }
+    // abone ol
     for(const sym of S.coins){ sendSub(kind, sym, true); }
+    // ping
+    S.ping[kind] = setInterval(()=>{
+      if(ws.readyState===1){
+        ws.send(JSON.stringify({time:Math.floor(Date.now()/1000), channel:isSpot?'spot.ping':'futures.ping'}));
+      }
+    }, 15000);
   };
   ws.onmessage = (ev)=>{
     try{
@@ -290,143 +287,128 @@ function wsConnect(kind){
       if(!j || j.event!=='update' || !j.result) return;
 
       if(isSpot && j.channel==='spot.book_ticker'){
-        const r = j.result; const sym = r.s; const bid=toNum(r.b), ask=toNum(r.a);
+        const r=j.result; const sym=r.s; const bid=toNum(r.b), ask=toNum(r.a);
         if(isFinite(bid)||isFinite(ask)) S.spot.set(sym,{bid,ask,ts:r.t||Date.now()});
         scheduleDraw();
       }
       if(!isSpot && j.channel==='futures.book_ticker'){
-        const r = j.result; const sym = r.s; const bid=toNum(r.b), ask=toNum(r.a);
+        const r=j.result; const sym=r.s; const bid=toNum(r.b), ask=toNum(r.a);
         if(isFinite(bid)||isFinite(ask)) S.fut.set(sym,{bid,ask,ts:r.t||Date.now()});
         scheduleDraw();
       }
     }catch(_){}
   };
-  ws.onclose = ()=>{ setTimeout(()=>wsConnect(kind), 800 + Math.random()*400); };
-  setInterval(()=>{
-    if(ws.readyState===1){
-      const t = Math.floor(Date.now()/1000);
-      ws.send(JSON.stringify({time:t,channel:isSpot?'spot.ping':'futures.ping'}));
-    }
-  }, 15000);
+  ws.onclose = ()=>{
+    if(S.ping[kind]){ clearInterval(S.ping[kind]); S.ping[kind]=null; }
+    setTimeout(()=>wsConnect(kind), 800 + Math.random()*400);
+  };
 }
 function sendSub(kind, sym, on){
   const ws=S.ws[kind]; if(!ws || ws.readyState!==1) return;
   const channel = (kind==='spot') ? 'spot.book_ticker' : 'futures.book_ticker';
   ws.send(JSON.stringify({ time: Math.floor(Date.now()/1000), channel, event: on?'subscribe':'unsubscribe', payload:[sym] }));
 }
-function sub(sym){ sendSub('spot',sym,true); sendSub('fut',sym,true); ensureRow(sym); }
+function sub(sym){ sendSub('spot',sym,true); sendSub('fut',sym,true); }
 function unsub(sym){ sendSub('spot',sym,false); sendSub('fut',sym,false); S.spot.delete(sym); S.fut.delete(sym); }
 
-/* Başlat WS */
+/* bağlan */
 wsConnect('spot'); wsConnect('fut');
 
-/* ====== Hesaplama ====== */
+/* ========= Hesaplama ========= */
 function cmpFor(sym){
   const sp=S.spot.get(sym), fu=S.fut.get(sym);
   if(!sp || !fu) return null;
   const askS=sp.ask, bidS=sp.bid, bidF=fu.bid, askF=fu.ask;
   const okShort = isFinite(askS)&&isFinite(bidF)&&askS>0;
   const okLong  = isFinite(bidS)&&isFinite(askF)&&askF>0;
-  const shortPct = okShort ? ( (bidF - askS) / askS * 100 ) : NaN;
-  const longPct  = okLong  ? ( (bidS - askF) / askF * 100 ) : NaN;
+  const shortPct = okShort ? ((bidF - askS)/askS*100) : NaN;
+  const longPct  = okLong  ? ((bidS - askF)/askF*100) : NaN;
   return {sym, askS, bidS, bidF, askF, shortPct, longPct};
 }
 
-/* ====== Tablo & Top kart (rAF) ====== */
+/* ========= Tablo ve Top Kart ========= */
 function ensureRow(sym){
   if(S.rowEls.has(sym)) return;
   const tr=document.createElement('tr'); tr.dataset.sym=sym;
-  const tdC=document.createElement('td'); tdC.className='sym'; tdC.textContent=sym.replace('_','');
-  const tdSAsk=document.createElement('td'); tdSAsk.className='mono src-spotAsk'; tdSAsk.textContent='—';
-  const tdFBid=document.createElement('td'); tdFBid.className='mono src-futBid'; tdFBid.textContent='—';
-  const tdShort=document.createElement('td'); tdShort.className='mono'; tdShort.textContent='—';
-  const tdSBid=document.createElement('td'); tdSBid.className='mono src-spotBid'; tdSBid.textContent='—';
-  const tdFAsk=document.createElement('td'); tdFAsk.className='mono src-futAsk'; tdFAsk.textContent='—';
-  const tdLong=document.createElement('td'); tdLong.className='mono'; tdLong.textContent='—';
-  tr.append(tdC,tdSAsk,tdFBid,tdShort,tdSBid,tdFAsk,tdLong);
+  const tdC   = document.createElement('td'); tdC.className='sym'; tdC.textContent=sym.replace('_','');
+  const tdA   = document.createElement('td'); tdA.className='mono src-spotAsk'; tdA.textContent='—';
+  const tdFB  = document.createElement('td'); tdFB.className='mono src-futBid';  tdFB.textContent='—';
+  const tdSP  = document.createElement('td'); tdSP.className='mono'; tdSP.textContent='—'; // short %
+  const tdSB  = document.createElement('td'); tdSB.className='mono src-spotBid'; tdSB.textContent='—';
+  const tdFA  = document.createElement('td'); tdFA.className='mono src-futAsk';  tdFA.textContent='—';
+  const tdLP  = document.createElement('td'); tdLP.className='mono'; tdLP.textContent='—'; // long %
+  tr.append(tdC,tdA,tdFB,tdSP,tdSB,tdFA,tdLP);
   $('#tbody').appendChild(tr);
-  S.rowEls.set(sym,{tr,tdSAsk,tdFBid,tdShort,tdSBid,tdFAsk,tdLong});
+  S.rowEls.set(sym,{tr,tdA,tdFB,tdSP,tdSB,tdFA,tdLP});
 }
 function scheduleDraw(){ if(!S.rafScheduled){ S.rafScheduled=true; requestAnimationFrame(draw); } }
 
 function draw(){
   S.rafScheduled=false;
-  const rows=[];
-  let visibleCount=0;
+  const thr = Number(S.ui.thresh)||0;
 
+  // tablo: SIRALAMA YOK, sabit sıra — sadece hücreler güncellenir, satırlar asla gizlenmez
   for(const sym of S.coins){
     ensureRow(sym);
     const r = cmpFor(sym);
     const el = S.rowEls.get(sym);
 
-    if(!r){ el.tr.style.display='none'; continue; }
-
-    const thr = Number(S.ui.thresh)||0;
-
-    // SADECE POZİTİF: >0 ve eşik üstü
-    const showShort = isFinite(r.shortPct) && r.shortPct > 0 && r.shortPct >= thr;
-    const showLong  = isFinite(r.longPct)  && r.longPct  > 0 && r.longPct  >= thr;
-
-    // Satır görünürlüğü
-    const show = (showShort || showLong);
-    el.tr.style.display = show ? '' : 'none';
-    if(show) visibleCount++;
-
-    // Fiyat hücreleri (bilgilendirici)
-    el.tdSAsk.textContent = isFinite(r.askS) ? nf.format(r.askS) : '—';
-    el.tdFBid.textContent = isFinite(r.bidF) ? nf.format(r.bidF) : '—';
-    el.tdSBid.textContent = isFinite(r.bidS) ? nf.format(r.bidS) : '—';
-    el.tdFAsk.textContent = isFinite(r.askF) ? nf.format(r.askF) : '—';
-
-    // Yüzdeler (sadece pozitif yaz)
-    el.tdShort.innerHTML = showShort ? `<span class="pctPos">${pctStr(r.shortPct)}</span>` : '—';
-    el.tdLong.innerHTML  = showLong  ? `<span class="pctPos">${pctStr(r.longPct)}</span>`  : '—';
-
-    if(show){
-      const best = Math.max(showShort?r.shortPct:-Infinity, showLong?r.longPct:-Infinity);
-      rows.push({sym, best, r});
+    if(!r){
+      // veri yoksa hücreler '—' kalır
+      continue;
     }
+
+    // fiyatlar (her zaman yaz)
+    el.tdA.textContent  = isFinite(r.askS) ? nf.format(r.askS) : '—';
+    el.tdFB.textContent = isFinite(r.bidF) ? nf.format(r.bidF) : '—';
+    el.tdSB.textContent = isFinite(r.bidS) ? nf.format(r.bidS) : '—';
+    el.tdFA.textContent = isFinite(r.askF) ? nf.format(r.askF) : '—';
+
+    // sadece POZİTİF ve EŞİK ÜSTÜ yüzde yaz; aksi '—'
+    const showShort = isFinite(r.shortPct) && r.shortPct>0 && r.shortPct>=thr;
+    const showLong  = isFinite(r.longPct)  && r.longPct>0  && r.longPct>=thr;
+
+    el.tdSP.innerHTML = showShort ? `<span class="pctPos">${pctStr(r.shortPct)}</span>` : '—';
+    el.tdLP.innerHTML = showLong  ? `<span class="pctPos">${pctStr(r.longPct)}</span>`  : '—';
   }
 
-  // Boş mesaj
-  $('#emptyNote').style.display = visibleCount===0 ? '' : 'none';
-
-  // En iyi kart (sadece pozitifler içerisinden)
+  // Top kart: SADECE SHORT ve en yükseği bul (sıralama yapmadan)
   const top=$('#topCard');
-  if(!S.ui.showTop || rows.length===0){ top.classList.add('hidden'); }
-  else{
-    rows.sort((a,b)=>b.best-a.best);
-    const t=rows[0].r;
-    const isLong = (t.longPct||-1) >= (t.shortPct||-1);
-    $('#topSym').textContent = t.sym.replace('_','');
-    $('#topSide').textContent = isLong ? 'FUTURES LONG' : 'FUTURES SHORT';
-    $('#topSide').className = 'pill ' + (isLong ? 'good' : 'bad');
-    $('#topDesc').textContent = isLong
-      ? `Spot BID ${nf.format(t.bidS)} ↔ Futures ASK ${nf.format(t.askF)}`
-      : `Spot ASK ${nf.format(t.askS)} ↔ Futures BID ${nf.format(t.bidF)}`;
-    const bestPct = isLong ? t.longPct : t.shortPct;
-    const pctEl = $('#topPct');
-    pctEl.textContent = pctStr(bestPct);
-    pctEl.className = 'mono good';
-    if(!S.lastTop || S.lastTop.sym!==t.sym || S.lastTop.side!==(isLong?'L':'S') || Math.abs(S.lastTop.pct-bestPct)>0.0005){
-      top.classList.add('blink'); setTimeout(()=>top.classList.remove('blink'), 260);
-      S.lastTop = {sym:t.sym, side:isLong?'L':'S', pct:bestPct};
+  if(!S.ui.showTop){ top.classList.add('hidden'); $('#clock').textContent=now(); return; }
+
+  let bestSym=null, bestPct=-Infinity, bestAskS=null, bestBidF=null;
+  for(const sym of S.coins){
+    const r = cmpFor(sym);
+    if(!r) continue;
+    const p = r.shortPct;
+    if(isFinite(p) && p>0 && p>=thr && p>bestPct){
+      bestPct=p; bestSym=sym; bestAskS=r.askS; bestBidF=r.bidF;
     }
+  }
+  if(bestSym){
+    $('#topSym').textContent = bestSym.replace('_','');
+    $('#topSide').textContent = 'FUTURES SHORT';
+    $('#topSide').className = 'pill bad';
+    $('#topDesc').textContent = `Spot ASK ${nf.format(bestAskS)} ↔ Futures BID ${nf.format(bestBidF)}`;
+    const pctEl = $('#topPct'); pctEl.textContent = pctStr(bestPct); pctEl.className='mono good';
+    const sig = bestSym+'|'+bestPct.toFixed(5);
+    if(S.lastTop!==sig){ top.classList.add('blink'); setTimeout(()=>top.classList.remove('blink'), 260); S.lastTop=sig; }
     top.classList.remove('hidden');
+  }else{
+    top.classList.add('hidden');
   }
 
   $('#clock').textContent = now();
 }
 
-/* ====== Başlangıç ====== */
+/* ========= Başlangıç ========= */
 function start(){
-  // Tema seçici görüntüsünü senkronla (modal açıldığında hazır olsun)
-  $('#themeSel').value = S.ui.theme;
+  // mevcut coinler için sabit satırlar oluştur
+  S.coins.forEach(sym=>ensureRow(sym));
+  // abone ol
+  S.coins.forEach(sym=>{ sendSub('spot',sym,true); sendSub('fut',sym,true); });
 
-  // Mevcut coinler
-  S.coins.forEach(sym=>{ ensureRow(sym); sub(sym); });
-
-  // Saat ve ilk çizim
+  // saat ve ilk çizim
   $('#clock').textContent = now();
   scheduleDraw();
 }
