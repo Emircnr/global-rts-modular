@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Gate.io Futures ↔ Spot — Anlık Fark (Ultra Hızlı + Bot)</title>
 <!--
-  Gate API v4 imza formatı:
+  Gate API v4 imza:
     SIGN_STRING = METHOD \n /api/v4 + PATH \n QUERY \n HEX(SHA512(BODY)) \n TIMESTAMP
   Spot REST base:    https://api.gateio.ws
   Futures REST base: https://fx-api.gateio.ws
   WS: spot  -> wss://api.gateio.ws/ws/v4/
-      futUSDT -> wss://fx-ws.gateio.ws/v4/ws/usdt
+      fut   -> wss://fx-ws.gateio.ws/v4/ws/usdt
   Futures market order: { price:"0", tif:"ioc", size<0 => short }
-  ⚠ Uyarı: API anahtarlarını tarayıcıda tutmak risklidir; üretimde imzalamayı sunucu/worker tarafına taşıyın.
+  ⚠ Uyarı: API anahtarlarını tarayıcıda saklamak risklidir; prod’da imzalamayı sunucu/worker üzerinden yapın.
 -->
 <style>
   :root{
@@ -254,7 +254,6 @@ const now = ()=>new Date().toLocaleTimeString('tr-TR',{hour12:false});
 const nf = new Intl.NumberFormat('tr-TR',{maximumFractionDigits:9});
 const toNum = v => (typeof v === 'number') ? v : parseFloat(v);
 const pctStr = v => isFinite(v) ? ((v>=0?'+':'') + v.toFixed(3) + '%') : '—';
-const sleep = ms => new Promise(r=>setTimeout(r,ms));
 const clamp = (x,a,b)=>Math.min(b,Math.max(a,x));
 const roundTo = (x,dec=6)=> Number.parseFloat(x).toFixed(dec);
 
@@ -276,11 +275,11 @@ const S = {
     enabled:false, dry:true, useTableThresh:true,
     thresh:0.20, notional:20, lev:5, margin:'isolated',
     cooldown:5, busy:false, lastExecBySym:new Map(),
-    // API creds (RAM only)
+    // API (RAM only)
     spotKey:'', spotSec:'', futKey:'', futSec:'',
-    // Proxy varsayılanı: yerel Node/Express (CORS çözümü)
+    // Proxy
     proxy:'http://localhost:8787/', proxyToken:'',
-    // futures settings applied cache
+    // caches
     futSetup:new Set()
   }
 };
@@ -310,13 +309,13 @@ $('#thresh').onchange = e=>{ S.ui.thresh=+e.target.value; saveUI(); scheduleDraw
 $('#toggleTop').onchange = e=>{ S.ui.showTop=e.target.checked; saveUI(); scheduleDraw(); };
 $('#themeSel').onchange = e=>{ S.ui.theme=e.target.value; saveUI(); applyTheme(); };
 
-/* ====== Bot UI bağlama ====== */
+/* ====== Bot UI ====== */
 function botLog(line){ const ta=$('#botLog'); ta.value += `[${now()}] ${line}\n`; ta.scrollTop = ta.scrollHeight; }
 $('#botEnable').onchange = e=>{ S.bot.enabled = e.target.checked; botLog(S.bot.enabled?'Bot AÇIK':'Bot KAPALI'); };
 $('#botDry').onchange = e=>{ S.bot.dry = e.target.checked; };
 $('#botUseTableThresh').onchange = e=>{ S.bot.useTableThresh = e.target.checked; };
 $('#botThresh').onchange = e=>{ S.bot.thresh = +e.target.value; };
-$('#botNotional').onchange = e=>{ S.bot.notional = Math.max(10, +e.target.value||0); }; // min 10
+$('#botNotional').onchange = e=>{ S.bot.notional = Math.max(10, +e.target.value||0); }; // min 10 USDT
 $('#botLev').onchange = e=>{ S.bot.lev = clamp(+e.target.value||1, 1, 125); };
 $('#botMargin').onchange = e=>{ S.bot.margin = e.target.value; };
 $('#botCooldown').onchange = e=>{ S.bot.cooldown = Math.max(1, +e.target.value||1); };
@@ -361,8 +360,6 @@ $('#btnClear').onclick = ()=>{
 };
 
 /* ====== Gate.io WebSocket (ticker) ====== */
-/* Spot: wss://api.gateio.ws/ws/v4/   channel: spot.book_ticker (payload: ["BTC_USDT"])
-   Fut:  wss://fx-ws.gateio.ws/v4/ws/usdt  channel: futures.book_ticker (payload: ["BTC_USDT"]) */
 function wsConnect(kind){
   const isSpot = kind==='spot';
   try{ S.ws[kind]?.close?.(); }catch{}
@@ -466,7 +463,7 @@ async function draw(){
       rows.push({sym, best, r});
     }
 
-    // ==== BOT TETİĞİ (yalnızca SHORT bacağı) ====
+    // ==== BOT TETİĞİ (yalnız SHORT) ====
     await maybeBot(sym, r, showShort);
   }
 
@@ -501,66 +498,9 @@ async function draw(){
   $('#clock').textContent = now();
 }
 
-/* ====== BOT AKIŞI ====== */
-async function maybeBot(sym, r, showShort){
-  if(!S.bot.enabled || S.bot.busy) return;
-  const pct = r?.shortPct;
-  if(!isFinite(pct) || pct<=0) return;
-
-  const refThresh = S.bot.useTableThresh ? S.ui.thresh : S.bot.thresh;
-  if(pct < refThresh) return;
-
-  // cooldown
-  const last = S.bot.lastExecBySym.get(sym) || 0;
-  if(Date.now() - last < S.bot.cooldown*1000) return;
-
-  // API kontrolü
-  if(!S.bot.dry && (!S.bot.spotKey || !S.bot.spotSec || !S.bot.futKey || !S.bot.futSec)){
-    botLog(`❗ ${sym}: API bilgileri eksik (Spot & Futures key/secret gerekli).`);
-    return;
-  }
-
-  // Miktar (baz birim)
-  const pxRef = Math.max(r.askS||0, r.bidF||0);
-  if(!isFinite(pxRef) || pxRef<=0) return;
-  const baseQty = +roundTo(S.bot.notional / pxRef, 6);
-  if(!(baseQty>0)) return;
-
-  // İşleme başla
-  S.bot.busy = true;
-  S.bot.lastExecBySym.set(sym, Date.now());
-
-  try{
-    botLog(`⏩ ${sym} | SHORT fark=${pctStr(pct)} | Baz Miktar≈${baseQty}`);
-
-    if(S.bot.dry){
-      botLog(`(dry-run) → Spot BUY ~${baseQty} | Futures SHORT ~${baseQty} x${S.bot.lev} (${S.bot.margin})`);
-    } else {
-      // Futures ayarları (marjin & kaldıraç)
-      await ensureFuturesSettings(sym, S.bot.margin, S.bot.lev);
-      // Emirler paralel
-      const futP = placeFuturesShortMarket(sym, baseQty);
-      const spotP = placeSpotBuyMarket(sym, baseQty);
-      const [futRes, spotRes] = await Promise.allSettled([futP, spotP]);
-      if(futRes.status==='fulfilled'){
-        botLog(`✅ Futures SHORT OK: ${futRes.value?.id||JSON.stringify(futRes.value)}`);
-      } else {
-        const msg = futRes.reason?.message || JSON.stringify(futRes.reason);
-        botLog(`❌ Futures hata: ${msg}`);
-      }
-      if(spotRes.status==='fulfilled'){
-        botLog(`✅ Spot BUY OK: ${spotRes.value?.id||JSON.stringify(spotRes.value)}`);
-      } else {
-        const msg = spotRes.reason?.message || JSON.stringify(spotRes.reason);
-        botLog(`❌ Spot hata: ${msg}`);
-      }
-    }
-  } catch(err){
-    botLog(`💥 Hata: ${err?.message||err}`);
-  } finally {
-    S.bot.busy = false;
-  }
-}
+/* ====== Creds helper (tek anahtarı iki yerde kullan) ====== */
+function credsSpot(){ return { key: S.bot.spotKey || S.bot.futKey, sec: S.bot.spotSec || S.bot.futSec }; }
+function credsFut(){  return { key: S.bot.futKey  || S.bot.spotKey, sec: S.bot.futSec  || S.bot.spotSec }; }
 
 /* ====== Gate REST — imza & fetch ====== */
 const GATE = {
@@ -622,11 +562,11 @@ const ContractMeta = new Map(); // sym -> meta cache
 
 async function getContractMeta(sym){
   if (ContractMeta.has(sym)) return ContractMeta.get(sym);
+  const { key, sec } = credsFut();
   const meta = await gateFetch(GATE.futHost, 'GET', `/futures/usdt/contracts/${sym}`, {
-    key: S.bot.futKey, secret: S.bot.futSec, proxy: S.bot.proxy, token: S.bot.proxyToken
+    key, secret: sec, proxy: S.bot.proxy, token: S.bot.proxyToken
   });
   const m = {
-    // bazı hesaplarda alan adı farklı olabilir; güvenli parse
     quanto_multiplier: Number(meta.quanto_multiplier ?? meta.multiplier ?? 1),
     order_size_min: Number(meta.order_size_min ?? 1),
     order_size_max: Number(meta.order_size_max ?? 1000000),
@@ -637,21 +577,22 @@ async function getContractMeta(sym){
 }
 
 async function ensureFuturesSettings(sym, margin, lev){
-  const key = S.bot.futKey, sec = S.bot.futSec, proxy=S.bot.proxy, token=S.bot.proxyToken;
+  const { key, sec } = credsFut();
+  const proxy=S.bot.proxy, token=S.bot.proxyToken;
   const cacheKey = `${sym}:${margin}:${lev}`;
   if (S.bot.futSetup.has(cacheKey)) return;
 
-  // 1) Marjin modu: "mode=cross|isolated"
+  // 1) Marjin modu: BODY { mode: cross|isolated }
   const mode = margin === 'cross' ? 'cross' : 'isolated';
   let modeOk = false;
   try{
     await gateFetch(GATE.futHost, 'POST', `/futures/usdt/positions/margin_mode`, {
-      query: `mode=${mode}`, bodyObj: {}, key, secret:sec, proxy, token
+      query: '', bodyObj: { mode }, key, secret:sec, proxy, token
     });
     botLog(`⚙ Futures margin_mode=${mode}`);
     modeOk = true;
-  }catch(e){
-    // Alternatif (bazı hesaplarda eski uç çalışabiliyor): cross=true/false
+  }catch(e1){
+    // Fallback: cross_mode?cross=true|false
     try{
       await gateFetch(GATE.futHost, 'POST', `/futures/usdt/positions/cross_mode`, {
         query: `cross=${mode==='cross'}`, bodyObj: {}, key, secret:sec, proxy, token
@@ -659,7 +600,7 @@ async function ensureFuturesSettings(sym, margin, lev){
       botLog(`⚙ Futures cross_mode=${mode==='cross'}`);
       modeOk = true;
     }catch(e2){
-      botLog(`(uyarı) margin_mode set edilemedi: ${e?.message||e} | alt uç: ${e2?.message||e2}`);
+      botLog(`(uyarı) margin_mode set edilemedi: ${e1?.message||e1} | alt uç: ${e2?.message||e2}`);
     }
   }
 
@@ -676,36 +617,145 @@ async function ensureFuturesSettings(sym, margin, lev){
   if (modeOk) S.bot.futSetup.add(cacheKey);
 }
 
-/* ====== Emir fonksiyonları ====== */
-async function placeSpotBuyMarket(sym, baseQty){
-  const key = S.bot.spotKey, sec=S.bot.spotSec, proxy=S.bot.proxy, token=S.bot.proxyToken;
-  const body = { currency_pair: sym, type: 'market', account: 'spot', side: 'buy', amount: String(baseQty) };
-  return gateFetch(GATE.spotHost, 'POST', `/spot/orders`, { bodyObj: body, key, secret:sec, proxy, token });
-}
-
 async function placeFuturesShortMarket(sym, baseQty){
-  const key = S.bot.futKey, sec=S.bot.futSec, proxy=S.bot.proxy, token=S.bot.proxyToken;
+  const { key, sec } = credsFut();
+  const proxy=S.bot.proxy, token=S.bot.proxyToken;
   const m = await getContractMeta(sym);
+
+  // kontrat adedi ≈ baz miktar / kontrat başına baz
   const perContractBase = m.quanto_multiplier > 0 ? m.quanto_multiplier : 1;
   let contracts = baseQty / perContractBase;
 
-  // step & limitlere uydur, integer yap
+  // step & limit & integer
   const step = m.order_size_step > 0 ? m.order_size_step : 1;
   contracts = Math.floor(contracts / step) * step;
   contracts = Math.max(m.order_size_min, Math.min(contracts, m.order_size_max));
   contracts = Math.trunc(contracts);
 
   if (!(contracts > 0)) throw new Error(`Geçersiz kontrat adedi (hesaplanan=${contracts})`);
+  if (contracts >= m.order_size_max) {
+    botLog(`(uyarı) ${sym}: kontrat adedi üst sınırda (${contracts}/${m.order_size_max}). Notional’ı düşürmeyi düşün.`);
+  }
+
+  botLog(`FUT calc → qm=${m.quanto_multiplier} step=${m.order_size_step} min=${m.order_size_min} max=${m.order_size_max} contracts=${contracts}`);
 
   const body = { contract: sym, size: -contracts, price: "0", tif: "ioc" }; // SHORT = negatif size
   return gateFetch(GATE.futHost, 'POST', `/futures/usdt/orders`, { bodyObj: body, key, secret:sec, proxy, token });
+}
+
+/* ====== Spot: pair meta & market buy ====== */
+const SpotMeta = new Map();
+
+async function getSpotPairMeta(sym){
+  if (SpotMeta.has(sym)) return SpotMeta.get(sym);
+  const { key, sec } = credsSpot();
+  const m = await gateFetch(GATE.spotHost, 'GET', `/spot/currency_pairs/${sym}`, {
+    key, secret: sec, proxy: S.bot.proxy, token: S.bot.proxyToken
+  });
+  const meta = {
+    min_base_amount: Number(m.min_base_amount ?? 0),
+    min_quote_amount: Number(m.min_quote_amount ?? 0),
+    amount_precision: Number(m.amount_precision ?? 6)
+  };
+  SpotMeta.set(sym, meta);
+  return meta;
+}
+function roundDown(x, decimals){ const f = Math.pow(10, decimals); return Math.floor(x * f) / f; }
+
+async function placeSpotBuyMarket(sym, baseQty){
+  const { key, sec } = credsSpot();
+  const proxy=S.bot.proxy, token=S.bot.proxyToken;
+
+  const meta = await getSpotPairMeta(sym);
+  const px = (S.spot.get(sym)?.ask) || 0;
+
+  // precision ve min kuralları
+  let amt = roundDown(baseQty, meta.amount_precision);
+  if (meta.min_base_amount && amt < meta.min_base_amount) amt = meta.min_base_amount;
+  if (px > 0 && meta.min_quote_amount && (amt * px) < meta.min_quote_amount) {
+    amt = Math.max(amt, roundDown(meta.min_quote_amount / px, meta.amount_precision));
+  }
+  if (!(amt > 0)) throw new Error(`Spot amount geçersiz (amt=${amt})`);
+
+  const body = {
+    currency_pair: sym,
+    type: 'market',
+    account: 'spot',
+    side: 'buy',
+    amount: String(amt),
+    time_in_force: 'ioc' // GTC markette desteklenmez
+  };
+  return gateFetch(GATE.spotHost, 'POST', `/spot/orders`, { bodyObj: body, key, secret: sec, proxy, token });
+}
+
+/* ====== BOT AKIŞI ====== */
+async function maybeBot(sym, r, showShort){
+  if(!S.bot.enabled || S.bot.busy) return;
+  const pct = r?.shortPct;
+  if(!isFinite(pct) || pct<=0) return;
+
+  const refThresh = S.bot.useTableThresh ? S.ui.thresh : S.bot.thresh;
+  if(pct < refThresh) return;
+
+  // cooldown
+  const last = S.bot.lastExecBySym.get(sym) || 0;
+  if(Date.now() - last < S.bot.cooldown*1000) return;
+
+  // API kontrolü
+  const hasSpot = (S.bot.spotKey && S.bot.spotSec) || (S.bot.futKey && S.bot.futSec);
+  const hasFut  = (S.bot.futKey && S.bot.futSec)  || (S.bot.spotKey && S.bot.spotSec);
+  if(!S.bot.dry && (!hasSpot || !hasFut)){
+    botLog(`❗ ${sym}: API bilgileri eksik (Spot & Futures key/secret gerekli).`);
+    return;
+  }
+
+  // Miktar (baz birim)
+  const pxRef = Math.max(r.askS||0, r.bidF||0);
+  if(!isFinite(pxRef) || pxRef<=0) return;
+  const baseQty = +roundTo(S.bot.notional / pxRef, 6);
+  if(!(baseQty>0)) return;
+
+  // İşleme başla
+  S.bot.busy = true;
+  S.bot.lastExecBySym.set(sym, Date.now());
+
+  try{
+    botLog(`⏩ ${sym} | SHORT fark=${pctStr(pct)} | Baz Miktar≈${baseQty}`);
+
+    if(S.bot.dry){
+      botLog(`(dry-run) → Spot BUY ~${baseQty} | Futures SHORT ~${baseQty} x${S.bot.lev} (${S.bot.margin})`);
+    } else {
+      // Futures ayarları (marjin & kaldıraç)
+      await ensureFuturesSettings(sym, S.bot.margin, S.bot.lev);
+      // Emirler paralel
+      const futP = placeFuturesShortMarket(sym, baseQty);
+      const spotP = placeSpotBuyMarket(sym, baseQty);
+      const [futRes, spotRes] = await Promise.allSettled([futP, spotP]);
+      if(futRes.status==='fulfilled'){
+        botLog(`✅ Futures SHORT OK: ${futRes.value?.id||JSON.stringify(futRes.value)}`);
+      } else {
+        const msg = futRes.reason?.message || JSON.stringify(futRes.reason);
+        botLog(`❌ Futures hata: ${msg}`);
+      }
+      if(spotRes.status==='fulfilled'){
+        botLog(`✅ Spot BUY OK: ${spotRes.value?.id||JSON.stringify(spotRes.value)}`);
+      } else {
+        const msg = spotRes.reason?.message || JSON.stringify(spotRes.reason);
+        botLog(`❌ Spot hata: ${msg}`);
+      }
+    }
+  } catch(err){
+    botLog(`💥 Hata: ${err?.message||err}`);
+  } finally {
+    S.bot.busy = false;
+  }
 }
 
 /* ====== Başlangıç ====== */
 function start(){
   // Tema ve UI
   $('#themeSel').value = S.ui.theme;
-  // Proxy alanlarını varsayılanla doldur
+  // Proxy alanlarını yükle
   $('#proxyUrl').value = S.bot.proxy;
   $('#proxyToken').value = S.bot.proxyToken || '';
 
