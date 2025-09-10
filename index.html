@@ -33,7 +33,6 @@
   .dot{width:9px;height:9px;border-radius:50%}
   .spotDot{background:var(--spot)} .spotBidDot{background:var(--spotBid)}
   .futBidDot{background:var(--futBid)} .futAskDot{background:var(--futAsk)}
-  /* Top kart */
   #topCard{margin:12px 0;padding:14px;border-radius:18px;border:1px solid var(--border);display:flex;gap:12px;align-items:center;flex-wrap:wrap; background:
     linear-gradient(180deg, rgba(255,255,255,.04), transparent),
     radial-gradient(1200px 500px at -10% -30%, rgba(96,165,250,.18), transparent 60%),
@@ -42,12 +41,10 @@
   #topPct{font-weight:900}
   .good{color:var(--good)} .bad{color:var(--bad)}
   .blink{animation:blink .7s ease-in-out 1} @keyframes blink{50%{filter:brightness(1.35)}}
-  /* Chip list */
   .chips{display:flex;flex-wrap:wrap;gap:8px}
   .chipx{background:var(--glass);border:1px solid var(--border);border-radius:999px;padding:6px 10px;display:inline-flex;gap:8px;align-items:center}
   .chipx b{letter-spacing:.3px}
   .chipx button{all:unset;cursor:pointer;color:var(--muted)}
-  /* Tablo */
   table{width:100%;border-collapse:separate;border-spacing:0 var(--gap)}
   thead th{font-size:13px;color:var(--muted);text-align:left;padding:0 10px}
   tbody td{padding:var(--padY) var(--padX);font-size:var(--font);background:linear-gradient(180deg,var(--panel),var(--panel2));border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
@@ -55,7 +52,7 @@
   tbody tr td:last-child{border-top-right-radius:var(--radius);border-bottom-right-radius:var(--radius)}
   .src-spotAsk{background:color-mix(in oklab, var(--spot) 18%, transparent)} .src-futBid{background:color-mix(in oklab, var(--futBid) 18%, transparent)}
   .src-spotBid{background:color-mix(in oklab, var(--spotBid) 18%, transparent)} .src-futAsk{background:color-mix(in oklab, var(--futAsk) 18%, transparent)}
-  .pctPos{color:var(--good);font-weight:800} .pctNeg{color:var(--bad);font-weight:800}
+  .pctPos{color:var(--good);font-weight:800}
   .note{color:var(--muted);font-size:12px}
   .right{margin-left:auto}
   .pill{border:1px solid var(--border);padding:4px 8px;border-radius:999px}
@@ -109,13 +106,6 @@
       <label>Görünüm</label>
       <div class="row" style="margin-top:6px">
         <label class="row"><input type="checkbox" id="toggleTop" checked/> En yüksek fark kartı</label>
-      </div>
-    </div>
-    <div class="card">
-      <label>Bilgi</label>
-      <div class="note" style="margin-top:6px">
-        Spot en iyi fiyatlar <code>spot.book_ticker</code>, Futures en iyi fiyatlar <code>futures.book_ticker</code> üzerinden gerçek zamanlı gelir (WS).  
-        Net kârlılık komisyon, slipaj, funding vb. faktörlere bağlıdır.
       </div>
     </div>
   </div>
@@ -210,7 +200,6 @@ $('#btnAdd').onclick = ()=>{
 $('#btnClear').onclick = ()=>{
   if(confirm('Tüm coinleri sil?')){
     [...S.coins].forEach(s=>unsub(s)); S.coins.clear(); saveList();
-    // satırları sil
     S.rowEls.forEach(el=>el.remove()); S.rowEls.clear();
     scheduleDraw();
   }
@@ -226,7 +215,6 @@ function wsConnect(kind){
   const ws = new WebSocket(url); S.ws[kind]=ws;
 
   ws.onopen = ()=>{
-    // Abonelikler
     for(const sym of S.coins){ sendSub(kind, sym, true); }
   };
   ws.onmessage = (ev)=>{
@@ -234,14 +222,12 @@ function wsConnect(kind){
       const j = JSON.parse(ev.data);
       if(!j || j.event!=='update' || !j.result) return;
 
-      // spot.book_ticker
       if(isSpot && j.channel==='spot.book_ticker'){
         const r = j.result;
         const sym = r.s; const bid=toNum(r.b), ask=toNum(r.a);
         if(isFinite(bid)||isFinite(ask)) S.spot.set(sym,{bid,ask,ts:r.t||Date.now()});
         scheduleDraw();
       }
-      // futures.book_ticker
       if(!isSpot && j.channel==='futures.book_ticker'){
         const r = j.result;
         const sym = r.s; const bid=toNum(r.b), ask=toNum(r.a);
@@ -250,11 +236,7 @@ function wsConnect(kind){
       }
     }catch(_){}
   };
-  ws.onclose = ()=>{
-    // yeniden bağlan (exponential-ish backoff)
-    setTimeout(()=>wsConnect(kind), 800 + Math.random()*400);
-  };
-  // uygulama-level ping
+  ws.onclose = ()=>{ setTimeout(()=>wsConnect(kind), 800 + Math.random()*400); };
   setInterval(()=>{
     if(ws.readyState===1){
       const t = Math.floor(Date.now()/1000);
@@ -307,41 +289,49 @@ function scheduleDraw(){ if(!S.rafScheduled){ S.rafScheduled=true; requestAnimat
 
 function draw(){
   S.rafScheduled=false;
-  // tablo satırlarını güncelle
   const rows=[];
   for(const sym of S.coins){
     ensureRow(sym);
     const r = cmpFor(sym);
     const el = S.rowEls.get(sym);
-    if(!r){ // veri yok
-      el.tdSAsk.textContent = el.tdFBid.textContent = el.tdShort.textContent = el.tdSBid.textContent = el.tdFAsk.textContent = el.tdLong.textContent = '—';
+    if(!r){
+      el.tr.style.display = 'none';
       continue;
     }
     const thr = Number(S.ui.thresh)||0;
-    const showShort = isFinite(r.shortPct) && r.shortPct >= thr;
-    const showLong  = isFinite(r.longPct)  && r.longPct  >= thr;
 
+    // Pozitif filtre: sadece >0 ve eşiği geçen farklar gösterilir
+    const showShort = isFinite(r.shortPct) && r.shortPct > 0 && r.shortPct >= thr;
+    const showLong  = isFinite(r.longPct)  && r.longPct  > 0 && r.longPct  >= thr;
+
+    // Satır görünürlüğü: iki yönde de pozitif yoksa satırı gizle
+    el.tr.style.display = (showShort || showLong) ? '' : 'none';
+
+    // Fiyat hücreleri her zaman güncellenir (satır görünürse)
     el.tdSAsk.textContent = isFinite(r.askS) ? nf.format(r.askS) : '—';
     el.tdFBid.textContent = isFinite(r.bidF) ? nf.format(r.bidF) : '—';
     el.tdSBid.textContent = isFinite(r.bidS) ? nf.format(r.bidS) : '—';
     el.tdFAsk.textContent = isFinite(r.askF) ? nf.format(r.askF) : '—';
 
-    el.tdShort.innerHTML = showShort ? `<span class="pctPos">${pct(r.shortPct)}</span>` : `<span class="pctNeg">${isFinite(r.shortPct)?pct(r.shortPct):'—'}</span>`;
-    el.tdLong.innerHTML  = showLong  ? `<span class="pctPos">${pct(r.longPct)}</span>`  : `<span class="pctNeg">${isFinite(r.longPct)?pct(r.longPct):'—'}</span>`;
+    // Yalnız pozitif yüzdeleri yaz; negatif/0 ise “—”
+    el.tdShort.innerHTML = showShort ? `<span class="pctPos">${pct(r.shortPct)}</span>` : '—';
+    el.tdLong.innerHTML  = showLong  ? `<span class="pctPos">${pct(r.longPct)}</span>`  : '—';
 
-    // Sıralama için topla
-    const best = Math.max(isFinite(r.shortPct)?r.shortPct:-Infinity, isFinite(r.longPct)?r.longPct:-Infinity);
-    if(isFinite(best)) rows.push({sym, best, short:r.shortPct, long:r.longPct, r});
+    if(showShort || showLong){
+      const best = Math.max(showShort?r.shortPct:-Infinity, showLong?r.longPct:-Infinity);
+      rows.push({sym, best, short:showShort?r.shortPct:NaN, long:showLong?r.longPct:NaN, r});
+    }
   }
 
-  // En iyi kart
+  // En iyi kart — sadece pozitifler arasından
   const top=$('#topCard');
   if(!S.ui.showTop || rows.length===0){ top.classList.add('hidden'); }
   else{
     rows.sort((a,b)=>b.best-a.best);
     const t=rows[0].r;
+    const isLong = (isFinite(t.longPct) && t.longPct>0 && t.longPct>= (Number(S.ui.thresh)||0)) &&
+                   (!(isFinite(t.shortPct) && t.shortPct>0) || t.longPct >= t.shortPct);
     $('#topSym').textContent = t.sym.replace('_','');
-    const isLong = (t.longPct||-1) >= (t.shortPct||-1);
     $('#topSide').textContent = isLong ? 'FUTURES LONG' : 'FUTURES SHORT';
     $('#topSide').className = 'pill ' + (isLong ? 'good' : 'bad');
     $('#topDesc').textContent = isLong
@@ -350,20 +340,20 @@ function draw(){
     const bestPct = isLong ? t.longPct : t.shortPct;
     const pctEl = $('#topPct');
     pctEl.textContent = pct(bestPct);
-    pctEl.className = 'mono ' + (bestPct>=0?'good':'bad');
+    pctEl.className = 'mono good';
     if(!S.lastTop || S.lastTop.sym!==t.sym || S.lastTop.side!== (isLong?'L':'S') || Math.abs(S.lastTop.pct - bestPct) > 0.0005){
       top.classList.add('blink'); setTimeout(()=>top.classList.remove('blink'), 300);
       S.lastTop = {sym:t.sym, side:isLong?'L':'S', pct:bestPct};
     }
     top.classList.remove('hidden');
   }
+
+  $('#clock').textContent = now();
 }
 
 /* ========= Başlangıç ========= */
 function start(){
-  // mevcut coinler için satır oluştur ve abone ol
   S.coins.forEach(sym=>{ ensureRow(sym); sub(sym); });
-  // saat ve ilk çizim
   $('#clock').textContent = now();
   scheduleDraw();
 }
