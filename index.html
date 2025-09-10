@@ -3,81 +3,39 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Gate.io Futures ↔ Spot — Anlık Fark (Limit IOC Bot, Eşit Notional)</title>
+<title>Gate.io Futures ↔ Spot — Maker Arb Bot (Anlık Fark)</title>
 <style>
   :root{
     --bg:#0b0f19; --fg:#e8eef7; --muted:#9fb0c9;
     --panel:#0f162a; --panel2:#101a32; --glass:rgba(255,255,255,.06);
     --border:#1b2a4a; --accent:#60a5fa; --good:#22c55e; --bad:#ef4444;
-    --spotAsk:#ef4444; --spotBid:#22c55e; --futBid:#22c55e; --futAsk:#ef4444;
     --radius:16px; --gap:14px; --padY:12px; --padX:14px; --font:16px; --maxW:1180px;
   }
-  body.light{
-    --bg:#ffffff; --fg:#0b1220; --muted:#4b5563; --panel:#f4f7fb; --panel2:#ffffff;
-    --glass:rgba(0,0,0,.06); --border:#d7e0ef; --accent:#2563eb;
-    --good:#16a34a; --bad:#dc2626;
-    --spotAsk:#b91c1c; --spotBid:#15803d; --futBid:#15803d; --futAsk:#b91c1c;
-  }
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{
-    margin:0; color:var(--fg);
+  body{ margin:0; color:var(--fg);
     background:
       radial-gradient(1200px 800px at 15% -10%, #0f2b59 0%, transparent 55%),
       radial-gradient(1000px 700px at 110% 0%, #153160 0%, transparent 55%),
       linear-gradient(180deg,#0a1222 0%, #0b0f19 60%);
-    font-family:Inter,system-ui,Segoe UI,Roboto,Arial;
-  }
+    font-family:Inter,system-ui,Segoe UI,Roboto,Arial }
+  *{box-sizing:border-box}
   .wrap{max-width:var(--maxW); margin:0 auto; padding:18px}
   header{position:sticky; top:0; z-index:5; background:linear-gradient(180deg, rgba(5,10,22,.85), transparent); backdrop-filter:blur(10px)}
   .center{display:flex; justify-content:center}
   h1{margin:0; font-size:22px; letter-spacing:.2px}
   .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
-  .btn{
-    border:1px solid var(--border); background:linear-gradient(180deg,var(--panel),var(--panel2));
-    color:var(--fg); padding:10px 14px; border-radius:12px; cursor:pointer
-  }
+  .btn{border:1px solid var(--border); background:linear-gradient(180deg,var(--panel),var(--panel2)); color:var(--fg); padding:10px 14px; border-radius:12px; cursor:pointer}
   .btn:hover{border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in oklab,var(--accent) 20%, transparent)}
   .iconbtn{width:40px; height:40px; display:grid; place-items:center; border-radius:12px}
-  input,select,textarea{
-    background:linear-gradient(180deg,var(--panel),var(--panel2));
-    border:1px solid var(--border); color:var(--fg); border-radius:12px; padding:10px 12px
-  }
-  .chip{background:var(--glass); border:1px solid var(--border); border-radius:999px; padding:6px 10px; font-size:12px; color:var(--muted); display:inline-flex; gap:8px; align-items:center}
-
-  #topCard{ margin:18px auto; max-width:900px; padding:16px 18px; border-radius:20px; border:1px solid var(--border);
-    display:flex; gap:12px; align-items:center; flex-wrap:wrap;
-    background: linear-gradient(180deg, rgba(255,255,255,.04), transparent),
-                radial-gradient(900px 400px at -10% -30%, rgba(96,165,250,.18), transparent 60%),
-                linear-gradient(180deg,var(--panel),var(--panel2));
-  }
-  #topCard.hidden{display:none}
-  .pill{border:1px solid var(--border); padding:5px 10px; border-radius:999px}
-  .mono{font-variant-numeric:tabular-nums slashed-zero; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-  .good{color:var(--good)} .bad{color:var(--bad)}
-  .blink{animation:blink .6s ease-in-out 1}
-  @keyframes blink{50%{filter:brightness(1.35)}}
-  .sym{font-weight:800; font-size:22px}
-
+  input,select,textarea{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--border); color:var(--fg); border-radius:12px; padding:10px 12px }
   .card{background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--border); border-radius:var(--radius); padding:12px; box-shadow:0 10px 34px rgba(0,0,0,.22)}
   table{width:100%; border-collapse:separate; border-spacing:0 var(--gap)}
   thead th{font-size:13px; color:var(--muted); text-align:left; padding:0 12px}
   tbody td{padding:var(--padY) var(--padX); font-size:var(--font); background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--border); border-left:none; border-right:none}
   tbody tr td:first-child{border-top-left-radius:var(--radius); border-bottom-left-radius:var(--radius); border-left:1px solid var(--border)}
   tbody tr td:last-child{border-top-right-radius:var(--radius); border-bottom-right-radius:var(--radius); border-right:1px solid var(--border)}
-  .src-spotAsk{background:color-mix(in oklab, var(--spotAsk) 18%, transparent)}
-  .src-futBid{background:color-mix(in oklab, var(--futBid) 18%, transparent)}
-  .src-spotBid{background:color-mix(in oklab, var(--spotBid) 18%, transparent)}
-  .src-futAsk{background:color-mix(in oklab, var(--futAsk) 18%, transparent)}
-  .pctPos{color:var(--good); font-weight:800}
-
-  .status{display:inline-flex; gap:8px; align-items:center}
-  .badge{font-size:12px; border:1px solid var(--border); padding:4px 8px; border-radius:999px; color:var(--muted); background:var(--glass)}
-  .badge.wait{color:#f59e0b; border-color:#634f1a; background:rgba(245,158,11,.15)}
-  .badge.lock{color:#60a5fa; border-color:#1b3b73; background:rgba(96,165,250,.15)}
-  .badge.block{color:#94a3b8; border-color:#334155; background:rgba(148,163,184,.15)}
-  .btn-mini{border:1px solid var(--border); background:linear-gradient(180deg,var(--panel),var(--panel2)); color:var(--fg); padding:3px 8px; border-radius:8px; cursor:pointer; font-size:12px}
-
+  .mono{font-variant-numeric:tabular-nums slashed-zero; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .sym{font-weight:800}
+  .pctPos{color:#22c55e; font-weight:800}
   #mgrBtn{position:fixed; right:22px; top:18px; z-index:50}
   #botBtn{position:fixed; right:72px; top:18px; z-index:50}
   .modal{position:fixed; inset:0; display:none; z-index:60}
@@ -91,13 +49,17 @@
   .panel h3{margin:0; font-size:16px}
   .panel .content{padding:12px 14px 14px; display:grid; gap:12px}
   .grp{border:1px dashed var(--border); border-radius:14px; padding:10px}
-  .lbl{font-size:12px; color:var(--muted); display:block; margin-bottom:6px}
+  .lbl{font-size:12px; color:#9fb0c9; display:block; margin-bottom:6px}
   .chips{display:flex; flex-wrap:wrap; gap:8px}
   .chipx{background:var(--glass); border:1px solid var(--border); border-radius:999px; padding:6px 10px; display:inline-flex; gap:8px; align-items:center}
-  .chipx b{letter-spacing:.3px}
-  .chipx button{all:unset; cursor:pointer; color:var(--muted)}
-  .warn{font-size:12px; color:var(--muted)}
-  #botLog{height:150px; resize:vertical}
+  .chipx button{all:unset; cursor:pointer; color:#9fb0c9; margin-left:8px}
+  .status{display:inline-flex; gap:8px; align-items:center}
+  .badge{font-size:12px; border:1px solid var(--border); padding:4px 8px; border-radius:999px; color:#9fb0c9; background:var(--glass)}
+  .badge.wait{color:#f59e0b; border-color:#634f1a; background:rgba(245,158,11,.15)}
+  .badge.lock{color:#60a5fa; border-color:#1b3b73; background:rgba(96,165,250,.15)}
+  .badge.act{color:#22c55e; border-color:#1f5b36; background:rgba(34,197,94,.15)}
+  .badge.block{color:#94a3b8; border-color:#334155; background:rgba(148,163,184,.15)}
+  .btn-mini{border:1px solid var(--border); background:linear-gradient(180deg,var(--panel),var(--panel2)); color:var(--fg); padding:3px 8px; border-radius:8px; cursor:pointer; font-size:12px}
 </style>
 </head>
 <body>
@@ -106,19 +68,10 @@
 
   <header class="wrap center">
     <div class="row">
-      <h1>Gate.io Futures ↔ Spot — Anlık Fark</h1>
+      <h1>Gate.io Futures ↔ Spot — Maker Arb Bot</h1>
       <div class="chip">Saat: <span id="clock" class="mono">—:—:—</span></div>
     </div>
   </header>
-
-  <div class="wrap center">
-    <div id="topCard" class="card" style="width:100%; max-width:900px;">
-      <span id="topSym" class="sym">—</span>
-      <span id="topSide" class="pill">—</span>
-      <span id="topDesc" class="mono">—</span>
-      <span id="topPct" class="mono">—</span>
-    </div>
-  </div>
 
   <main class="wrap center" style="padding-bottom:34px">
     <div class="card" style="width:100%">
@@ -129,35 +82,30 @@
             <th>Durum</th>
             <th>Spot ASK</th>
             <th>Fut BID</th>
-            <th>% Short</th>
+            <th>% Short*</th>
             <th>Spot BID</th>
             <th>Fut ASK</th>
-            <th>% Long</th>
+            <th>% Long*</th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
       </table>
-      <p id="emptyNote" style="margin:12px 6px 2px; color:var(--muted); font-size:13px; display:none">Liste boş.</p>
+      <p id="emptyNote" style="margin:12px 6px 2px; color:#9fb0c9; font-size:13px; display:none">Liste boş.</p>
+      <p style="margin:8px 6px 0; color:#9fb0c9; font-size:12px">* Yıldızlı yüzdeler maker baz fiyatlarıyla (açılış: Fut <b>ASK</b>, kapanış: Fut <b>BID</b>) hesaplanır.</p>
     </div>
   </main>
 
-  <!-- Yönetim Modal -->
+  <!-- Yönetim -->
   <div id="mgrModal" class="modal">
     <div class="overlay" data-close="1"></div>
     <div class="panel">
       <header>
         <h3>Yönetim</h3>
-        <div class="row">
-          <select id="themeSel">
-            <option value="dark">Koyu tema</option>
-            <option value="light">Açık tema</option>
-          </select>
-          <button class="btn iconbtn" title="Kapat" data-close="1">✖</button>
-        </div>
+        <button class="btn iconbtn" title="Kapat" data-close="1">✖</button>
       </header>
       <div class="content">
         <div class="grp">
-          <label class="lbl">Coin ekle / çıkar (örn: ETH veya ETH_USDT)</label>
+          <label class="lbl">Coin ekle/çıkar (örn: ETH ya da ETH_USDT)</label>
           <div class="row">
             <input id="addSym" type="text" placeholder="Sembol"/>
             <button id="btnAdd" class="btn">Ekle</button>
@@ -166,22 +114,21 @@
           <div id="chipWrap" class="chips" style="margin-top:8px"></div>
         </div>
         <div class="grp">
-          <label class="lbl">Vurgu eşiği (%)</label>
+          <label class="lbl">Vurgu Eşiği (%)</label>
           <div class="row">
-            <input id="thresh" type="number" step="0.01" value="0.10" style="width:160px"/>
-            <label class="row" style="margin-left:auto"><input type="checkbox" id="toggleTop" checked/> En yüksek fark kartı</label>
+            <input id="thresh" type="number" step="0.01" value="0.10" style="width:140px"/>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- BOT Modal -->
+  <!-- BOT -->
   <div id="botModal" class="modal">
     <div class="overlay" data-close="1"></div>
     <div class="panel">
       <header>
-        <h3>Limit IOC Bot — Eşit Notional</h3>
+        <h3>Maker Arb Bot — Ayarlar</h3>
         <button class="btn iconbtn" title="Kapat" data-close="1">✖</button>
       </header>
       <div class="content">
@@ -190,19 +137,19 @@
           <div class="row">
             <label class="row"><input type="checkbox" id="botEnable"/> Botu Başlat</label>
             <label class="row"><input type="checkbox" id="botDry" checked/> Dry-Run</label>
-            <label class="row"><input type="checkbox" id="botUseTableThresh" checked/> Açılış için tablo eşiği</label>
           </div>
         </div>
         <div class="grp">
-          <label class="lbl">Eşikler & Tutar</label>
+          <label class="lbl">Eşikler ve Tutar</label>
           <div class="row" style="gap:12px; flex-wrap:wrap">
-            <label> Açış Eşiği % <input id="botOpenThresh" type="number" step="0.01" value="0.30" style="width:120px"/></label>
-            <label> Kapanış Eşiği % (LONG) <input id="botCloseThresh" type="number" step="0.01" value="0.20" style="width:150px"/></label>
-            <label> İşlem Tutarı (USDT) <input id="botNotional" type="number" step="1" value="10" style="width:120px"/></label>
+            <label> Açış (SHORT) % <input id="botOpenThresh" type="number" step="0.01" value="0.30" style="width:120px"/></label>
+            <label> Kapanış (LONG) % <input id="botCloseThresh" type="number" step="0.01" value="0.20" style="width:120px"/></label>
+            <label> Hedef Notional (USDT) <input id="botNotional" type="number" step="1" value="10" style="width:140px"/></label>
+            <label> Cooldown (ms) <input id="botCooldown" type="number" step="50" value="0" style="width:120px"/></label>
           </div>
         </div>
         <div class="grp">
-          <label class="lbl">Futures Ayarları</label>
+          <label class="lbl">Futures</label>
           <div class="row" style="gap:12px; flex-wrap:wrap">
             <label> Kaldıraç <input id="botLev" type="number" step="1" value="5" style="width:100px"/></label>
             <label> Marjin
@@ -211,9 +158,7 @@
                 <option value="cross">Cross</option>
               </select>
             </label>
-            <label> Cooldown (sn) <input id="botCooldown" type="number" step="1" value="0" style="width:90px"/></label>
           </div>
-          <div class="warn">Aynı sembolde aynı anda tek işlem. LONG sinyali → tam kapanış.</div>
         </div>
         <div class="grp">
           <label class="lbl">API & Proxy</label>
@@ -229,560 +174,524 @@
             <input id="proxyUrl" value="http://localhost:8787/" placeholder="Proxy URL (örn: http://localhost:8787/ veya Cloudflare/Vercel)" style="flex:1 1 320px"/>
             <input id="proxyToken" placeholder="Proxy Token (opsiyonel)" style="flex:1 1 220px"/>
           </div>
-          <div class="warn">CORS için proxy zorunludur. Tek API anahtarını iki pazarda da kullanabilirsiniz.</div>
+          <div class="lbl">Not: Tarayıcıdan direkt REST CORS’a takılır; proxy zorunlu.</div>
         </div>
         <div class="grp">
           <label class="lbl">Log</label>
-          <textarea id="botLog" class="mono" placeholder="Log..."></textarea>
+          <textarea id="botLog" class="mono" style="height:160px; resize:vertical" placeholder="Log..."></textarea>
         </div>
       </div>
     </div>
   </div>
 
 <script>
-/*** ===== Yardımcılar ===== ***/
-const $ = s=>document.querySelector(s);
-const $$ = s=>document.querySelectorAll(s);
-const now = ()=>new Date().toLocaleTimeString('tr-TR',{hour12:false});
-const nf = new Intl.NumberFormat('tr-TR',{maximumFractionDigits:9});
-const toNum = v => (typeof v === 'number') ? v : parseFloat(v);
-const pctStr = v => isFinite(v) ? ((v>=0?'+':'') + v.toFixed(3) + '%') : '—';
-const clamp = (x,a,b)=>Math.min(b,Math.max(a,x));
-const roundTo = (x,dec=6)=> Number.parseFloat(x).toFixed(dec);
-const sleep = ms => new Promise(r=>setTimeout(r,ms));
-const fmtPx = p => String(Number(p).toFixed(8));
-function roundDown(x, decimals){ const f = Math.pow(10, decimals); return Math.floor(x * f) / f; }
+/*** === Yardımcılar === ***/
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+const now=()=>new Date().toLocaleTimeString('tr-TR',{hour12:false});
+const nf=new Intl.NumberFormat('tr-TR',{maximumFractionDigits:9});
+const toNum=v=>typeof v==='number'?v:parseFloat(v);
+const pctStr=v=>isFinite(v)?((v>=0?'+':'')+v.toFixed(3)+'%'):'—';
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+const fmtPx=p=>String(Number(p).toFixed(8));
+function roundDown(x,d=6){const f=10**d;return Math.floor(x*f)/f;}
 
-/*** ===== Durum ===== ***/
-const CANCEL_BLOCK_MS = 30_000;
-const S = {
-  coins: new Set(JSON.parse(localStorage.getItem('gate:list')||'["BTC_USDT","ETH_USDT"]')),
-  ui: { thresh:+(localStorage.getItem('gate:thresh')||0.10), theme: localStorage.getItem('gate:theme') || 'dark', showTop: JSON.parse(localStorage.getItem('gate:showTop')||'true') },
-  spot: new Map(),  fut: new Map(), rowEls: new Map(),
-  ws:{spot:null, fut:null}, rafScheduled:false, lastTop:null,
-  locks:new Map(), active:new Map(), blockedUntil:new Map(),
+/*** === Durum === ***/
+const S={
+  coins:new Set(JSON.parse(localStorage.getItem('gate:list')||'["BTC_USDT","ETH_USDT"]')),
+  ui:{thresh:+(localStorage.getItem('gate:thresh')||0.10)},
+  ws:{spot:null,fut:null},
+  spot:new Map(), fut:new Map(),
+  rowEls:new Map(), rafScheduled:false,
+  // bot state
   bot:{
-    enabled:false, dry:true, useTableThresh:true,
-    openThresh:0.30, closeThresh:0.20,
-    notional:10, lev:5, margin:'isolated',
-    cooldown:0, lastExecBySym:new Map(),
-    spotKey:'', spotSec:'', futKey:'', futSec:'',
+    enabled:false, dry:true,
+    openThresh:0.30, closeThresh:0.20, notional:10, cooldown:0,
+    lev:5, margin:'isolated',
+    spotKey:'',spotSec:'',futKey:'',futSec:'',
     proxy:'http://localhost:8787/', proxyToken:'',
     futSetup:new Set()
-  }
+  },
+  // per-symbol runtime
+  state: new Map(), // sym -> {waiting:'open'|'close'|null, openOrderId, closeOrderId, lastCheckedTs, hedgedBase, lock:false}
+  lastExecBySym:new Map()
 };
-function saveList(){ localStorage.setItem('gate:list', JSON.stringify([...S.coins])); }
-function saveUI(){ localStorage.setItem('gate:thresh', S.ui.thresh); localStorage.setItem('gate:theme', S.ui.theme); localStorage.setItem('gate:showTop', S.ui.showTop); }
 
-/*** ===== Tema & UI ===== ***/
-function applyTheme(){ document.body.classList.toggle('light', S.ui.theme==='light'); $('#themeSel').value=S.ui.theme; }
-applyTheme();
-setInterval(()=>$('#clock').textContent=now(), 1000);
+function stGet(sym){ if(!S.state.has(sym)) S.state.set(sym,{waiting:null,openOrderId:null,closeOrderId:null,hedgedBase:0,lock:false}); return S.state.get(sym); }
 
-const mgr = { open(){ $('#mgrModal').classList.add('open'); $('#addSym').focus(); }, close(){ $('#mgrModal').classList.remove('open'); } };
-const bot = { open(){ $('#botModal').classList.add('open'); }, close(){ $('#botModal').classList.remove('open'); } };
-$('#mgrBtn').onclick = ()=>mgr.open();
-$('#botBtn').onclick = ()=>bot.open();
-document.querySelectorAll('.modal').forEach(m=> m.addEventListener('click', e=>{ if(e.target.dataset.close) m.classList.remove('open'); }));
-document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ mgr.close(); bot.close(); }});
+/*** === UI === ***/
+function botLog(t){ const ta=$('#botLog'); ta.value+=`[${now()}] ${t}\n`; ta.scrollTop=ta.scrollHeight; }
+setInterval(()=>$('#clock').textContent=now(),1000);
 
-$('#thresh').value = String(S.ui.thresh);
-$('#toggleTop').checked = !!S.ui.showTop;
-$('#themeSel').value = S.ui.theme;
-$('#thresh').onchange = e=>{ S.ui.thresh=+e.target.value; saveUI(); scheduleDraw(); };
-$('#toggleTop').onchange = e=>{ S.ui.showTop=e.target.checked; saveUI(); scheduleDraw(); };
-$('#themeSel').onchange = e=>{ S.ui.theme=e.target.value; saveUI(); applyTheme(); };
+$('#mgrBtn').onclick=()=>$('#mgrModal').classList.add('open');
+$('#botBtn').onclick=()=>$('#botModal').classList.add('open');
+$$('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target.dataset.close) m.classList.remove('open'); }));
 
-function botLog(line){ const ta=$('#botLog'); ta.value += `[${now()}] ${line}\n`; ta.scrollTop = ta.scrollHeight; }
-$('#botEnable').onchange = e=>{ S.bot.enabled = e.target.checked; botLog(S.bot.enabled?'Bot AÇIK':'Bot KAPALI'); };
-$('#botDry').onchange = e=>{ S.bot.dry = e.target.checked; };
-$('#botUseTableThresh').onchange = e=>{ S.bot.useTableThresh = e.target.checked; };
-$('#botOpenThresh').onchange = e=>{ S.bot.openThresh = +e.target.value; };
-$('#botCloseThresh').onchange = e=>{ S.bot.closeThresh = +e.target.value; };
-$('#botNotional').onchange = e=>{ S.bot.notional = Math.max(10, +e.target.value||0); };
-$('#botLev').onchange = e=>{ S.bot.lev = clamp(+e.target.value||1, 1, 125); };
-$('#botMargin').onchange = e=>{ S.bot.margin = e.target.value; };
-$('#botCooldown').onchange = e=>{ S.bot.cooldown = Math.max(0, +e.target.value||0); };
-$('#spotKey').oninput = e=>S.bot.spotKey=e.target.value.trim();
-$('#spotSec').oninput = e=>S.bot.spotSec=e.target.value.trim();
-$('#futKey').oninput  = e=>S.bot.futKey = e.target.value.trim();
-$('#futSec').oninput  = e=>S.bot.futSec = e.target.value.trim();
-$('#proxyUrl').oninput = e=>S.bot.proxy = e.target.value.trim();
-$('#proxyToken').oninput = e=>S.bot.proxyToken = e.target.value.trim();
+$('#thresh').value=String(S.ui.thresh||0.10);
+$('#thresh').onchange=e=>{S.ui.thresh=+e.target.value; localStorage.setItem('gate:thresh',S.ui.thresh);};
 
-/*** ===== Coin UI ===== ***/
+$('#botEnable').onchange=e=>{S.bot.enabled=e.target.checked; botLog(S.bot.enabled?'Bot AÇIK':'Bot KAPALI');};
+$('#botDry').onchange=e=>S.bot.dry=e.target.checked;
+$('#botOpenThresh').onchange=e=>S.bot.openThresh=+e.target.value;
+$('#botCloseThresh').onchange=e=>S.bot.closeThresh=+e.target.value;
+$('#botNotional').onchange=e=>S.bot.notional=Math.max(5,+e.target.value||0);
+$('#botCooldown').onchange=e=>S.bot.cooldown=Math.max(0,+e.target.value||0);
+$('#botLev').onchange=e=>S.bot.lev=clamp(+e.target.value||1,1,125);
+$('#botMargin').onchange=e=>S.bot.margin=e.target.value;
+$('#spotKey').oninput=e=>S.bot.spotKey=e.target.value.trim();
+$('#spotSec').oninput=e=>S.bot.spotSec=e.target.value.trim();
+$('#futKey').oninput=e=>S.bot.futKey=e.target.value.trim();
+$('#futSec').oninput=e=>S.bot.futSec=e.target.value.trim();
+$('#proxyUrl').oninput=e=>S.bot.proxy=e.target.value.trim();
+$('#proxyToken').oninput=e=>S.bot.proxyToken=e.target.value.trim();
+
 function renderChips(){
-  const wrap = $('#chipWrap'); wrap.innerHTML = '';
-  const frag = document.createDocumentFragment();
+  const wrap=$('#chipWrap'); wrap.innerHTML=''; const frag=document.createDocumentFragment();
   [...S.coins].forEach(sym=>{
-    const d = document.createElement('div'); d.className='chipx';
-    const b = document.createElement('b'); b.textContent = sym.replace('_','');
-    const x = document.createElement('button'); x.textContent='✕';
-    x.onclick=()=>{ S.coins.delete(sym); saveList(); unsub(sym); S.rowEls.get(sym)?.tr.remove(); S.rowEls.delete(sym); scheduleDraw(); };
-    d.append(b,x); frag.appendChild(d);
-  });
-  wrap.appendChild(frag);
+    const c=document.createElement('div'); c.className='chipx'; c.textContent=sym.replace('_','');
+    const x=document.createElement('button'); x.textContent='✕';
+    x.onclick=()=>{ S.coins.delete(sym); localStorage.setItem('gate:list',JSON.stringify([...S.coins])); unsub(sym); const row=S.rowEls.get(sym); row?.tr.remove(); S.rowEls.delete(sym);};
+    c.appendChild(x); frag.appendChild(c);
+  }); wrap.appendChild(frag);
 }
 renderChips();
-$('#btnAdd').onclick = ()=>{
-  const raw=$('#addSym').value.trim().toUpperCase();
-  if(!raw) return;
-  let sym = raw.includes('_')? raw : raw.replace('USDT','_USDT');
-  sym = sym.replace(/[^A-Z0-9_]/g,'');
-  if(!sym.endsWith('_USDT')) return alert('Sadece *_USDT sembolleri.');
-  if(!S.coins.has(sym)){ S.coins.add(sym); saveList(); renderChips(); ensureRow(sym); sub(sym); }
+$('#btnAdd').onclick=()=>{
+  const raw=$('#addSym').value.trim().toUpperCase(); if(!raw) return;
+  let sym=raw.includes('_')?raw:raw.replace('USDT','_USDT'); sym=sym.replace(/[^A-Z0-9_]/g,''); if(!sym.endsWith('_USDT')) return alert('Sadece *_USDT');
+  if(!S.coins.has(sym)){ S.coins.add(sym); localStorage.setItem('gate:list',JSON.stringify([...S.coins])); renderChips(); ensureRow(sym); sub(sym); }
   $('#addSym').value='';
 };
-$('#btnClear').onclick = ()=>{
-  if(confirm('Tüm coinleri sil?')){
-    [...S.coins].forEach(s=>unsub(s));
-    S.coins.clear(); saveList();
-    S.rowEls.forEach(el=>el.tr.remove()); S.rowEls.clear();
-    scheduleDraw();
-  }
+$('#btnClear').onclick=()=>{
+  if(!confirm('Tüm coinleri sil?')) return;
+  [...S.coins].forEach(unsub); S.coins.clear(); localStorage.setItem('gate:list','[]');
+  S.rowEls.forEach(v=>v.tr.remove()); S.rowEls.clear();
 };
 
-/*** ===== WS ===== ***/
+/*** === WS === ***/
 function wsConnect(kind){
-  const isSpot = kind==='spot';
+  const url = kind==='spot' ? 'wss://api.gateio.ws/ws/v4/' : 'wss://fx-ws.gateio.ws/v4/ws/usdt';
   try{ S.ws[kind]?.close?.(); }catch{}
-  const url = isSpot ? 'wss://api.gateio.ws/ws/v4/' : 'wss://fx-ws.gateio.ws/v4/ws/usdt';
-  const ws = new WebSocket(url); S.ws[kind]=ws;
-  ws.onopen = ()=>{ for(const sym of S.coins){ sendSub(kind, sym, true); } };
-  ws.onmessage = (ev)=>{
+  const ws=new WebSocket(url); S.ws[kind]=ws;
+  ws.onopen=()=>{ for(const sym of S.coins){ sendSub(kind,sym,true); } };
+  ws.onmessage=(ev)=>{
     try{
-      const j = JSON.parse(ev.data);
-      if(!j || j.event!=='update' || !j.result) return;
-      if(isSpot && j.channel==='spot.book_ticker'){
-        const r = j.result; const sym = r.s;
-        const bid=toNum(r.b), ask=toNum(r.a);
+      const j=JSON.parse(ev.data);
+      if(!j||j.event!=='update'||!j.result) return;
+      if(kind==='spot' && j.channel==='spot.book_ticker'){
+        const r=j.result; const sym=r.s; const bid=toNum(r.b), ask=toNum(r.a);
         if(isFinite(bid)||isFinite(ask)) S.spot.set(sym,{bid,ask,ts:r.t||Date.now()});
-        scheduleDraw();
       }
-      if(!isSpot && j.channel==='futures.book_ticker'){
-        const r = j.result; const sym = r.s;
-        const bid=toNum(r.b), ask=toNum(r.a);
+      if(kind!=='spot' && j.channel==='futures.book_ticker'){
+        const r=j.result; const sym=r.s; const bid=toNum(r.b), ask=toNum(r.a);
         if(isFinite(bid)||isFinite(ask)) S.fut.set(sym,{bid,ask,ts:r.t||Date.now()});
-        scheduleDraw();
       }
-    }catch(_){}
+      scheduleDraw();
+    }catch{}
   };
-  ws.onclose = ()=>{ setTimeout(()=>wsConnect(kind), 300 + Math.random()*500); };
-  setInterval(()=>{ if(ws.readyState===1){
-    const t = Math.floor(Date.now()/1000);
-    ws.send(JSON.stringify({time:t,channel:isSpot?'spot.ping':'futures.ping'}));
-  }}, 12000);
+  ws.onclose=()=>setTimeout(()=>wsConnect(kind), 400+Math.random()*600);
+  setInterval(()=>{ if(ws.readyState===1){ const t=Math.floor(Date.now()/1000); ws.send(JSON.stringify({time:t,channel:kind==='spot'?'spot.ping':'futures.ping'})); } },12000);
 }
-function sendSub(kind, sym, on){
-  const ws=S.ws[kind]; if(!ws || ws.readyState!==1) return;
-  const channel = (kind==='spot') ? 'spot.book_ticker' : 'futures.book_ticker';
-  ws.send(JSON.stringify({ time: Math.floor(Date.now()/1000), channel, event: on?'subscribe':'unsubscribe', payload:[sym] }));
+function sendSub(kind,sym,on){
+  const ws=S.ws[kind]; if(!ws||ws.readyState!==1) return;
+  const channel=kind==='spot'?'spot.book_ticker':'futures.book_ticker';
+  ws.send(JSON.stringify({time:Math.floor(Date.now()/1000),channel,event:on?'subscribe':'unsubscribe',payload:[sym]}));
 }
-function sub(sym){ sendSub('spot',sym,true); sendSub('fut',sym,true); }
+function sub(sym){ sendSub('spot',sym,true); sendSub('fut',sym,true); ensureRow(sym); }
 function unsub(sym){ sendSub('spot',sym,false); sendSub('fut',sym,false); S.spot.delete(sym); S.fut.delete(sym); }
 
-/*** ===== Hesaplama & Çizim ===== ***/
-function cmpFor(sym){
-  const sp=S.spot.get(sym), fu=S.fut.get(sym);
-  if(!sp || !fu) return null;
-  const askS=sp.ask, bidS=sp.bid, bidF=fu.bid, askF=fu.ask;
-  const okShort = isFinite(askS)&&isFinite(bidF)&&askS>0;
-  const okLong  = isFinite(bidS)&&isFinite(askF)&&askF>0;
-  const shortPct = okShort ? ( (bidF - askS) / askS * 100 ) : NaN;
-  const longPct  = okLong  ? ( (bidS - askF) / askF * 100 ) : NaN;
-  return {sym, askS, bidS, bidF, askF, shortPct, longPct};
-}
-
+/*** === Tablo === ***/
 function ensureRow(sym){
   if(S.rowEls.has(sym)) return;
   const tr=document.createElement('tr'); tr.dataset.sym=sym;
+  const tdSym=document.createElement('td'); tdSym.className='sym'; tdSym.textContent=sym.replace('_','');
 
-  const tdC=document.createElement('td'); tdC.className='sym'; tdC.textContent=sym.replace('_','');
   const tdStatus=document.createElement('td'); tdStatus.className='status';
-  const statusBadge=document.createElement('span'); statusBadge.className='badge'; statusBadge.textContent='—';
-  const cancelBtn=document.createElement('button'); cancelBtn.className='btn-mini'; cancelBtn.textContent='İptal'; cancelBtn.style.display='none';
-  cancelBtn.onclick=()=> cancelWaiting(sym);
-  tdStatus.append(statusBadge, cancelBtn);
+  const badge=document.createElement('span'); badge.className='badge'; badge.textContent='—';
+  const btn=document.createElement('button'); btn.className='btn-mini'; btn.textContent='İptal'; btn.style.display='none';
+  btn.onclick=()=>cancelWaiting(sym);
+  tdStatus.append(badge,btn);
 
-  const tdSAsk=document.createElement('td'); tdSAsk.className='mono src-spotAsk'; tdSAsk.textContent='—';
-  const tdFBid=document.createElement('td'); tdFBid.className='mono src-futBid'; tdFBid.textContent='—';
-  const tdShort=document.createElement('td'); tdShort.className='mono'; tdShort.textContent='—';
-  const tdSBid=document.createElement('td'); tdSBid.className='mono src-spotBid'; tdSBid.textContent='—';
-  const tdFAsk=document.createElement('td'); tdFAsk.className='mono src-futAsk'; tdFAsk.textContent='—';
-  const tdLong=document.createElement('td'); tdLong.className='mono'; tdLong.textContent='—';
+  const tdSAsk=document.createElement('td'); tdSAsk.className='mono'; const tdFBid=document.createElement('td'); tdFBid.className='mono';
+  const tdShort=document.createElement('td'); tdShort.className='mono';
+  const tdSBid=document.createElement('td'); tdSBid.className='mono'; const tdFAsk=document.createElement('td'); tdFAsk.className='mono';
+  const tdLong=document.createElement('td'); tdLong.className='mono';
 
-  tr.append(tdC,tdStatus,tdSAsk,tdFBid,tdShort,tdSBid,tdFAsk,tdLong);
+  tr.append(tdSym,tdStatus,tdSAsk,tdFBid,tdShort,tdSBid,tdFAsk,tdLong);
   $('#tbody').appendChild(tr);
-  S.rowEls.set(sym,{tr, tdStatus, statusBadge, cancelBtn, tdSAsk, tdFBid, tdShort, tdSBid, tdFAsk, tdLong});
+  S.rowEls.set(sym,{tr,tdSAsk,tdFBid,tdShort,tdSBid,tdFAsk,tdLong,badge,btn});
 }
-function updateStatusUI(sym){
-  const el = S.rowEls.get(sym); if(!el) return;
-  const locked = !!S.locks.get(sym);
-  const active = S.active.has(sym);
-  const until = S.blockedUntil.get(sym) || 0;
-  const blocked = Date.now() < until;
+function updateRow(sym,r){
+  const el=S.rowEls.get(sym); if(!el) return;
+  el.tdSAsk.textContent = isFinite(r.askS)?nf.format(r.askS):'—';
+  el.tdFBid.textContent = isFinite(r.bidF)?nf.format(r.bidF):'—';
+  el.tdSBid.textContent = isFinite(r.bidS)?nf.format(r.bidS):'—';
+  el.tdFAsk.textContent = isFinite(r.askF)?nf.format(r.askF):'—';
+  el.tdShort.innerHTML = isFinite(r.shortStar) ? `<span class="${r.shortStar>=S.ui.thresh?'pctPos':''}">${pctStr(r.shortStar)}</span>` : '—';
+  el.tdLong.innerHTML  = isFinite(r.longStar)  ? `<span class="${r.longStar>=S.ui.thresh?'pctPos':''}">${pctStr(r.longStar)}</span>`  : '—';
 
-  el.statusBadge.className='badge'; el.statusBadge.textContent='—'; el.cancelBtn.style.display='none';
-  if(locked){ el.statusBadge.classList.add('lock'); el.statusBadge.textContent='⚙️ İşlem'; }
-  else if(active){ el.statusBadge.classList.add('wait'); el.statusBadge.textContent='⏳ Beklemede'; el.cancelBtn.style.display=''; }
-  else if(blocked){ el.statusBadge.classList.add('block'); el.statusBadge.textContent='⏸ Blok (30s)'; }
+  const st=stGet(sym);
+  el.badge.className='badge'; el.badge.textContent='—'; el.btn.style.display='none';
+  if(st.lock){ el.badge.classList.add('lock'); el.badge.textContent='⚙️ İşlem'; }
+  else if(st.waiting==='open'){ el.badge.classList.add('wait'); el.badge.textContent='⏳ Açılış'; el.btn.style.display=''; }
+  else if(st.waiting==='close'){ el.badge.classList.add('act'); el.badge.textContent='⏳ Kapanış'; el.btn.style.display=''; }
 }
+
+/*** === Hesaplama (maker baz fiyatlarıyla) === ***/
+function cmpFor(sym){
+  const sp=S.spot.get(sym), fu=S.fut.get(sym); if(!sp||!fu) return null;
+  const askS=sp.ask, bidS=sp.bid, bidF=fu.bid, askF=fu.ask;
+  // maker bazlı yüzdeler:
+  const shortStar = isFinite(askS)&&isFinite(askF)&&askS>0 ? ((askF - askS)/askS*100) : NaN; // açılış (SELL futures at maker ask vs spot ask)
+  const longStar  = isFinite(bidS)&&isFinite(bidF)&&bidF>0 ? ((bidS - bidF)/bidF*100) : NaN; // kapanış (BUY futures at maker bid vs spot bid)
+  return {sym, askS, bidS, bidF, askF, shortStar, longStar};
+}
+
+/*** === Çizim & Bot tetik === ***/
 function scheduleDraw(){ if(!S.rafScheduled){ S.rafScheduled=true; requestAnimationFrame(draw); } }
-
 async function draw(){
   S.rafScheduled=false;
-  let any = false;
+  let any=false;
   for(const sym of S.coins){
     ensureRow(sym);
-    const r = cmpFor(sym);
-    updateStatusUI(sym);
-    if(r){
-      const thr = Number(S.ui.thresh)||0;
-      const sh = isFinite(r.shortPct) && r.shortPct>0 && r.shortPct>=thr;
-      const lo = isFinite(r.longPct)  && r.longPct>0  && r.longPct>=thr;
-
-      const el=S.rowEls.get(sym);
-      el.tdSAsk.textContent = isFinite(r.askS) ? nf.format(r.askS) : '—';
-      el.tdFBid.textContent = isFinite(r.bidF) ? nf.format(r.bidF) : '—';
-      el.tdSBid.textContent = isFinite(r.bidS) ? nf.format(r.bidS) : '—';
-      el.tdFAsk.textContent = isFinite(r.askF) ? nf.format(r.askF) : '—';
-      el.tdShort.innerHTML = isFinite(r.shortPct) ? `<span class="${sh?'pctPos':''}">${pctStr(r.shortPct)}</span>` : '—';
-      el.tdLong.innerHTML  = isFinite(r.longPct)  ? `<span class="${lo?'pctPos':''}">${pctStr(r.longPct)}</span>`  : '—';
-
-      any = true;
-      await maybeBot(sym, r);
-    }
+    const r=cmpFor(sym);
+    if(r){ updateRow(sym,r); any=true; await maybeBot(sym,r); }
   }
-  $('#emptyNote').style.display = S.coins.size===0 || !any ? '' : 'none';
-
-  const top=$('#topCard');
-  if(!S.ui.showTop || S.coins.size===0){ top.classList.add('hidden'); }
-  else{
-    let best=null;
-    for(const sym of S.coins){
-      const r = cmpFor(sym); if(!r) continue;
-      const thr = Number(S.ui.thresh)||0;
-      const sh = isFinite(r.shortPct) && r.shortPct>0 && r.shortPct>=thr;
-      const lo = isFinite(r.longPct)  && r.longPct>0  && r.longPct>=thr;
-      if(sh || lo){
-        const bestPct = Math.max(sh?r.shortPct:-Infinity, lo?r.longPct:-Infinity);
-        if(!best || bestPct>best.bestPct) best={r, bestPct, isLong: bestPct===r.longPct};
-      }
-    }
-    if(!best){ top.classList.add('hidden'); }
-    else{
-      const t=best.r; const isLong=best.isLong;
-      $('#topSym').textContent = t.sym.replace('_','');
-      $('#topSide').textContent = isLong ? 'FUTURES LONG' : 'FUTURES SHORT';
-      $('#topSide').className = 'pill ' + (isLong ? 'good' : 'bad');
-      $('#topDesc').textContent = isLong
-        ? `Spot BID ${nf.format(t.bidS)} ↔ Fut ASK ${nf.format(t.askF)}`
-        : `Spot ASK ${nf.format(t.askS)} ↔ Fut BID ${nf.format(t.bidF)}`;
-      const pctEl = $('#topPct'); pctEl.textContent = pctStr(best.bestPct); pctEl.className='mono good';
-      if(!S.lastTop || S.lastTop.sym!==t.sym || S.lastTop.side!==(isLong?'L':'S') || Math.abs(S.lastTop.pct-best.bestPct)>0.0005){
-        top.classList.add('blink'); setTimeout(()=>top.classList.remove('blink'), 220);
-        S.lastTop = {sym:t.sym, side:isLong?'L':'S', pct:best.bestPct};
-      }
-      top.classList.remove('hidden');
-    }
-  }
-  $('#clock').textContent = now();
+  $('#emptyNote').style.display = any? 'none':'';
 }
 
-/*** ===== Bekleme iptali ===== ***/
+/*** === IPtal === ***/
 function cancelWaiting(sym){
-  if(!S.active.has(sym)){ botLog(`ℹ ${sym}: aktif bekleme yok.`); return; }
-  S.active.delete(sym);
-  S.blockedUntil.set(sym, Date.now()+CANCEL_BLOCK_MS);
-  botLog(`🛑 ${sym}: Bekleme iptal edildi, ${CANCEL_BLOCK_MS/1000}s blok.`);
-  updateStatusUI(sym);
+  const st=stGet(sym);
+  if(st.waiting==='open' && st.openOrderId){ cancelFuturesOrder(sym, st.openOrderId).catch(()=>{}); }
+  if(st.waiting==='close' && st.closeOrderId){ cancelFuturesOrder(sym, st.closeOrderId).catch(()=>{}); }
+  st.waiting=null; st.openOrderId=null; st.closeOrderId=null;
+  botLog(`🛑 ${sym}: Bekleyen maker emri iptal edildi`);
 }
 
-/*** ===== Creds helper ===== ***/
-function credsSpot(){ return { key: S.bot.spotKey || S.bot.futKey, sec: S.bot.spotSec || S.bot.futSec }; }
-function credsFut(){  return { key: S.bot.futKey  || S.bot.spotKey, sec: S.bot.futSec  || S.bot.spotSec }; }
-
-/*** ===== Gate REST (imza/fetch) ===== ***/
-const GATE = { spotHost: 'https://api.gateio.ws', futHost: 'https://fx-api.gateio.ws', prefix: '/api/v4' };
-async function sha512Hex(str){ const data=new TextEncoder().encode(str); const d=await crypto.subtle.digest('SHA-512',data); return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
-async function hmac512Hex(secret, msg){ const key=await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), {name:'HMAC',hash:'SHA-512'}, false, ['sign']); const sig=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(msg)); return [...new Uint8Array(sig)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
-async function signHeaders(method, path, query, body, secret, key){
-  const ts = Math.floor(Date.now()/1000).toString();
-  const bodyHex = await sha512Hex(body||'');
-  const signStr = `${method}\n${GATE.prefix}${path}\n${query||''}\n${bodyHex}\n${ts}`;
-  const sign = await hmac512Hex(secret, signStr);
-  return { 'Content-Type':'application/json', 'Accept':'application/json', 'KEY':key, 'Timestamp':ts, 'SIGN':sign };
+/*** === Gate REST imza/fetch === ***/
+const GATE={spotHost:'https://api.gateio.ws', futHost:'https://fx-api.gateio.ws', prefix:'/api/v4'};
+async function sha512Hex(s){ const d=await crypto.subtle.digest('SHA-512', new TextEncoder().encode(s)); return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
+async function hmac512Hex(secret,msg){ const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-512'},false,['sign']); const s=await crypto.subtle.sign('HMAC',k,new TextEncoder().encode(msg)); return [...new Uint8Array(s)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
+async function signHeaders(method,path,query,body,secret,key){
+  const ts=Math.floor(Date.now()/1000).toString();
+  const bodyHex=await sha512Hex(body||'');
+  const signStr=`${method}\n${GATE.prefix}${path}\n${query||''}\n${bodyHex}\n${ts}`;
+  const sign=await hmac512Hex(secret,signStr);
+  return {'Content-Type':'application/json','Accept':'application/json','KEY':key,'Timestamp':ts,'SIGN':sign};
 }
-async function gateFetch(host, method, path, {query='', bodyObj=null, key='', secret='', proxy='', token='' }){
-  const body = bodyObj ? JSON.stringify(bodyObj) : '';
-  const headers = await signHeaders(method, path, query, body, secret, key);
-  const url = host + GATE.prefix + path + (query?`?${query}`:'');
-  const target = proxy ? (proxy.endsWith('/')? proxy.slice(0,-1):proxy) : null;
+async function gateFetch(host,method,path,{query='',bodyObj=null,key='',secret='',proxy='',token=''}){
+  const body=bodyObj?JSON.stringify(bodyObj):'';
+  const headers=await signHeaders(method,path,query,body,secret,key);
+  const url=host+GATE.prefix+path+(query?`?${query}`:'');
+  const target=proxy?(proxy.endsWith('/')?proxy.slice(0,-1):proxy):null;
   if(target){
     const h={'Content-Type':'application/json'}; if(token) h['x-proxy-token']=token;
-    const f = await fetch(target, { method:'POST', headers:h, body:JSON.stringify({ url, method, headers, body }) });
-    if(!f.ok){ throw new Error(`Proxy ${f.status}: ${await f.text()}`); }
-    return (f.headers.get('content-type')||'').includes('application/json') ? f.json() : f.text();
-  } else {
-    const f = await fetch(url, { method, headers, body });
-    if(!f.ok){ throw new Error(`HTTP ${f.status}: ${await f.text()}`); }
-    return (f.headers.get('content-type')||'').includes('application/json') ? f.json() : f.text();
+    const f=await fetch(target,{method:'POST',headers:h,body:JSON.stringify({url,method,headers,body})});
+    if(!f.ok) throw new Error(`Proxy ${f.status}: ${await f.text()}`);
+    return (f.headers.get('content-type')||'').includes('application/json')? f.json(): f.text();
+  }else{
+    const f=await fetch(url,{method,headers,body});
+    if(!f.ok) throw new Error(`HTTP ${f.status}: ${await f.text()}`);
+    return (f.headers.get('content-type')||'').includes('application/json')? f.json(): f.text();
   }
 }
 
-/*** ===== Futures meta/ayar/pozisyon ===== ***/
-const ContractMeta = new Map();
-async function getContractMeta(sym){
-  if (ContractMeta.has(sym)) return ContractMeta.get(sym);
-  const { key, sec } = credsFut();
-  const meta = await gateFetch(GATE.futHost, 'GET', `/futures/usdt/contracts/${sym}`, { key, secret: sec, proxy: S.bot.proxy, token: S.bot.proxyToken });
-  const m = {
-    quanto_multiplier: Number(meta.quanto_multiplier ?? meta.multiplier ?? 1),
-    order_size_min: Number(meta.order_size_min ?? 1),
-    order_size_max: Number(meta.order_size_max ?? 1000000),
-    order_size_step: Number(meta.order_size_step ?? 1)
+/*** === Meta & yardımcı REST === ***/
+const FutMeta=new Map(), SpotMeta=new Map();
+function credsSpot(){return {key:S.bot.spotKey||S.bot.futKey, sec:S.bot.spotSec||S.bot.futSec};}
+function credsFut(){ return {key:S.bot.futKey||S.bot.spotKey, sec:S.bot.futSec||S.bot.spotSec};}
+
+async function getFutMeta(sym){
+  if(FutMeta.has(sym)) return FutMeta.get(sym);
+  const {key,sec}=credsFut();
+  const m=await gateFetch(GATE.futHost,'GET',`/futures/usdt/contracts/${sym}`,{key,secret:sec,proxy:S.bot.proxy,token:S.bot.proxyToken});
+  const meta={
+    qm:Number(m.quanto_multiplier ?? m.multiplier ?? 1),
+    step:Number(m.order_size_step ?? 1),
+    min:Number(m.order_size_min ?? 1),
+    max:Number(m.order_size_max ?? 1000000),
+    tick: Number(m.order_price_round ?? m.tick_size ?? 0.01)
   };
-  ContractMeta.set(sym, m); return m;
+  FutMeta.set(sym,meta); return meta;
 }
-async function ensureFuturesSettings(sym, margin, lev){
-  const { key, sec } = credsFut(); const proxy=S.bot.proxy, token=S.bot.proxyToken;
-  const cacheKey = `${sym}:${margin}:${lev}`; if (S.bot.futSetup.has(cacheKey)) return;
-  const mode = margin === 'cross' ? 'cross' : 'isolated';
-  try{ await gateFetch(GATE.futHost, 'POST', `/futures/usdt/positions/margin_mode`, { bodyObj:{mode}, key, secret:sec, proxy, token }); }
-  catch{ try{ await gateFetch(GATE.futHost, 'POST', `/futures/usdt/positions/cross_mode`, { query:`cross=${mode==='cross'}`, bodyObj:{}, key, secret:sec, proxy, token }); }catch{} }
-  try{ await gateFetch(GATE.futHost, 'POST', `/futures/usdt/positions/${sym}/leverage`, { query:`leverage=${lev}`, bodyObj:{}, key, secret:sec, proxy, token }); }catch{}
-  S.bot.futSetup.add(cacheKey);
+async function ensureFutSettings(sym){
+  const ck=`${sym}:${S.bot.margin}:${S.bot.lev}`; if(S.bot.futSetup.has(ck)) return;
+  const {key,sec}=credsFut(); const proxy=S.bot.proxy, token=S.bot.proxyToken;
+  const mode=S.bot.margin==='cross'?'cross':'isolated';
+  try{ await gateFetch(GATE.futHost,'POST',`/futures/usdt/positions/margin_mode`,{bodyObj:{mode},key,secret:sec,proxy,token}); }catch{}
+  try{ await gateFetch(GATE.futHost,'POST',`/futures/usdt/positions/${sym}/leverage`,{query:`leverage=${S.bot.lev}`,bodyObj:{},key,secret:sec,proxy,token}); }catch{}
+  S.bot.futSetup.add(ck);
 }
-async function getFuturesPositionSize(sym){
-  const { key, sec } = credsFut();
+async function getFutOrder(sym,id){
+  const {key,sec}=credsFut();
+  return gateFetch(GATE.futHost,'GET',`/futures/usdt/orders/${id}`,{key,secret:sec,proxy:S.bot.proxy,token:S.bot.proxyToken});
+}
+async function cancelFuturesOrder(sym,id){
+  const {key,sec}=credsFut();
   try{
-    const p = await gateFetch(GATE.futHost, 'GET', `/futures/usdt/positions/${sym}`, { key, secret:sec, proxy:S.bot.proxy, token:S.bot.proxyToken });
-    const sz = Number(p.size||0); return sz;   // short ise negatif
+    await gateFetch(GATE.futHost,'DELETE',`/futures/usdt/orders/${id}`,{key,secret:sec,proxy:S.bot.proxy,token:S.bot.proxyToken});
+  }catch(e){ /* swallow */ }
+}
+async function getFutPosSize(sym){
+  const {key,sec}=credsFut();
+  try{
+    const p=await gateFetch(GATE.futHost,'GET',`/futures/usdt/positions/${sym}`,{key,secret:sec,proxy:S.bot.proxy,token:S.bot.proxyToken});
+    return Number(p.size||0); // short < 0
   }catch{ return 0; }
 }
-
-/*** ===== Futures LIMIT IOC — EŞİT NOTIONAL ===== ***/
-async function placeFuturesShortLimitByNotional(sym, usdtNotional, limitPx){
-  const { key, sec } = credsFut();
-  const proxy=S.bot.proxy, token=S.bot.proxyToken;
-  const m = await getContractMeta(sym);
-
-  const per = m.quanto_multiplier>0 ? m.quanto_multiplier : 1;
-  // n ≈ N / (per * price)
-  let n = usdtNotional / (per * limitPx);
-  const step = m.order_size_step>0 ? m.order_size_step : 1;
-  n = Math.ceil(n/step)*step; // yukarı yuvarla (IOC dolsun)
-  n = Math.max(m.order_size_min, Math.min(n, m.order_size_max));
-  n = Math.trunc(n);
-  if(!(n>0)) n = m.order_size_min;
-
-  const notionalEst = n * per * limitPx;
-  botLog(`FUT notional≈${notionalEst.toFixed(4)} USDT (hedef ${usdtNotional}) | per=${per}, step=${step}, n=${n}`);
-
-  const body = { contract:sym, size:-n, price:fmtPx(limitPx), tif:"ioc" };
-  const res = await gateFetch(GATE.futHost, 'POST', `/futures/usdt/orders`, { bodyObj:body, key, secret:sec, proxy, token });
-  return { id: res?.id, contracts: n, notional: notionalEst };
-}
-async function closeFuturesShortLimitAll(sym, limitPx){
-  const sz = await getFuturesPositionSize(sym);
-  const openShort = sz<0 ? -sz : 0;
-  if(openShort<=0) return { id:null, closed:0 };
-  const { key, sec } = credsFut(); const proxy=S.bot.proxy, token=S.bot.proxyToken;
-  const body = { contract:sym, size: openShort, price:fmtPx(limitPx), tif:"ioc", reduce_only:true };
-  const res = await gateFetch(GATE.futHost, 'POST', `/futures/usdt/orders`, { bodyObj:body, key, secret:sec, proxy, token });
-  return { id: res?.id, closed: openShort };
-}
-
-/*** ===== Spot LIMIT IOC — EŞİT NOTIONAL ===== ***/
-const SpotMeta = new Map();
-async function getSpotPairMeta(sym){
-  if (SpotMeta.has(sym)) return SpotMeta.get(sym);
-  const { key, sec } = credsSpot();
-  const m = await gateFetch(GATE.spotHost, 'GET', `/spot/currency_pairs/${sym}`, { key, secret:sec, proxy:S.bot.proxy, token:S.bot.proxyToken });
-  const meta = {
-    min_base_amount: Number(m.min_base_amount ?? 0),
-    min_quote_amount: Number(m.min_quote_amount ?? 0),
-    amount_precision: Number(m.amount_precision ?? 6),
-    base: (m.base || sym.split('_')[0]).toUpperCase(),
-    quote: (m.quote || 'USDT').toUpperCase()
+async function getSpotMeta(sym){
+  if(SpotMeta.has(sym)) return SpotMeta.get(sym);
+  const {key,sec}=credsSpot();
+  const m=await gateFetch(GATE.spotHost,'GET',`/spot/currency_pairs/${sym}`,{key,secret:sec,proxy:S.bot.proxy,token:S.bot.proxyToken});
+  const meta={
+    amount_precision:Number(m.amount_precision ?? 6),
+    min_base:Number(m.min_base_amount ?? 0),
+    min_quote:Number(m.min_quote_amount ?? 0),
+    base:(m.base||sym.split('_')[0]).toUpperCase()
   };
-  SpotMeta.set(sym, meta); return meta;
+  SpotMeta.set(sym,meta); return meta;
 }
-async function getSpotAvailable(baseCurrency){
-  const { key, sec } = credsSpot();
-  try{
-    const q=`currency=${encodeURIComponent(baseCurrency)}`;
-    const list = await gateFetch(GATE.spotHost, 'GET', `/spot/accounts`, { query:q, key, secret:sec, proxy:S.bot.proxy, token:S.bot.proxyToken });
-    const rec = Array.isArray(list)? list.find(x=>(x.currency||'').toUpperCase()===baseCurrency):null;
-    return rec ? Number(rec.available||0) : 0;
-  }catch{ return 0; }
-}
-function roundDown(x, decimals){ const f = Math.pow(10, decimals); return Math.floor(x * f) / f; }
-async function placeSpotBuyLimitByNotional(sym, usdtNotional, limitPx){
-  const { key, sec } = credsSpot();
-  const proxy=S.bot.proxy, token=S.bot.proxyToken;
-  const meta = await getSpotPairMeta(sym);
-
-  // amount ≈ N / price
-  let amt = usdtNotional / limitPx;
-  amt = roundDown(amt, meta.amount_precision);
-
-  // min kuralları
-  if(meta.min_base_amount && amt < meta.min_base_amount) amt = meta.min_base_amount;
-  if(meta.min_quote_amount && amt*limitPx < meta.min_quote_amount){
-    const need = meta.min_quote_amount/limitPx;
-    amt = Math.max(amt, roundDown(need, meta.amount_precision));
-  }
-  if(!(amt>0)) amt = meta.min_base_amount || (1/Math.pow(10, meta.amount_precision));
-
-  const notionalEst = amt * limitPx;
-  botLog(`SPOT notional≈${notionalEst.toFixed(4)} USDT (hedef ${usdtNotional}) | amt=${amt}`);
-
-  const body = { currency_pair:sym, type:'limit', account:'spot', side:'buy', amount:String(amt), price:fmtPx(limitPx), time_in_force:'ioc' };
-  const res = await gateFetch(GATE.spotHost, 'POST', `/spot/orders`, { bodyObj:body, key, secret:sec, proxy, token });
-  return { id: res?.id, basePlaced: amt, notional: notionalEst };
-}
-async function placeSpotSellLimitAll(sym, limitPx){
-  const meta = await getSpotPairMeta(sym);
-  let avail = await getSpotAvailable(meta.base);
-  avail = roundDown(avail, meta.amount_precision);
-  if(!(avail>0)) return { id:null, sold:0 };
-  if(meta.min_base_amount && avail < meta.min_base_amount) return { id:null, sold:0 };
-  const { key, sec } = credsSpot(); const proxy=S.bot.proxy, token:S.bot.proxyToken;
-  const body = { currency_pair:sym, type:'limit', account:'spot', side:'sell', amount:String(avail), price:fmtPx(limitPx), time_in_force:'ioc' };
-  const res = await gateFetch(GATE.spotHost, 'POST', `/spot/orders`, { bodyObj:body, key, secret:sec, proxy, token });
-  return { id: res?.id, sold: avail };
+async function getSpotAvail(base){
+  const {key,sec}=credsSpot();
+  const list=await gateFetch(GATE.spotHost,'GET',`/spot/accounts`,{query:`currency=${encodeURIComponent(base)}`,key,secret:sec,proxy:S.bot.proxy,token:S.bot.proxyToken});
+  const rec=Array.isArray(list)?list.find(x=>(x.currency||'').toUpperCase()===base):null;
+  return rec? Number(rec.available||0):0;
 }
 
-/*** ===== Lock helpers ===== ***/
-function isLocked(sym){ return !!S.locks.get(sym); }
-function lock(sym){ S.locks.set(sym, true); updateStatusUI(sym); }
-function unlock(sym){ S.locks.delete(sym); updateStatusUI(sym); }
+/*** === Emir Yerleştirme === ***/
+// Futures SELL maker (açılış): GTC, price = current top ASK (maker)
+async function futMakerSellOpen(sym, usdtN){
+  const {key,sec}=credsFut(); const meta=await getFutMeta(sym);
+  const askF=S.fut.get(sym)?.ask; if(!(askF>0)) throw new Error('Fut ask yok');
+  const nRaw = usdtN / (meta.qm * askF);
+  let n = Math.max(meta.min, Math.min(Math.ceil(nRaw/meta.step)*meta.step, meta.max));
+  n = Math.trunc(n); if(!(n>0)) n=meta.min;
+  const body={contract:sym, size:-n, price:fmtPx(askF), tif:'gtc'};
+  const res=await gateFetch(GATE.futHost,'POST',`/futures/usdt/orders`,{bodyObj:body,key,secret:sec,proxy:S.bot.proxy,token:S.bot.proxyToken});
+  return { id:res?.id, price:askF, contracts:n, per:meta.qm };
+}
+// Futures BUY maker (kapanış): GTC, price = current top BID (maker)
+async function futMakerBuyClose(sym, contracts){
+  const {key,sec}=credsFut(); const bidF=S.fut.get(sym)?.bid; if(!(bidF>0)) throw new Error('Fut bid yok');
+  const body={contract:sym,size:Math.trunc(Math.max(1,contracts)),price:fmtPx(bidF),tif:'gtc',reduce_only:true};
+  const res=await gateFetch(GATE.futHost,'POST',`/futures/usdt/orders`,{bodyObj:body,key,secret:sec,proxy:S.bot.proxy,token:S.bot.proxyToken});
+  return { id:res?.id, price:bidF };
+}
+// Spot BUY taker (IOC) — anlık hedge (açılış)
+async function spotIOCbuyByNotional(sym, usdtN){
+  const {key,sec}=credsSpot(); const meta=await getSpotMeta(sym);
+  const askS=S.spot.get(sym)?.ask; if(!(askS>0)) throw new Error('Spot ask yok');
+  let amt = roundDown(usdtN/askS, meta.amount_precision);
+  if(meta.min_base && amt<meta.min_base) amt=meta.min_base;
+  if(!(amt>0)) throw new Error('Spot amount yetersiz');
+  const body={currency_pair:sym,type:'limit',account:'spot',side:'buy',amount:String(amt),price:fmtPx(askS),time_in_force:'ioc'};
+  const res=await gateFetch(GATE.spotHost,'POST',`/spot/orders`,{bodyObj:body,key,secret:sec,proxy:S.bot.proxy,token:S.bot.proxyToken});
+  return { id:res?.id, base:amt, px:askS, notional:amt*askS };
+}
+// Spot SELL taker (IOC) — kapanışta hedge çözme
+async function spotIOCsellBase(sym, baseAmt){
+  const {key,sec}=credsSpot(); const meta=await getSpotMeta(sym);
+  const bidS=S.spot.get(sym)?.bid; if(!(bidS>0)) throw new Error('Spot bid yok');
+  let amt = roundDown(baseAmt, meta.amount_precision);
+  if(!(amt>0)) return {id:null, base:0, px:bidS, notional:0};
+  const body={currency_pair:sym,type:'limit',account:'spot',side:'sell',amount:String(amt),price:fmtPx(bidS),time_in_force:'ioc'};
+  const res=await gateFetch(GATE.spotHost,'POST',`/spot/orders`,{bodyObj:body,key,secret:sec,proxy:S.bot.proxy,token:S.bot.proxyToken});
+  return { id:res?.id, base:amt, px:bidS, notional:amt*bidS };
+}
 
-/*** ===== Bot tetik ===== ***/
+/*** === Bot çekirdeği === ***/
+function lock(sym){ const st=stGet(sym); st.lock=true; }
+function unlock(sym){ const st=stGet(sym); st.lock=false; }
+
 async function maybeBot(sym, r){
-  if(!S.bot.enabled || isLocked(sym)) return;
+  if(!S.bot.enabled) return;
 
-  const openRef  = S.bot.useTableThresh ? S.ui.thresh : S.bot.openThresh;
-  const closeRef = S.bot.closeThresh;
+  const st=stGet(sym);
+  // açık poz var mı? (hedgedBase>0 veya futures short size<0)
+  const hasActive = st.hedgedBase>0.0000001 || (await getFutPosSize(sym))<0;
 
-  const shortOK = isFinite(r.shortPct) && r.shortPct>=openRef && r.shortPct>0;
-  const longOK  = isFinite(r.longPct)  && r.longPct>=closeRef && r.longPct>0;
-
-  const hasActive = S.active.has(sym);
-  const blockUntil = S.blockedUntil.get(sym) || 0;
-  const isBlocked = Date.now() < blockUntil;
-
-  if(longOK && hasActive){
-    lock(sym);
-    try{ await closePairFull(sym, r); } finally{ unlock(sym); }
-    return;
+  // KAPANIŞ koşulu: maker LONG farkı
+  if(hasActive && isFinite(r.longStar) && r.longStar>=S.bot.closeThresh && !st.lock){
+    st.waiting='close'; updateRow(sym,r);
+    await doCloseCycle(sym); return;
   }
-  if(shortOK && !hasActive && !isBlocked){
-    const last = S.bot.lastExecBySym.get(sym) || 0;
-    if(Date.now() - last >= S.bot.cooldown*1000){
-      lock(sym);
-      try{ await openPairEqualNotional(sym, r); } finally{ unlock(sym); }
-    }
+
+  // AÇILIŞ koşulu: maker SHORT farkı
+  if(!hasActive && isFinite(r.shortStar) && r.shortStar>=S.bot.openThresh && !st.lock){
+    st.waiting='open'; updateRow(sym,r);
+    await doOpenCycle(sym); return;
+  }
+
+  // aksi halde bekleme yoksa rozeti reset
+  if(!hasActive && !st.openOrderId && !st.closeOrderId && st.waiting===null){
+    updateRow(sym,r);
   }
 }
 
-/*** ===== Açılış: EŞİT NOTIONAL iki bacak ===== ***/
-async function openPairEqualNotional(sym, r){
-  S.bot.lastExecBySym.set(sym, Date.now());
-  const ask = r?.askS||0, bidF=r?.bidF||0;
-  if(!(ask>0 && bidF>0)){ botLog(`⏩ [OPEN] ${sym} fiyat eksik (ask/bidF)`); return; }
+/*** === Açılış Döngüsü: maker SELL -> kısmi fill’lerde spot IOC BUY === ***/
+async function doOpenCycle(sym){
+  const st=stGet(sym);
+  if(S.bot.dry){ botLog(`(dry) ${sym} açılış döngüsü`); st.waiting=null; return; }
 
-  const N = S.bot.notional; // USDT
-  botLog(`⏩ [OPEN] ${sym} hedef notional=${N} USDT | Fiyatlar: spotAsk=${fmtPx(ask)} futBid=${fmtPx(bidF)} | fark=${pctStr(r.shortPct)}`);
+  lock(sym);
+  try{
+    await ensureFutSettings(sym);
 
-  if(S.bot.dry){
-    S.active.set(sym, { openedAt: Date.now(), targetN: N });
-    updateStatusUI(sym);
-    botLog(`(dry-run) → iki bacak simüle (eşit notional)`);
-    return;
-  }
+    // Emri ilk ask’a koy
+    const {id,price,contracts,per}=await futMakerSellOpen(sym,S.bot.notional);
+    st.openOrderId=id; st.lastCheckedTs=0;
+    botLog(`▶ ${sym} OPEN fut SELL GTC @${fmtPx(price)} (n=${contracts})`);
 
-  await ensureFuturesSettings(sym, S.bot.margin, S.bot.lev);
+    let prevLeft=null, done=false;
+    while(st.waiting==='open' && st.openOrderId && !done){
+      // hız
+      if(S.bot.cooldown>0) await sleep(S.bot.cooldown); else await sleep(250);
 
-  const futP  = placeFuturesShortLimitByNotional(sym, N, bidF);
-  const spotP = placeSpotBuyLimitByNotional(sym, N, ask);
-  const [futRes, spotRes] = await Promise.allSettled([futP, spotP]);
+      // FARK uygunsuzlaştı mı?
+      const r=cmpFor(sym);
+      if(!(r && isFinite(r.shortStar) && r.shortStar>=S.bot.openThresh)){
+        botLog(`↩ ${sym} fark yetersiz → OPEN maker iptal`);
+        await cancelFuturesOrder(sym, st.openOrderId); st.openOrderId=null; st.waiting=null; break;
+      }
 
-  let futOk=false, spotOk=false, futN=0, spotN=0;
+      // Top ask değişmişse → iptal & yeniden en üste koy
+      const curAsk=S.fut.get(sym)?.ask||0;
+      if(curAsk>0 && Math.abs(curAsk - price) > 1e-8){
+        await cancelFuturesOrder(sym, st.openOrderId); st.openOrderId=null;
+        const rep=await futMakerSellOpen(sym,S.bot.notional);
+        st.openOrderId=rep.id; botLog(`⟳ ${sym} OPEN reprice SELL @${fmtPx(rep.price)}`);
+      }
 
-  if(futRes.status==='fulfilled'){ futOk=true; futN=futRes.value.notional; botLog(`✅ Futures SHORT LMT OK: ${futRes.value?.id||'—'} | cntr=${futRes.value.contracts} | N≈${futN.toFixed(4)}`); }
-  else botLog(`❌ Futures hata [OPEN]: ${futRes.reason?.message||String(futRes.reason)}`);
-
-  if(spotRes.status==='fulfilled'){ spotOk=true; spotN=spotRes.value.notional; botLog(`✅ Spot BUY LMT OK: ${spotRes.value?.id||'—'} | base≈${roundTo(spotRes.value.basePlaced,6)} | N≈${spotN.toFixed(4)}`); }
-  else botLog(`❌ Spot hata [OPEN]: ${spotRes.reason?.message||String(spotRes.reason)}`);
-
-  if(futOk && spotOk){
-    S.active.set(sym, { openedAt: Date.now(), targetN: N, futN, spotN });
-    updateStatusUI(sym);
-    botLog(`📌 [OPEN] ${sym} AKTİF (eşit notional). LONG sinyalde tam kapanış bekleniyor.`);
-  } else {
-    // Fail-safe
-    if(futOk && !spotOk){
-      botLog(`↩ Fail-safe: Spot FAIL → futures short’u kapat`);
-      try{ await closeFuturesShortLimitAll(sym, r.askF||bidF); botLog(`✅ Fail-safe futures kapandı`); }catch(e){ botLog(`💥 Fail-safe fut close hata: ${e?.message||e}`); }
+      // Fill kontrolü
+      const ord=await getFutOrder(sym, st.openOrderId);
+      const left=Number(ord.left??ord.remain??ord.unfilled??contracts);
+      const size=Number(ord.size??contracts);
+      if(prevLeft===null) prevLeft=left;
+      const filled = Math.max(0, (prevLeft - left));
+      prevLeft=left;
+      if(filled>0){
+        // notional ≈ filled * per * limitPrice (yaklaşık)
+        const notional = filled * per * (S.fut.get(sym)?.ask||price);
+        try{
+          const spot=await spotIOCbuyByNotional(sym, notional);
+          st.hedgedBase += spot.base;
+          botLog(`✅ ${sym} HEDGE spot BUY base≈${spot.base.toFixed(6)} @${fmtPx(spot.px)} (N≈${spot.notional.toFixed(4)})`);
+        }catch(e){
+          botLog(`❌ ${sym} spot BUY hedge hata: ${e?.message||e}`);
+        }
+      }
+      if(left<=0){ done=true; botLog(`✔ ${sym} OPEN futures SELL tamamlandı`); st.waiting=null; }
     }
-    if(!futOk && spotOk){
-      botLog(`↩ Fail-safe: Futures FAIL → spot’u sat`);
-      try{ await placeSpotSellLimitAll(sym, r.bidS||ask); botLog(`✅ Fail-safe spot satıldı`); }catch(e){ botLog(`💥 Fail-safe spot close hata: ${e?.message||e}`); }
-    }
-  }
+  }catch(e){
+    botLog(`💥 ${sym} OPEN hata: ${e?.message||e}`);
+    if(st.openOrderId){ await cancelFuturesOrder(sym, st.openOrderId).catch(()=>{}); st.openOrderId=null; }
+    st.waiting=null;
+  }finally{ unlock(sym); updateRow(sym, cmpFor(sym) || {}); }
 }
 
-/*** ===== Kapanış: LONG sinyali → tam kapanış ===== ***/
-async function closePairFull(sym, r){
-  const askF=r?.askF||0, bidS=r?.bidS||0;
-  if(!(askF>0 && bidS>0)){ botLog(`⏹ [CLOSE] ${sym} fiyat eksik`); return; }
+/*** === Kapanış Döngüsü: maker BUY -> kısmi fill’lerde spot IOC SELL === ***/
+async function doCloseCycle(sym){
+  const st=stGet(sym);
+  if(S.bot.dry){ botLog(`(dry) ${sym} kapanış döngüsü`); st.waiting=null; return; }
 
-  botLog(`⏹ [CLOSE] ${sym} → fut BUY reduce_only @${fmtPx(askF)} + spot SELL ALL @${fmtPx(bidS)} | fark=${pctStr(r.longPct)}`);
+  lock(sym);
+  try{
+    const posSz=await getFutPosSize(sym); // short negatif
+    const shortOpen = posSz<0 ? -Math.trunc(Math.abs(posSz)) : 0;
+    if(shortOpen===0 && st.hedgedBase<=0){
+      botLog(`ℹ ${sym} kapatılacak poz yok`); st.waiting=null; return;
+    }
+    // Eğer kontrat 0 ama hedge base varsa, sadece spot sat döngüsü yapacağız
+    let buyId=null, prevLeft=null;
+    if(shortOpen>0){
+      const rep=await futMakerBuyClose(sym, shortOpen);
+      buyId=rep.id; botLog(`▶ ${sym} CLOSE fut BUY GTC @${fmtPx(rep.price)} (target=${shortOpen})`);
+      st.closeOrderId=buyId;
+    }
 
-  if(S.bot.dry){
-    S.active.delete(sym); updateStatusUI(sym);
-    botLog(`(dry-run) → tüm pozisyon varsayımsal kapatıldı`);
-    return;
-  }
+    let done=false;
+    while(st.waiting==='close' && !done){
+      if(S.bot.cooldown>0) await sleep(S.bot.cooldown); else await sleep(250);
 
-  const futP  = closeFuturesShortLimitAll(sym, askF);
-  const spotP = placeSpotSellLimitAll(sym, bidS);
-  const [futRes, spotRes] = await Promise.allSettled([futP, spotP]);
+      // Fark (LONG) uygunsuzsa → iptal
+      const r=cmpFor(sym);
+      if(!(r && isFinite(r.longStar) && r.longStar>=S.bot.closeThresh)){
+        if(buyId){ await cancelFuturesOrder(sym,buyId).catch(()=>{}); st.closeOrderId=null; }
+        botLog(`↩ ${sym} fark yetersiz → CLOSE maker iptal`);
+        st.waiting=null; break;
+      }
 
-  let futOk=false, spotOk=false;
-  if(futRes.status==='fulfilled'){ futOk=true; botLog(`✅ Futures close OK: ${futRes.value?.id||'—'} (closed=${futRes.value?.closed})`); }
-  else botLog(`❌ Futures close hata: ${futRes.reason?.message||String(futRes.reason)}`);
+      // Reprice gerekiyorsa (top bid değişti)
+      const curBid=S.fut.get(sym)?.bid||0;
+      if(buyId && curBid>0){
+        const ord=await getFutOrder(sym,buyId);
+        const pricePlaced=Number(ord.price||curBid);
+        if(Math.abs(curBid - pricePlaced)>1e-8){
+          await cancelFuturesOrder(sym,buyId).catch(()=>{});
+          const posSzNow=await getFutPosSize(sym);
+          const stillShort = posSzNow<0 ? -Math.trunc(Math.abs(posSzNow)) : 0;
+          if(stillShort>0){
+            const rep=await futMakerBuyClose(sym, stillShort);
+            buyId=rep.id; st.closeOrderId=buyId;
+            botLog(`⟳ ${sym} CLOSE reprice BUY @${fmtPx(rep.price)} (remain=${stillShort})`);
+            prevLeft=null;
+          }else buyId=null;
+        }
+      }
 
-  if(spotRes.status==='fulfilled'){ spotOk=true; botLog(`✅ Spot SELL ALL OK: ${spotRes.value?.id||'—'} (sold=${spotRes.value?.sold})`); }
-  else botLog(`❌ Spot SELL ALL hata: ${futRes.reason?.message||String(futRes.reason)}`);
-
-  if(futOk || spotOk){
-    S.active.delete(sym); updateStatusUI(sym);
-    botLog(`🏁 [DONE] ${sym} kapatma tamamlandı (>=1 bacak başarı)`);
-  } else {
-    botLog(`⚠ [CLOSE] ${sym} iki bacak da başarısız oldu`);
-  }
+      // Fill kontrolü + spot satış
+      if(buyId){
+        const ord=await getFutOrder(sym,buyId);
+        const left=Number(ord.left??ord.remain??0);
+        const size=Number(ord.size??0);
+        if(prevLeft===null) prevLeft=left;
+        const filled = Math.max(0,(prevLeft-left));
+        prevLeft=left;
+        if(filled>0){
+          const per=(await getFutMeta(sym)).qm;
+          const baseToSellApprox = filled * per; // hedge bazını azalt
+          const sellBase = Math.min(st.hedgedBase, baseToSellApprox);
+          try{
+            const spot=await spotIOCsellBase(sym, sellBase);
+            st.hedgedBase = Math.max(0, st.hedgedBase - sellBase);
+            botLog(`✅ ${sym} HEDGE spot SELL base≈${spot.base.toFixed(6)} @${fmtPx(spot.px)} (N≈${spot.notional.toFixed(4)})`);
+          }catch(e){ botLog(`❌ ${sym} spot SELL hedge hata: ${e?.message||e}`); }
+        }
+        if(left<=0){
+          // futures kapandı; kalan bütün hedge’i sat
+          if(st.hedgedBase>0){
+            try{
+              const spot=await spotIOCsellBase(sym, st.hedgedBase);
+              st.hedgedBase=0; botLog(`✅ ${sym} Kalan hedge tamamı satıldı: base≈${spot.base.toFixed(6)}`);
+            }catch(e){ botLog(`❌ ${sym} kalan hedge satış hata: ${e?.message||e}`); }
+          }
+          botLog(`✔ ${sym} CLOSE tamamlandı`);
+          st.waiting=null; st.closeOrderId=null; done=true; break;
+        }
+      }else{
+        // Sadece hedge varsa satmaya devam et
+        if(st.hedgedBase>0){
+          try{
+            const spot=await spotIOCsellBase(sym, st.hedgedBase);
+            st.hedgedBase=0; botLog(`✅ ${sym} hedge-only SELL: base≈${spot.base.toFixed(6)}`);
+          }catch(e){ botLog(`❌ ${sym} hedge-only SELL hata: ${e?.message||e}`); }
+        }
+        botLog(`✔ ${sym} CLOSE (futures yok) tamam`);
+        st.waiting=null; done=true; break;
+      }
+    }
+  }catch(e){
+    botLog(`💥 ${sym} CLOSE hata: ${e?.message||e}`);
+    const st2=stGet(sym);
+    if(st2.closeOrderId){ await cancelFuturesOrder(sym, st2.closeOrderId).catch(()=>{}); st2.closeOrderId=null; }
+    st2.waiting=null;
+  }finally{ unlock(sym); updateRow(sym, cmpFor(sym) || {}); }
 }
 
-/*** ===== Start ===== ***/
+/*** === Başlat === ***/
 function start(){
-  $('#themeSel').value = S.ui.theme;
-  $('#proxyUrl').value = S.bot.proxy;
-  $('#proxyToken').value = S.bot.proxyToken || '';
-  $('#botOpenThresh').value = String(S.bot.openThresh);
-  $('#botCloseThresh').value = String(S.bot.closeThresh);
-  $('#botNotional').value = String(S.bot.notional);
-  $('#botLev').value = String(S.bot.lev);
-  $('#botMargin').value = S.bot.margin;
-  $('#botCooldown').value = String(S.bot.cooldown);
-
-  S.coins.forEach(sym=> ensureRow(sym));
-  wsConnect('spot'); wsConnect('fut');
-  S.coins.forEach(sym=> sub(sym));
-
-  $('#clock').textContent = now();
+  S.coins.forEach(ensureRow);
+  wsConnect('spot'); wsConnect('fut'); S.coins.forEach(sub);
   scheduleDraw();
 }
 start();
