@@ -71,7 +71,6 @@
   .src-futAsk{background:color-mix(in oklab, var(--futAsk) 18%, transparent)}
   .pctPos{color:var(--good); font-weight:800}
 
-  /* Durum rozeti */
   .status{display:inline-flex; gap:8px; align-items:center}
   .badge{font-size:12px; border:1px solid var(--border); padding:4px 8px; border-radius:999px; color:var(--muted); background:var(--glass)}
   .badge.wait{color:#f59e0b; border-color:#634f1a; background:rgba(245,158,11,.15)}
@@ -128,11 +127,11 @@
           <tr>
             <th>Coin</th>
             <th>Durum</th>
-            <th>Spot ASK (Kırmızı)</th>
-            <th>Futures BID (Yeşil)</th>
+            <th>Spot ASK</th>
+            <th>Futures BID</th>
             <th>% Fark (SHORT)</th>
-            <th>Spot BID (Yeşil)</th>
-            <th>Futures ASK (Kırmızı)</th>
+            <th>Spot BID</th>
+            <th>Futures ASK</th>
             <th>% Fark (LONG)</th>
           </tr>
         </thead>
@@ -218,7 +217,7 @@
             </label>
             <label> Cooldown (sn) <input id="botCooldown" type="number" step="1" value="0" style="width:90px"/></label>
           </div>
-          <div class="warn">Aynı sembolde aynı anda tek işlem. LONG sinyali <b>tam kapanış</b> demektir (long açmaz).</div>
+          <div class="warn">Aynı sembolde aynı anda tek işlem. LONG sinyali <b>tam kapanış</b> demektir.</div>
         </div>
 
         <div class="grp">
@@ -261,32 +260,23 @@ const fmtPx = p => String(Number(p).toFixed(8));
 function roundDown(x, decimals){ const f = Math.pow(10, decimals); return Math.floor(x * f) / f; }
 
 /*** ===== Durum ===== ***/
-const CANCEL_BLOCK_MS = 30_000; // İptal sonrası yeniden açmaya blok
+const CANCEL_BLOCK_MS = 30_000;
 const S = {
   coins: new Set(JSON.parse(localStorage.getItem('gate:list')||'["BTC_USDT","ETH_USDT"]')),
   ui: { thresh:+(localStorage.getItem('gate:thresh')||0.10), theme: localStorage.getItem('gate:theme') || 'dark', showTop: JSON.parse(localStorage.getItem('gate:showTop')||'true') },
-  spot: new Map(),  // sym -> {bid, ask, ts}
-  fut: new Map(),   // sym -> {bid, ask, ts}
-  rowEls: new Map(),
-  ws:{spot:null, fut:null},
-  rafScheduled:false, lastTop:null,
-
-  locks:new Map(),          // sembol-bazlı lock
-  active:new Map(),         // açık işlem kaydı {baseQty, futContracts, openedAt}
-  blockedUntil:new Map(),   // iptal sonrası blok süresi
-
+  spot: new Map(),  fut: new Map(), rowEls: new Map(),
+  ws:{spot:null, fut:null}, rafScheduled:false, lastTop:null,
+  locks:new Map(), active:new Map(), blockedUntil:new Map(),
   bot:{
     enabled:false, dry:true, useTableThresh:true,
     openThresh:0.30, closeThresh:0.20,
     notional:50, lev:5, margin:'isolated',
     cooldown:0, lastExecBySym:new Map(),
-    // api/proxy
     spotKey:'', spotSec:'', futKey:'', futSec:'',
     proxy:'http://localhost:8787/', proxyToken:'',
     futSetup:new Set()
   }
 };
-
 function saveList(){ localStorage.setItem('gate:list', JSON.stringify([...S.coins])); }
 function saveUI(){ localStorage.setItem('gate:thresh', S.ui.thresh); localStorage.setItem('gate:theme', S.ui.theme); localStorage.setItem('gate:showTop', S.ui.showTop); }
 
@@ -462,7 +452,6 @@ async function draw(){
   S.rafScheduled=false;
   let any = false;
 
-  // Satırları sabit tut: eklenmiş tüm coinler sırayla çiziliyor, gizleme yok
   for(const sym of S.coins){
     ensureRow(sym);
     const r = cmpFor(sym);
@@ -474,38 +463,33 @@ async function draw(){
       const shortHit = isFinite(r.shortPct) && r.shortPct>0 && r.shortPct>=thr;
       const longHit  = isFinite(r.longPct)  && r.longPct>0  && r.longPct>=thr;
 
-      // Fiyatlar
       el.tdSAsk.textContent = isFinite(r.askS) ? nf.format(r.askS) : '—';
       el.tdFBid.textContent = isFinite(r.bidF) ? nf.format(r.bidF) : '—';
       el.tdSBid.textContent = isFinite(r.bidS) ? nf.format(r.bidS) : '—';
       el.tdFAsk.textContent = isFinite(r.askF) ? nf.format(r.askF) : '—';
 
-      // Yüzdeler (vurgulama)
       el.tdShort.innerHTML = isFinite(r.shortPct) ? `<span class="${shortHit?'pctPos':''}">${pctStr(r.shortPct)}</span>` : '—';
       el.tdLong.innerHTML  = isFinite(r.longPct)  ? `<span class="${longHit?'pctPos':''}">${pctStr(r.longPct)}</span>`  : '—';
 
       any = true;
 
-      // Bot tetik
       await maybeBot(sym, r, shortHit, longHit);
     }
   }
 
   $('#emptyNote').style.display = S.coins.size===0 || !any ? '' : 'none';
 
-  // En iyi kart (opsiyonel)
   const top=$('#topCard');
   if(!S.ui.showTop || S.coins.size===0){ top.classList.add('hidden'); }
   else{
-    // en yüksek farkı bul
     let best=null;
     for(const sym of S.coins){
       const r = cmpFor(sym); if(!r) continue;
       const thr = Number(S.ui.thresh)||0;
-      const shortHit = isFinite(r.shortPct) && r.shortPct>0 && r.shortPct>=thr;
-      const longHit  = isFinite(r.longPct)  && r.longPct>0  && r.longPct>=thr;
-      if(shortHit || longHit){
-        const bestPct = Math.max(shortHit?r.shortPct:-Infinity, longHit?r.longPct:-Infinity);
+      const sh = isFinite(r.shortPct) && r.shortPct>0 && r.shortPct>=thr;
+      const lo = isFinite(r.longPct)  && r.longPct>0  && r.longPct>=thr;
+      if(sh || lo){
+        const bestPct = Math.max(sh?r.shortPct:-Infinity, lo?r.longPct:-Infinity);
         if(!best || bestPct>best.bestPct) best={r, bestPct, isLong: bestPct===r.longPct};
       }
     }
@@ -610,7 +594,7 @@ async function placeFuturesShortLimit(sym, baseQty, limitPx){
   const per = m.quanto_multiplier>0 ? m.quanto_multiplier : 1;
   let contracts = baseQty / per;
   const step = m.order_size_step>0 ? m.order_size_step : 1;
-  contracts = Math.ceil(contracts/step)*step;  // min’i kaçırmamak için yukarı
+  contracts = Math.ceil(contracts/step)*step;
   contracts = Math.max(m.order_size_min, Math.min(contracts, m.order_size_max));
   contracts = Math.trunc(contracts);
   if(!(contracts>0)) contracts = m.order_size_min;
@@ -684,7 +668,7 @@ function lock(sym){ S.locks.set(sym, true); updateStatusUI(sym); }
 function unlock(sym){ S.locks.delete(sym); updateStatusUI(sym); }
 
 /*** ===== Bot tetik ===== ***/
-async function maybeBot(sym, r, shortHit, longHit){
+async function maybeBot(sym, r){
   if(!S.bot.enabled || isLocked(sym)) return;
 
   const openRef  = S.bot.useTableThresh ? S.ui.thresh : S.bot.openThresh;
@@ -697,14 +681,11 @@ async function maybeBot(sym, r, shortHit, longHit){
   const blockUntil = S.blockedUntil.get(sym) || 0;
   const isBlocked = Date.now() < blockUntil;
 
-  // Kapanış (long sinyal) — sadece aktif varsa
   if(longOK && hasActive){
     lock(sym);
     try{ await closePairFull(sym, r); } finally{ unlock(sym); }
     return;
   }
-
-  // Açılış (short sinyal) — aktif yoksa ve blok yoksa
   if(shortOK && !hasActive && !isBlocked){
     const last = S.bot.lastExecBySym.get(sym) || 0;
     if(Date.now() - last >= S.bot.cooldown*1000){
@@ -751,7 +732,6 @@ async function openPairAlwaysBoth(sym, r){
     updateStatusUI(sym);
     botLog(`📌 [OPEN] ${sym} AKTİF: beklemede (long sinyalde kapanır)`);
   } else {
-    // Fail-safe
     if(futOk && !spotOk){
       botLog(`↩ Fail-safe: Spot FAIL → futures short’u kapat`);
       try{ await closeFuturesShortLimitAll(sym, r.askF||bidF); botLog(`✅ Fail-safe futures kapandı`); }catch(e){ botLog(`💥 Fail-safe fut close hata: ${e?.message||e}`); }
@@ -809,7 +789,12 @@ function start(){
 
   // Sabit sıra: mevcut coinleri eklenme sırasıyla renderla
   S.coins.forEach(sym=> ensureRow(sym));
-  // WS abonelikleri
+
+  // ✅ WS bağlantılarını başlat (önceki sürümde eksikti)
+  wsConnect('spot');
+  wsConnect('fut');
+
+  // Abonelikler (ws onopen içinde de tekrar yapılır)
   S.coins.forEach(sym=> sub(sym));
 
   $('#clock').textContent = now();
