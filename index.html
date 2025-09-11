@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Gate.io Futures — Rastgele Bot + Kapsamlı Muhasebe</title>
+<title>Gate.io Futures — Rastgele Bot (Proxy + Muhasebe)</title>
 <style>
 :root{
   --bg:#0b0f19; --fg:#e8eef7; --muted:#9fb0c9;
@@ -17,10 +17,12 @@ body{
   margin:0; color:var(--fg);
   background:
     radial-gradient(1200px 800px at 15% -10%, #0f2b59 0%, transparent 55%),
-    radial-gradient(1000px 700px at 110% 0%, transparent 55%),
+    radial-gradient(1000px 700px at 110% 0%, #153160 0%, transparent 55%),
     linear-gradient(180deg,#0a1222 0%, #0b0f19 60%);
   font-family:Inter,system-ui,Segoe UI,Roboto,Arial;
 }
+
+/* Header */
 .wrap{max-width:var(--maxW); margin:0 auto; padding:18px}
 header{position:sticky; top:0; z-index:5; background:linear-gradient(180deg, rgba(5,10,22,.85), transparent); backdrop-filter:blur(10px)}
 .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
@@ -39,38 +41,32 @@ input,select,textarea{
   background:linear-gradient(180deg,var(--panel),var(--panel2));
   border:1px solid var(--border); color:var(--fg); border-radius:12px; padding:10px 12px
 }
-input[type="date"]{padding:8px 10px}
-.mono{font-variant-numeric:tabular-nums slashed-zero; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-.badge{font-size:11px; padding:3px 8px; border:1px solid var(--border); border-radius:999px; color:var(--muted)}
-.good{color:var(--good)} .bad{color:var(--bad)}
+label.small{font-size:12px; color:var(--muted)}
 
 /* Cards & table */
 .card{background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--border); border-radius:var(--radius); padding:12px; box-shadow:0 10px 34px rgba(0,0,0,.22)}
+.mono{font-variant-numeric:tabular-nums slashed-zero; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.good{color:var(--good)} .bad{color:var(--bad)}
+.sym{font-weight:800}
 table{width:100%; border-collapse:separate; border-spacing:0 var(--gap)}
 thead th{font-size:12px; color:var(--muted); padding:0 10px; text-align:left}
 tbody td{padding:var(--padY) var(--padX); font-size:var(--font); background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--border); border-left:none; border-right:none}
 tbody tr td:first-child{border-top-left-radius:var(--radius); border-bottom-left-radius:var(--radius); border-left:1px solid var(--border)}
 tbody tr td:last-child{border-top-right-radius:var(--radius); border-bottom-right-radius:var(--radius); border-right:1px solid var(--border)}
-.sym{font-weight:800}
 .sticky-head{position:sticky; top:64px; z-index:4}
 
-/* Summary cards */
-.grid{display:grid; gap:12px}
-.grid.stats{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
-.stat{padding:12px; border:1px solid var(--border); border-radius:14px; background:linear-gradient(180deg,var(--panel),var(--panel2))}
-.stat b{display:block; font-size:12px; color:var(--muted)}
-.stat .v{font-size:18px; margin-top:4px}
-
 /* Floating buttons */
-#btnCoins,#btnBot,#btnAcc{position:fixed; right:22px; z-index:50}
-#btnCoins{top:18px} #btnBot{top:70px} #btnAcc{top:122px}
+#btnBot,#btnCoins,#btnAcc{position:fixed; right:22px; z-index:50}
+#btnCoins{top:18px}
+#btnBot{top:70px}
+#btnAcc{top:122px}
 
 /* Modals */
 .modal{position:fixed; inset:0; display:none; z-index:60}
 .modal.open{display:block}
 .overlay{position:absolute; inset:0; background:rgba(3,6,15,.55); backdrop-filter:blur(4px); opacity:0; animation:fadeIn .15s ease forwards}
 @keyframes fadeIn{to{opacity:1}}
-.panel{ position:absolute; right:24px; top:72px; width:min(920px, calc(100% - 32px)); background:linear-gradient(180deg,var(--panel),var(--panel2));
+.panel{ position:absolute; right:24px; top:72px; width:min(560px, calc(100% - 32px)); background:linear-gradient(180deg,var(--panel),var(--panel2));
   border:1px solid var(--border); border-radius:18px; box-shadow:0 24px 80px rgba(0,0,0,.45); transform:translateY(-10px); opacity:0; animation:pop .18s ease forwards }
 @keyframes pop{to{transform:none; opacity:1}}
 .panel header{display:flex; align-items:center; justify-content:space-between; padding:14px 14px 0}
@@ -82,10 +78,11 @@ tbody tr td:last-child{border-top-right-radius:var(--radius); border-bottom-righ
 .chipx{background:var(--glass); border:1px solid var(--border); border-radius:999px; padding:6px 10px; display:inline-flex; gap:8px; align-items:center}
 .chipx b{letter-spacing:.3px}
 .chipx button{all:unset; cursor:pointer; color:var(--muted)}
-#log{height:140px; resize:vertical}
+
+/* Ledger table */
 #accTable th,#accTable td{font-size:13px}
-.controls .row{gap:10px; align-items:flex-end}
-.search{flex:1 1 200px}
+#log{height:140px; resize:vertical}
+.badge{font-size:11px; padding:3px 8px; border:1px solid var(--border); border-radius:999px; color:var(--muted)}
 </style>
 </head>
 <body>
@@ -93,10 +90,11 @@ tbody tr td:last-child{border-top-right-radius:var(--radius); border-bottom-righ
   <div class="row">
     <h1>Gate.io Futures — Rastgele Bot</h1>
     <div class="chip">Saat: <span id="clock" class="mono">—:—:—</span></div>
-    <span class="badge">Yalnızca Futures (USDT)</span>
+    <span class="badge">Sadece Futures (USDT)</span>
   </div>
 </header>
 
+<!-- Main: Best quotes of watching list (sticky simple table just for visual) -->
 <main class="wrap" style="padding-bottom:60px">
   <div class="card">
     <div class="row sticky-head">
@@ -127,7 +125,7 @@ tbody tr td:last-child{border-top-right-radius:var(--radius); border-bottom-righ
 <!-- Coins Modal -->
 <div id="coinsModal" class="modal">
   <div class="overlay" data-close="1"></div>
-  <div class="panel" style="width:min(560px, calc(100% - 32px))">
+  <div class="panel">
     <header>
       <h3>Coin Listesi</h3>
       <button class="btn iconbtn" data-close="1">✖</button>
@@ -197,10 +195,10 @@ tbody tr td:last-child{border-top-right-radius:var(--radius); border-bottom-righ
           <input id="proxyTok" placeholder="Proxy Token (opsiyonel)" style="flex:1 1 220px"/>
         </div>
         <div class="row" style="gap:10px; flex-wrap:wrap; margin-top:6px">
-          <label class="row"><input type="checkbox" id="isolated" checked/> Isolated</label>
+          <label class="row small"><input type="checkbox" id="isolated" checked/> Isolated</label>
           <button id="btnApplyLev" class="btn">Seçilen kontrata kaldıraç & mod uygula</button>
         </div>
-        <span class="label" style="font-size:12px; color:var(--muted)">Proxy; <b>POST</b> olarak <code>{url, method, headers, body}</code> alıp upstream’e iletmeli.</span>
+        <span class="label small">Proxy; <b>POST</b> olarak <code>{url, method, headers, body}</code> alıp upstream’e iletmeli.</span>
       </div>
 
       <div class="grp">
@@ -214,112 +212,82 @@ tbody tr td:last-child{border-top-right-radius:var(--radius); border-bottom-righ
 <!-- Accounting Modal -->
 <div id="accModal" class="modal">
   <div class="overlay" data-close="1"></div>
-  <div class="panel">
+  <div class="panel" style="width:min(900px, calc(100% - 32px))">
     <header>
-      <h3>Muhasebe — PNL, Ücretler, ROI</h3>
+      <h3>Muhasebe (PNL & Ücretler)</h3>
       <button class="btn iconbtn" data-close="1">✖</button>
     </header>
     <div class="content">
-      <!-- Summary cards -->
-      <div class="grid stats" id="sumCards">
-        <!-- doldurulacak -->
-      </div>
-
-      <!-- Controls / Filters -->
-      <div class="grp controls">
-        <label class="lbl">Filtreler & Dışa Aktarma</label>
-        <div class="row">
-          <select id="fltCoin" style="width:160px"><option value="">Tüm Coinler</option></select>
-          <select id="fltSide" style="width:140px">
-            <option value="">Tümü</option>
-            <option value="LONG">LONG</option>
-            <option value="SHORT">SHORT</option>
-          </select>
-          <div class="row" style="gap:6px">
-            <label class="small">Başlangıç <input type="date" id="fltFrom"></label>
-            <label class="small">Bitiş <input type="date" id="fltTo"></label>
-          </div>
-          <input id="fltSearch" class="search" placeholder="Ara (id/symbol/not…)" />
-          <button id="btnCSV" class="btn">CSV İndir</button>
-          <button id="btnClearAcc" class="btn" style="margin-left:auto">Muhasebeyi Temizle</button>
-        </div>
-      </div>
-
-      <!-- Table -->
       <div class="grp">
         <table id="accTable">
           <thead>
             <tr>
-              <th>Zaman</th><th>İşlem ID</th><th>Sembol</th><th>Yön</th><th>Lev</th>
-              <th>Söz.</th><th>Entry</th><th>Exit</th>
-              <th>Notional (USDT)</th>
-              <th>Brüt PnL</th><th>Ücret</th><th>Net</th><th>Durum</th>
+              <th>Zaman</th><th>Sembol</th><th>Yön</th><th>Lev</th>
+              <th>Sözleşme</th><th>Giriş</th><th>Çıkış</th>
+              <th>PNL (USDT)</th><th>Ücret</th><th>Net</th><th>Durum</th>
             </tr>
           </thead>
           <tbody id="accBody"></tbody>
         </table>
       </div>
-
-      <!-- Per-coin aggregation -->
-      <div class="grp">
-        <label class="lbl">Coin Bazlı Özet</label>
-        <table id="coinAgg">
-          <thead>
-            <tr>
-              <th>Coin</th><th>İşlem</th><th>Kazançlı</th><th>Zararlı</th>
-              <th>Toplam Notional</th><th>Brüt PnL</th><th>Ücret</th><th>Net</th><th>ROI %</th>
-            </tr>
-          </thead>
-          <tbody id="coinAggBody"></tbody>
-        </table>
+      <div class="row">
+        <button id="btnClearAcc" class="btn">Muhasebeyi Temizle</button>
+        <span class="badge">PNL= (exit-entry)*contracts*qm * (LONG:+1 / SHORT:-1)</span>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-/* ==== Helpers ==== */
+/* ===== Helpers ===== */
 const $ = s=>document.querySelector(s);
 const $$ = s=>document.querySelectorAll(s);
 const nowStr = ()=>new Date().toLocaleTimeString('tr-TR',{hour12:false});
 const nf2 = new Intl.NumberFormat('tr-TR',{maximumFractionDigits:8});
-const rnd=(a,b)=>Math.random()*(b-a)+a;
-const rndi=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const rndi = (a,b)=> Math.floor(Math.random()*(b-a+1))+a;
+const rndf = (a,b)=> Math.random()*(b-a)+a;
+const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const ts=()=>Math.floor(Date.now()/1000);
 
-/* ==== State ==== */
+/* ===== State ===== */
 const S = {
   coins: new Set(JSON.parse(localStorage.getItem('rb:coins')||'["BTC_USDT","ETH_USDT"]')),
-  ws:null,
-  ticks:new Map(), // sym -> {bid,ask,last}
-  rows:new Map(),
-  bot:{
-    on:false,dry:true,randClose:true,
-    levMin:2,levMax:10,
-    notMin:20,notMax:120,
-    tpMin:0.4,tpMax:2.0,
-    slMin:0.4,slMax:2.0,
-    makerPct:55,closePct:40,closeMin:20,closeMax:180,
-    isolated:true,key:'',sec:'',proxy:'http://localhost:8787/',token:'',
-    futSetup:new Set()
+  ws: null,
+  ticks: new Map(), // sym -> {bid, ask, last}
+  rows: new Map(),
+  bot: {
+    on:false, dry:true,
+    levMin:2, levMax:10,
+    notMin:20, notMax:120,
+    tpMin:0.4, tpMax:2.0,
+    slMin:0.4, slMax:2.0,
+    makerPct:55,
+    closePct:40, closeMin:20, closeMax:180,
+    randClose:true,
+    isolated:true,
+    key:'', sec:'', proxy:'http://localhost:8787/', token:'',
+    // caches
+    futSetup:new Set(),
   },
-  pos:new Map(), // sym-> { side, lev, contracts, entry, orderId, tpId, slId, openTs, fees, notional, tradeId }
-  ledger: JSON.parse(localStorage.getItem('rb:ledger')||'[]') // closed trades
+  // positions by symbol (tek pozisyon/coin)
+  pos: new Map(), // sym -> { side:+1|-1, lev, contracts, entry, orderId, tpId?, slId?, openTs, fees }
+  // accounting
+  ledger: JSON.parse(localStorage.getItem('rb:ledger')||'[]')
 };
 
-/* ==== UI: Header clock ==== */
-setInterval(()=>$('#clock').textContent=nowStr(),1000);
-
-/* ==== Coins UI ==== */
+/* ===== UI Bind ===== */
 $('#btnCoins').onclick=()=>openModal('coinsModal');
 $('#btnBot').onclick=()=>openModal('botModal');
-$('#btnAcc').onclick=()=>{ openModal('accModal'); populateFilters(); renderAccounting(); };
+$('#btnAcc').onclick=()=>{ openModal('accModal'); renderAcc(); };
 
 function openModal(id){ $('#'+id).classList.add('open'); }
 $$('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target.dataset.close) m.classList.remove('open'); }));
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') $$('.modal').forEach(m=>m.classList.remove('open')); });
 
+setInterval(()=>$('#clock').textContent=nowStr(),1000);
+
+/* Coins UI */
 function saveCoins(){ localStorage.setItem('rb:coins', JSON.stringify([...S.coins])); }
 function renderChips(){
   const w=$('#chipWrap'); w.innerHTML='';
@@ -336,7 +304,7 @@ function renderChips(){
 $('#btnAdd').onclick=()=>{
   const raw=$('#addSym').value.trim().toUpperCase();
   if(!raw) return;
-  const sym = raw.includes('_')?raw:raw.replace('USDT','_USDT');
+  const sym = raw.includes('_') ? raw : raw.replace('USDT','_USDT');
   S.coins.add(sym); saveCoins(); ensureRow(sym);
 };
 $('#btnClr').onclick=()=>{
@@ -347,7 +315,7 @@ $('#btnClr').onclick=()=>{
 };
 renderChips();
 
-/* ==== Ticker Table ==== */
+/* ===== Table ===== */
 function ensureRow(sym){
   renderChips();
   if(S.rows.has(sym)) return;
@@ -365,19 +333,20 @@ function drawRow(sym){
   ensureRow(sym);
   const t=S.ticks.get(sym)||{};
   const el=S.rows.get(sym);
-  el.td2.textContent = isFinite(t.bid)? nf2.format(t.bid):'—';
-  el.td3.textContent = isFinite(t.ask)? nf2.format(t.ask):'—';
-  el.td4.textContent = isFinite(t.last)? nf2.format(t.last):'—';
+  el.td2.textContent = t.bid? nf2.format(t.bid):'—';
+  el.td3.textContent = t.ask? nf2.format(t.ask):'—';
+  el.td4.textContent = t.last? nf2.format(t.last):'—';
   const p=S.pos.get(sym);
   el.td5.innerHTML = p
     ? (p.side>0?'<span class="badge good">LONG açık</span>':'<span class="badge bad">SHORT açık</span>')
     : '<span class="badge">—</span>';
 }
 
-/* ==== WebSocket (futures.book_ticker) ==== */
+/* ===== WS Ticker (best bid/ask/last) ===== */
 function wsStart(){
   try{ S.ws?.close?.(); }catch{}
-  const ws = new WebSocket('wss://fx-ws.gateio.ws/v4/ws/usdt'); S.ws=ws;
+  const ws = new WebSocket('wss://fx-ws.gateio.ws/v4/ws/usdt');
+  S.ws=ws;
   ws.onopen=()=>{
     for(const sym of S.coins){
       ws.send(JSON.stringify({time:ts(),channel:'futures.book_ticker',event:'subscribe',payload:[sym]}));
@@ -387,53 +356,89 @@ function wsStart(){
     try{
       const j=JSON.parse(ev.data);
       if(j.event==='update' && j.channel==='futures.book_ticker'){
-        const r=j.result; const sym=r.s;
-        const bid=+r.b, ask=+r.a, last=+r.p;
-        if(isFinite(bid)||isFinite(ask)||isFinite(last)){ S.ticks.set(sym,{bid,ask,last}); drawRow(sym); }
+        const r=j.result;
+        const sym=r.s; const bid=+r.b, ask=+r.a, last=+r.p;
+        if(isFinite(bid)||isFinite(ask)||isFinite(last)){
+          S.ticks.set(sym,{bid,ask,last});
+          drawRow(sym);
+        }
       }
     }catch(_){}
   };
-  ws.onclose=()=>setTimeout(wsStart,1000);
-  setInterval(()=>{ if(ws.readyState===1) ws.send(JSON.stringify({time:ts(),channel:'futures.ping'})); },15000);
+  ws.onclose=()=>setTimeout(wsStart, 1000);
+  setInterval(()=>{ if(ws.readyState===1){ ws.send(JSON.stringify({time:ts(),channel:'futures.ping'})); }}, 15000);
 }
 wsStart();
 
-/* ==== Bot Controls ==== */
-const B=S.bot;
-$('#botOn').onchange=e=>{ B.on=e.target.checked; log(B.on?'Bot AÇIK':'Bot KAPALI'); if(B.on) loop(); };
-$('#dry').onchange=e=>B.dry=e.target.checked;
-$('#randClose').onchange=e=>B.randClose=e.target.checked;
-
-['levMin','levMax','notMin','notMax','tpMin','tpMax','slMin','slMax','makerPct','closePct','closeMin','closeMax']
-.forEach(id=>{ $('#'+id).onchange = e=>{ const v=e.target.type==='number'? +e.target.value : e.target.value; B[id]=v; }; });
-
-$('#isolated').onchange=e=>B.isolated=e.target.checked;
-$('#keyF').oninput=e=>B.key=e.target.value.trim();
-$('#secF').oninput=e=>B.sec=e.target.value.trim();
-$('#proxyUrl').oninput=e=>B.proxy=e.target.value.trim();
-$('#proxyTok').oninput=e=>B.token=e.target.value.trim();
-$('#btnApplyLev').onclick=async()=>{
-  const sym = pickSym(); if(!sym) return alert('Önce coin ekleyin.');
-  const lev = rndi(B.levMin,B.levMax);
-  try{ await ensureFutSettings(sym, B.isolated?'isolated':'cross', lev); log(`⚙ ${sym} mod=${B.isolated?'isolated':'cross'} lev=${lev}`); }
-  catch(e){ log(`⚠ ayar hata: ${e?.message||e}`); }
+/* ===== BOT Controls Bind ===== */
+const B = S.bot;
+$('#botOn').onchange = e=>{ B.on=e.target.checked; log(B.on?'Bot AÇIK':'Bot KAPALI'); if(B.on) loop(); };
+$('#dry').onchange = e=>B.dry=e.target.checked;
+$('#randClose').onchange = e=>B.randClose=e.target.checked;
+$('#levMin').onchange = e=>B.levMin=+e.target.value;
+$('#levMax').onchange = e=>B.levMax=+e.target.value;
+$('#notMin').onchange = e=>B.notMin=+e.target.value;
+$('#notMax').onchange = e=>B.notMax=+e.target.value;
+$('#tpMin').onchange = e=>B.tpMin=+e.target.value;
+$('#tpMax').onchange = e=>B.tpMax=+e.target.value;
+$('#slMin').onchange = e=>B.slMin=+e.target.value;
+$('#slMax').onchange = e=>B.slMax=+e.target.value;
+$('#makerPct').onchange = e=>B.makerPct=+e.target.value;
+$('#closePct').onchange = e=>B.closePct=+e.target.value;
+$('#closeMin').onchange = e=>B.closeMin=+e.target.value;
+$('#closeMax').onchange = e=>B.closeMax=+e.target.value;
+$('#isolated').onchange = e=>B.isolated = e.target.checked;
+$('#keyF').oninput = e=>B.key=e.target.value.trim();
+$('#secF').oninput = e=>B.sec=e.target.value.trim();
+$('#proxyUrl').oninput = e=>B.proxy=e.target.value.trim();
+$('#proxyTok').oninput = e=>B.token=e.target.value.trim();
+$('#btnApplyLev').onclick = async ()=>{
+  const sym = pickSym();
+  if(!sym) return alert('Önce coin ekleyin.');
+  const lev = rndi(B.levMin, B.levMax);
+  try{
+    await ensureFutSettings(sym, B.isolated?'isolated':'cross', lev);
+    log(`⚙ ${sym} mod=${B.isolated?'isolated':'cross'}, lev=${lev} uygulandı`);
+  }catch(e){ log(`⚠ ayar hata: ${e?.message||e}`); }
 };
 
+/* ===== LOG ===== */
 function log(m){ const ta=$('#log'); ta.value += `[${nowStr()}] ${m}\n`; ta.scrollTop=ta.scrollHeight; }
 
-/* ==== Gate Futures REST (proxy üzerinden) ==== */
-const G={ host:'https://fx-api.gateio.ws', prefix:'/api/v4' };
-async function sha512Hex(s){ const d=new TextEncoder().encode(s||''); const h=await crypto.subtle.digest('SHA-512',d); return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
-async function hmac512Hex(secret,msg){ const key=await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), {name:'HMAC',hash:'SHA-512'}, false, ['sign']); const sig=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(msg)); return [...new Uint8Array(sig)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
-async function signHeaders(method,path,query,body){ const t=ts().toString(); const bh=await sha512Hex(body||''); const s=`${method}\n${G.prefix}${path}\n${query||''}\n${bh}\n${t}`; const sign=await hmac512Hex(B.sec,s); return {'Content-Type':'application/json','Accept':'application/json','KEY':B.key,'Timestamp':t,'SIGN':sign}; }
-async function gateFetch(method,path,{query='',bodyObj=null}={}){
-  const body = bodyObj? JSON.stringify(bodyObj):'';
-  const headers = await signHeaders(method,path,query,body);
-  const url = G.host+G.prefix+path+(query?`?${query}`:'');
-  const target = (B.proxy||'').replace(/\/+$/,'');
+/* ===== Gate API (Futures only) ===== */
+/* Docs: https://fx-api.gateio.ws/api/v4 ... 
+   Create order:  POST /futures/usdt/orders
+   Price orders:  POST /futures/usdt/price_orders
+   Order book:    GET  /futures/usdt/order_book?contract=...&limit=1
+   (Schemas doğrulandı) */
+const G = { host:'https://fx-api.gateio.ws', prefix:'/api/v4' };
+
+async function sha512Hex(s){
+  const d=new TextEncoder().encode(s||'');
+  const h=await crypto.subtle.digest('SHA-512', d);
+  return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function hmac512Hex(secret,msg){
+  const key=await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), {name:'HMAC', hash:'SHA-512'}, false, ['sign']);
+  const sig=await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg));
+  return [...new Uint8Array(sig)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function signHeaders(method, path, query, body){
+  const tsSec=ts().toString();
+  const bodyHex=await sha512Hex(body||'');
+  const str=`${method}\n${G.prefix}${path}\n${query||''}\n${bodyHex}\n${tsSec}`;
+  const sign=await hmac512Hex(B.sec, str);
+  return { 'Content-Type':'application/json', 'Accept':'application/json', 'KEY':B.key, 'Timestamp':tsSec, 'SIGN':sign };
+}
+async function gateFetch(method, path, {query='', bodyObj=null}={}){
+  const body = bodyObj ? JSON.stringify(bodyObj) : '';
+  const headers = await signHeaders(method, path, query, body);
+  const url = G.host + G.prefix + path + (query?`?${query}`:'');
+  const target = (B.proxy||'').replace(/\/+$/,''); // trim slash
   if(target){
-    const h={'Content-Type':'application/json'}; if(B.token) h['x-proxy-token']=B.token;
-    const r=await fetch(target,{method:'POST',headers:h,body:JSON.stringify({url,method,headers,body})});
+    const proxyHeaders = {'Content-Type':'application/json'};
+    if(B.token) proxyHeaders['x-proxy-token']=B.token;
+    const r = await fetch(target, {method:'POST', headers:proxyHeaders, body:JSON.stringify({url, method, headers, body})});
     if(!r.ok){ const t=await r.text().catch(()=>r.status); throw new Error(`Proxy ${r.status}: ${t}`); }
     const ct=r.headers.get('content-type')||''; return ct.includes('json')? r.json(): r.text();
   }else{
@@ -442,262 +447,242 @@ async function gateFetch(method,path,{query='',bodyObj=null}={}){
     const ct=r.headers.get('content-type')||''; return ct.includes('json')? r.json(): r.text();
   }
 }
-const Meta=new Map();
+
+/* Contract meta cache */
+const Meta=new Map(); // sym -> {qm, tick, minSz, maxSz, step}
 async function getMeta(sym){
   if(Meta.has(sym)) return Meta.get(sym);
-  const m=await gateFetch('GET', `/futures/usdt/contracts/${sym}`);
-  const meta={ qm:+m.quanto_multiplier||1, tick:+m.order_price_round||0.0001, minSz:+m.order_size_min||1, maxSz:+m.order_size_max||1e6, step:+m.order_size_step||1, makerFee:+m.maker_fee_rate||0, takerFee:+m.taker_fee_rate||0 };
-  Meta.set(sym,meta); return meta;
+  const m = await gateFetch('GET', `/futures/usdt/contracts/${sym}`);
+  const meta = {
+    qm: +m.quanto_multiplier || 1,
+    tick: +m.order_price_round || 0.0001,
+    minSz: +m.order_size_min || 1,
+    maxSz: +m.order_size_max || 1000000,
+    step: +m.order_size_step || 1,
+    makerFee: +m.maker_fee_rate || 0,
+    takerFee: +m.taker_fee_rate || 0
+  };
+  Meta.set(sym, meta);
+  return meta;
 }
-function priceUp(px,t){ return Math.floor(px/t)*t + t; }
-function priceDn(px,t){ return Math.ceil(px/t)*t - t; }
+function roundToTick(px, tick){ return Math.round(px/tick)*tick; }
+function priceUp(px,tick){ return (Math.floor(px/tick)*tick + tick); }
+function priceDn(px,tick){ return (Math.ceil(px/tick)*tick - tick); }
+
 async function orderBook1(sym){
-  const ob=await gateFetch('GET', `/futures/usdt/order_book`, {query:`contract=${sym}&limit=1`});
-  const ask=ob.asks?.[0]?.p? +ob.asks[0].p : (S.ticks.get(sym)?.ask||NaN);
-  const bid=ob.bids?.[0]?.p? +ob.bids[0].p : (S.ticks.get(sym)?.bid||NaN);
-  return {bid,ask};
+  const ob = await gateFetch('GET', `/futures/usdt/order_book`, {query:`contract=${sym}&limit=1`});
+  // {asks:[{p,s}], bids:[{p,s}]}
+  const ask = ob.asks?.[0]?.p? +ob.asks[0].p : (S.ticks.get(sym)?.ask||NaN);
+  const bid = ob.bids?.[0]?.p? +ob.bids[0].p : (S.ticks.get(sym)?.bid||NaN);
+  return {bid, ask};
 }
-async function ensureFutSettings(sym,mode,lev){
-  const key=`${sym}:${mode}:${lev}`; if(S.bot.futSetup.has(key)) return;
-  try{ await gateFetch('POST', `/futures/usdt/positions/margin_mode`, {bodyObj:{mode: mode==='cross'?'cross':'isolated'}}); }
-  catch(e){ try{ await gateFetch('POST', `/futures/usdt/positions/cross_mode`, {query:`cross=${mode==='cross'}`} ); }catch(e2){ log(`(uyarı) margin_mode değişmedi: ${e?.message||e} | alt: ${e2?.message||e2}`); } }
-  try{ await gateFetch('POST', `/futures/usdt/positions/${sym}/leverage`, {query:`leverage=${lev}`}); }
-  catch(e){ log(`(uyarı) leverage set edilemedi: ${e?.message||e}`); }
-  S.bot.futSetup.add(key);
-}
-async function placeOrder(sym,size,price,tif='gtc',reduce_only=false,close=false,text='t-rand'){
-  const body={contract:sym,size,price:String(price),tif,reduce_only,close,text};
-  return gateFetch('POST', `/futures/usdt/orders`, {bodyObj:body});
-}
-async function cancelOrder(sym,id){ return gateFetch('DELETE', `/futures/usdt/orders/${id}`); }
-async function getOrder(sym,id){ return gateFetch('GET', `/futures/usdt/orders/${id}`); }
-async function placeTrigger(sym,price,rule,reduce_only=true){
-  const body={ initial:{contract:sym,size:0,price:String(price),tif:'gtc',reduce_only,close:true,text:'api'}, trigger:{strategy_type:0,price_type:0,price:String(price),rule,expiration:7*24*3600} };
-  const r=await gateFetch('POST', `/futures/usdt/price_orders`, {bodyObj:body}); return r?.id;
-}
-async function cancelTrigger(id){ return gateFetch('DELETE', `/futures/usdt/price_orders/${id}`); }
-function feeFromOrder(o){ let f=0; if(o?.mkfr) f+=+o.mkfr; if(o?.tkfr) f+=+o.tkfr; return f; }
 
-/* ==== Random Bot ==== */
-function pickSym(){ const a=[...S.coins]; return a.length? a[Math.floor(Math.random()*a.length)] : null; }
+async function ensureFutSettings(sym, mode, lev){
+  const cacheKey=`${sym}:${mode}:${lev}`;
+  if(S.futSetup?.has?.(cacheKey)) return;
+  // margin mode
+  try{
+    await gateFetch('POST', `/futures/usdt/positions/margin_mode`, { bodyObj:{mode: mode==='cross'?'cross':'isolated'} });
+  }catch(e){
+    // fallback cross_mode
+    try{
+      await gateFetch('POST', `/futures/usdt/positions/cross_mode`, { query:`cross=${mode==='cross'}` });
+    }catch(e2){ log(`(uyarı) margin_mode değişmedi: ${e?.message||e} | alt: ${e2?.message||e2}`); }
+  }
+  // leverage
+  try{
+    await gateFetch('POST', `/futures/usdt/positions/${sym}/leverage`, { query:`leverage=${lev}` });
+  }catch(e){ log(`(uyarı) leverage set edilemedi: ${e?.message||e}`); }
+  (S.futSetup|| (S.futSetup=new Set())).add(cacheKey);
+}
 
+/* Place futures order */
+async function placeOrder(sym, size, price, tif='gtc', reduce_only=false, close=false, text='t-rand'){
+  const body={ contract:sym, size, price:String(price), tif, text, reduce_only, close };
+  return gateFetch('POST', `/futures/usdt/orders`, { bodyObj: body });
+}
+/* Cancel order */
+async function cancelOrder(sym, orderId){
+  return gateFetch('DELETE', `/futures/usdt/orders/${orderId}`);
+}
+/* Get single order */
+async function getOrder(sym, orderId){
+  return gateFetch('GET', `/futures/usdt/orders/${orderId}`);
+}
+
+/* Price-triggered order (TP/SL) */
+async function placeTrigger(sym, price, rule, reduce_only=true){
+  const body={
+    initial:{ contract:sym, size:0, price:String(price), tif:'gtc', reduce_only, close:true, text:'api' },
+    trigger:{ strategy_type:0, price_type:0, price:String(price), rule, expiration:7*24*3600 }
+  };
+  const r = await gateFetch('POST', `/futures/usdt/price_orders`, { bodyObj: body });
+  return r?.id;
+}
+async function cancelTrigger(id){
+  return gateFetch('DELETE', `/futures/usdt/price_orders/${id}`);
+}
+
+/* ===== Random Bot Engine ===== */
+function pickSym(){
+  const arr=[...S.coins];
+  return arr.length? arr[Math.floor(Math.random()*arr.length)] : null;
+}
 async function loop(){
   while(B.on){
     try{
-      const sym=pickSym();
+      // 1) coin seç
+      const sym = pickSym();
       if(!sym){ log('⚠ coin listesi boş'); await sleep(1500); continue; }
       ensureRow(sym);
-      const {bid,ask} = await orderBook1(sym);
-      if(!isFinite(bid)||!isFinite(ask)){ await sleep(600); continue; }
-      const m=await getMeta(sym);
 
-      const dir = Math.random()<0.5 ? +1 : -1;   // +1 LONG, -1 SHORT
-      const lev = rndi(B.levMin,B.levMax);
-      const notion = Math.max(10, Math.round(rnd(B.notMin,B.notMax)));
+      // 2) rastgele param.
+      const dir = Math.random()<0.5 ? +1 : -1; // +1 long, -1 short
+      const lev = rndi(B.levMin, B.levMax);
+      const notion = Math.max(10, Math.round(rndf(B.notMin, B.notMax))); // USDT
       const maker = Math.random()*100 < B.makerPct;
 
-      // fiyat seçimi
-      const entryPx = dir>0 ? (maker ? priceDn(bid,m.tick) : ask) : (maker ? priceUp(ask,m.tick) : bid);
-      const base = notion / entryPx;
-      let contracts = base / m.qm;
+      // 3) book & meta
+      const {bid,ask} = await orderBook1(sym);
+      if(!isFinite(bid)||!isFinite(ask)){ await sleep(800); continue; }
+      const mid = (bid+ask)/2;
+      const m = await getMeta(sym);
+
+      // 4) base & contracts
+      const entryPx = dir>0 ? (maker ? priceDn(bid, m.tick) : ask) : (maker ? priceUp(ask, m.tick) : bid);
+      const baseQty = notion / entryPx;                       // baz coin miktarı ~ USDT/price
+      let contracts = baseQty / (m.qm||1);
+      // step & min & max & integer
       contracts = Math.max(m.minSz, Math.min(Math.floor(contracts/m.step)*m.step, m.maxSz));
       contracts = Math.trunc(contracts);
       if(!(contracts>0)){ log(`(geçersiz sözleşme) ${sym}`); await sleep(800); continue; }
 
+      // 5) kaldıraç & margin
       await ensureFutSettings(sym, B.isolated?'isolated':'cross', lev);
 
-      const tif = maker? 'poc':'ioc';
-      const size = dir>0? +contracts : -contracts;
-      const px   = maker? entryPx : 0;
+      // 6) entry order
+      const tif = maker ? 'poc' : 'ioc';
+      const size = dir>0 ? +contracts : -contracts;
+      const price = maker ? entryPx : 0; // market => 0 with ioc
+      log(`🎲 ${sym} | ${dir>0?'LONG':'SHORT'} lev=${lev} notion≈${notion} maker=${maker?'poc':'ioc'} px=${price?nf2.format(price):'MKT'} ctr=${contracts}`);
 
-      log(`🎲 ${sym} | ${dir>0?'LONG':'SHORT'} lev=${lev} not≈${notion} maker=${maker?'poc':'ioc'} px=${px?nf2.format(px):'MKT'} ctr=${contracts}`);
-
-      let entryRes=null, entryFee=0, avg=entryPx, tradeId=(Date.now()+':'+Math.random().toString(36).slice(2,8));
+      let entryRes=null;
       if(!B.dry){
-        entryRes = await placeOrder(sym, size, px, tif, false, false, 't-rand');
-        entryFee = feeFromOrder(entryRes);
-        if(entryRes?.fill_price>0) avg=+entryRes.fill_price;
-        log(`➡ entry id=${entryRes?.id||'-'} status=${entryRes?.status||'-'} fill=${entryRes?.fill_price||'-'} fee=${entryFee}`);
-      }else{
-        log('(dry) entry gönderildi');
+        entryRes = await placeOrder(sym, size, price, tif, false, false, 't-rand');
+      }
+      // 7) pozisyon kayıt (filled/avg)
+      let avg = entryPx;
+      let orderId = entryRes?.id;
+      if(entryRes){
+        if(entryRes.fill_price && +entryRes.fill_price>0) avg=+entryRes.fill_price;
+        if(entryRes.status==='open'){ log(`⏳ açık (maker) order_id=${entryRes.id}`); }
+        else log(`✅ gönderildi id=${entryRes.id} fill=${entryRes.fill_price||'-'}`);
+      } else {
+        log('(dry-run) entry atıldı (varsayılan avg=entryPx)');
       }
 
-      const notional = contracts * m.qm * avg;
-
-      // kayıt
-      S.pos.set(sym,{ side:dir, lev, contracts, entry:avg, orderId:entryRes?.id||null, tpId:null, slId:null, openTs:Date.now(), fees:entryFee, notional, tradeId });
+      // kayıt (tek poz/coin)
+      if(S.pos.has(sym)){ log(`(bilgi) ${sym} üzerinde zaten pozisyon var, üzerine yazılacak`); }
+      S.pos.set(sym, {side:dir, lev, contracts, entry:avg, orderId, tpId:null, slId:null, openTs:Date.now(), fees:0});
       drawRow(sym);
 
-      // TP/SL kur
-      const tpPct = rnd(B.tpMin,B.tpMax)/100;
-      const slPct = rnd(B.slMin,B.slMax)/100;
+      // 8) Rastgele TP/SL kur
+      const tpPct = rndf(B.tpMin, B.tpMax)/100;
+      const slPct = rndf(B.slMin, B.slMax)/100;
       const tpPx = dir>0 ? avg*(1+tpPct) : avg*(1-tpPct);
       const slPx = dir>0 ? avg*(1-slPct) : avg*(1+slPct);
       let tpId=null, slId=null;
       if(!B.dry){
-        try{ tpId=await placeTrigger(sym,tpPx, dir>0?1:2, true); log(`🎯 TP @ ${nf2.format(tpPx)} id=${tpId}`);}catch(e){log(`TP hata: ${e?.message||e}`);}
-        try{ slId=await placeTrigger(sym,slPx, dir>0?2:1, true); log(`🛡 SL @ ${nf2.format(slPx)} id=${slId}`);}catch(e){log(`SL hata: ${e?.message||e}`);}
-      }else{
+        try{
+          tpId = await placeTrigger(sym, tpPx, dir>0?1:2, true); // rule: >= for long TP, <= for short TP
+          log(`🎯 TP @ ${nf2.format(tpPx)} (id=${tpId})`);
+        }catch(e){ log(`TP hata: ${e?.message||e}`); }
+        try{
+          slId = await placeTrigger(sym, slPx, dir>0?2:1, true); // rule: <= for long SL, >= for short SL
+          log(`🛡 SL @ ${nf2.format(slPx)} (id=${slId})`);
+        }catch(e){ log(`SL hata: ${e?.message||e}`); }
+      } else {
         log(`(dry) TP ${nf2.format(tpPx)} / SL ${nf2.format(slPx)}`);
       }
-      const P=S.pos.get(sym); if(P){ P.tpId=tpId; P.slId=slId; }
+      const P = S.pos.get(sym); if(P){ P.tpId=tpId; P.slId=slId; }
 
-      // rastgele kapanış
+      // 9) Rastgele kapanış olasılığı
       if(B.randClose && Math.random()*100 < B.closePct){
-        const dly=rndi(B.closeMin,B.closeMax)*1000;
+        const dly = rndi(B.closeMin, B.closeMax)*1000;
         setTimeout(()=>randomClose(sym).catch(e=>log(`close hata: ${e?.message||e}`)), dly);
       }
 
-      await sleep(rndi(1800,4200));
-    }catch(e){
-      log(`💥 ${e?.message||e}`); await sleep(1000);
+      // Döngüler arası ufak bekleme
+      await sleep( rndi(2000, 4500) );
+    }catch(err){
+      log(`💥 ${err?.message||err}`);
+      await sleep(1200);
     }
   }
 }
 
+/* Rastgele kapanış: pozisyon varsa market IOC reduce-only ile kapat, tetikleri iptal et */
 async function randomClose(sym){
-  const p=S.pos.get(sym); if(!p) return;
-  log(`🔔 Rastgele kapanış: ${sym}`);
-  if(B.dry){ finishTrade(sym, p.entry, p.entry, 0); return; }
+  const p=S.pos.get(sym); if(!p){ return; }
+  log(`🔔 Rastgele kapanış denemesi: ${sym}`);
+  if(B.dry){
+    finishPosition(sym, p.entry, p.entry); // dry: net 0
+    return;
+  }
   try{
-    const closeRes = await placeOrder(sym, 0, "0", "ioc", true, true, 't-close'); // market close
-    const fee = feeFromOrder(closeRes);
-    const exit = closeRes?.fill_price? +closeRes.fill_price : p.entry;
-    // tetikler iptal
+    // mevcut pozisyon yönünün tersine close=true ile size=0 (veya reduce_only)
+    const closeOrder = await placeOrder(sym, 0, "0", "ioc", true, true, 't-close'); // market close
+    log(`✳ close sent id=${closeOrder?.id||'-'} fill=${closeOrder?.fill_price||'-'}`);
+    // tetikleri iptal
     try{ if(p.tpId) await cancelTrigger(p.tpId); }catch(_){}
     try{ if(p.slId) await cancelTrigger(p.slId); }catch(_){}
-    finishTrade(sym, p.entry, exit, fee);
-  }catch(e){ log(`close err: ${e?.message||e}`); }
+    const exitPx = closeOrder?.fill_price? +closeOrder.fill_price : p.entry;
+    // ücretler
+    const fee = feeFromOrder(closeOrder);
+    finishPosition(sym, p.entry, exitPx, fee);
+  }catch(e){
+    log(`close err: ${e?.message||e}`);
+  }
 }
 
-/* ==== Accounting ==== */
-function finishTrade(sym, entry, exitPx, feeClose=0){
+function feeFromOrder(ord){
+  // Ord içinde mkfr/tkfr string olabilir
+  let f=0;
+  if(ord?.mkfr) f += +ord.mkfr;
+  if(ord?.tkfr) f += +ord.tkfr;
+  return f;
+}
+
+/* Muhasebe & PNL */
+function finishPosition(sym, entry, exitPx, extraFee=0){
   const p=S.pos.get(sym); if(!p) return;
   const qm = (Meta.get(sym)?.qm)||1;
-  const gross = (exitPx - entry) * p.contracts * qm * (p.side>0? +1 : -1);
-  const fees = (p.fees||0) + (feeClose||0);
-  const net = gross - Math.abs(fees);
+  const pnl = (exitPx - entry) * p.contracts * qm * (p.side>0? +1 : -1);
+  const fee = (p.fees||0) + (extraFee||0);
+  const net = pnl - Math.abs(fee);
   const row = {
     t: new Date().toLocaleString('tr-TR'),
-    id: p.tradeId || (Date.now()+''), sym, side: p.side>0?'LONG':'SHORT', lev: p.lev, contracts: p.contracts,
-    entry: +entry, exit: +exitPx,
-    notional: +(p.notional|| (p.contracts*qm*entry)),
-    pnl: +gross.toFixed(6), fee: +(+fees).toFixed(6), net: +net.toFixed(6),
+    sym, side: p.side>0?'LONG':'SHORT', lev: p.lev, contracts: p.contracts,
+    entry: +entry, exit: +exitPx, pnl:+pnl.toFixed(6), fee:+(+fee).toFixed(6), net:+net.toFixed(6),
     status:'closed'
   };
   S.ledger.push(row);
   localStorage.setItem('rb:ledger', JSON.stringify(S.ledger));
+  renderAcc();
   S.pos.delete(sym);
   drawRow(sym);
-  log(`📘 ${sym} NET=${row.net.toFixed(4)} (pnl=${row.pnl.toFixed(4)} fee=${row.fee.toFixed(6)})`);
+  log(`📘 ${sym} PNL=${row.pnl.toFixed(4)} fee=${row.fee.toFixed(6)} net=${row.net.toFixed(4)}`);
 }
-
-/* Summary calculations */
-function computeStats(rows){
-  const out={count:0,wins:0,loss:0,brut:0,fee:0,net:0,notional:0,avgNet:0,best:null,worst:null};
-  for(const r of rows){
-    out.count++;
-    if(r.net>=0) out.wins++; else out.loss++;
-    out.brut += r.pnl;
-    out.fee  += Math.abs(r.fee||0);
-    out.net  += r.net;
-    out.notional += Math.abs(r.notional||0);
-    if(out.best===null || r.net>out.best) out.best=r.net;
-    if(out.worst===null || r.net<out.worst) out.worst=r.net;
-  }
-  out.avgNet = out.count? out.net/out.count : 0;
-  out.winRate = out.count? (out.wins/out.count*100):0;
-  out.roi = out.notional? (out.net/out.notional*100):0;
-  return out;
-}
-function coinAggregate(rows){
-  const m=new Map();
-  for(const r of rows){
-    const x=m.get(r.sym)||{sym:r.sym,cnt:0,wins:0,loss:0,notional:0,brut:0,fee:0,net:0};
-    x.cnt++; if(r.net>=0) x.wins++; else x.loss++;
-    x.notional += Math.abs(r.notional||0);
-    x.brut += r.pnl; x.fee += Math.abs(r.fee||0); x.net += r.net;
-    m.set(r.sym,x);
-  }
-  return [...m.values()].map(x=>({...x, roi: x.notional? x.net/x.notional*100:0 }));
-}
-
-/* Filters */
-function getFilters(){
-  const coin = $('#fltCoin').value||'';
-  const side = $('#fltSide').value||'';
-  const q = ($('#fltSearch').value||'').toLowerCase().trim();
-  const from = $('#fltFrom').value? new Date($('#fltFrom').value+'T00:00:00'):null;
-  const to   = $('#fltTo').value? new Date($('#fltTo').value+'T23:59:59'):null;
-  return {coin,side,q,from,to};
-}
-function applyFilters(){
-  const f=getFilters();
-  return S.ledger.filter(r=>{
-    if(f.coin && r.sym!==f.coin) return false;
-    if(f.side && r.side!==f.side) return false;
-    if(f.q){
-      const s=(r.id+' '+r.sym+' '+r.side).toLowerCase();
-      if(!s.includes(f.q)) return false;
-    }
-    if(f.from||f.to){
-      const dt = new Date(r.t);
-      if(f.from && dt<f.from) return false;
-      if(f.to && dt>f.to) return false;
-    }
-    return true;
-  });
-}
-function populateFilters(){
-  const sel=$('#fltCoin'); const set=new Set(S.ledger.map(r=>r.sym));
-  sel.innerHTML='<option value="">Tüm Coinler</option>'+ [...set].map(s=>`<option>${s}</option>`).join('');
-}
-
-/* Render Accounting UI */
-function renderAccounting(){
-  const rows = applyFilters();
-
-  // Summary cards
-  const Sx = computeStats(rows);
-  const cards = [
-    {k:'Toplam İşlem', v:Sx.count},
-    {k:'Kazançlı', v:Sx.wins},
-    {k:'Zararlı', v:Sx.loss},
-    {k:'Win Rate %', v:Sx.winRate.toFixed(2)},
-    {k:'Toplam Notional', v:nf2.format(Sx.notional)},
-    {k:'Brüt PnL', v:`${Sx.brut>=0?'+':''}${nf2.format(Sx.brut)}`},
-    {k:'Toplam Ücret', v:`-${nf2.format(Sx.fee)}`},
-    {k:'Net PnL', v:`${Sx.net>=0?'+':''}${nf2.format(Sx.net)}`},
-    {k:'ROI %', v:`${Sx.roi>=0?'+':''}${Sx.roi.toFixed(2)}`},
-    {k:'Ortalama Net/İşlem', v:`${Sx.avgNet>=0?'+':''}${nf2.format(Sx.avgNet)}`},
-    {k:'En İyi İşlem', v:Sx.best===null? '—' : `${Sx.best>=0?'+':''}${nf2.format(Sx.best)}`},
-    {k:'En Kötü İşlem', v:Sx.worst===null? '—' : `${Sx.worst>=0?'+':''}${nf2.format(Sx.worst)}`}
-  ];
-  const box = $('#sumCards');
-  box.innerHTML='';
-  const grid=document.createElement('div'); grid.className='grid stats';
-  for(const c of cards){
-    const d=document.createElement('div'); d.className='stat';
-    d.innerHTML=`<b>${c.k}</b><div class="v mono">${c.v}</div>`;
-    grid.appendChild(d);
-  }
-  box.appendChild(grid);
-
-  // Table rows
+function renderAcc(){
   const tb=$('#accBody'); tb.innerHTML='';
   const frag=document.createDocumentFragment();
-  for(const r of rows.slice().reverse()){
+  for(const r of S.ledger.slice().reverse()){
     const tr=document.createElement('tr');
     tr.innerHTML = `
-      <td>${r.t}</td>
-      <td class="mono">${r.id||'-'}</td>
-      <td>${r.sym}</td>
-      <td>${r.side}</td>
-      <td>${r.lev}</td>
+      <td>${r.t}</td><td>${r.sym}</td><td>${r.side}</td><td>${r.lev}</td>
       <td class="mono">${r.contracts}</td>
       <td class="mono">${nf2.format(r.entry)}</td>
       <td class="mono">${nf2.format(r.exit)}</td>
-      <td class="mono">${nf2.format(r.notional||0)}</td>
       <td class="mono ${r.pnl>=0?'good':'bad'}">${nf2.format(r.pnl)}</td>
       <td class="mono">${nf2.format(r.fee)}</td>
       <td class="mono ${r.net>=0?'good':'bad'}">${nf2.format(r.net)}</td>
@@ -706,84 +691,21 @@ function renderAccounting(){
     frag.appendChild(tr);
   }
   tb.appendChild(frag);
-
-  // Per-coin aggregation
-  const agg = coinAggregate(rows);
-  const ab=$('#coinAggBody'); ab.innerHTML='';
-  const f2=document.createDocumentFragment();
-  for(const a of agg){
-    const tr=document.createElement('tr');
-    const roi=(a.roi>=0?'+':'')+a.roi.toFixed(2);
-    tr.innerHTML=`
-      <td>${a.sym}</td>
-      <td>${a.cnt}</td>
-      <td>${a.wins}</td>
-      <td>${a.loss}</td>
-      <td class="mono">${nf2.format(a.notional)}</td>
-      <td class="mono ${a.brut>=0?'good':'bad'}">${nf2.format(a.brut)}</td>
-      <td class="mono">${nf2.format(a.fee)}</td>
-      <td class="mono ${a.net>=0?'good':'bad'}">${nf2.format(a.net)}</td>
-      <td class="mono ${a.roi>=0?'good':'bad'}">${roi}</td>
-    `;
-    f2.appendChild(tr);
-  }
-  ab.appendChild(f2);
 }
-
-/* CSV Export */
-function toCSV(rows){
-  const cols=['time','id','symbol','side','lev','contracts','entry','exit','notional','pnl','fee','net','status'];
-  const head=cols.join(',');
-  const lines = rows.map(r=>[
-    r.t, r.id||'', r.sym, r.side, r.lev, r.contracts, r.entry, r.exit, r.notional||0, r.pnl, r.fee, r.net, r.status
-  ].map(v=>String(v).replace(/"/g,'""')).map(v=>`"${v}"`).join(','));
-  return head+'\n'+lines.join('\n');
-}
-function downloadCSV(){
-  const rows=applyFilters();
-  const csv = toCSV(rows);
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download='ledger.csv'; document.body.appendChild(a); a.click();
-  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 100);
-}
-
-$('#btnCSV').onclick=downloadCSV;
 $('#btnClearAcc').onclick=()=>{
-  if(confirm('Muhasebe kayıtlarını sıfırlamak istiyor musunuz?')){
-    S.ledger=[]; localStorage.setItem('rb:ledger','[]'); renderAccounting();
+  if(confirm('Muhasebeyi temizlemek istiyor musunuz?')){
+    S.ledger=[]; localStorage.setItem('rb:ledger','[]'); renderAcc();
   }
 };
-['fltCoin','fltSide','fltFrom','fltTo','fltSearch'].forEach(id=>{
-  $('#'+id).addEventListener('input', ()=>renderAccounting());
-});
 
-/* ==== Init ==== */
-function ensureRowInit(){ S.coins.forEach(sym=>ensureRow(sym)); }
+/* ===== Init ===== */
 function init(){
-  ensureRowInit();
+  // paint rows
+  S.coins.forEach(sym=>ensureRow(sym));
+  // small clock
   $('#clock').textContent=nowStr();
 }
 init();
-
-/* ==== Random close helper ==== */
-async function randomClose(sym){
-  const p=S.pos.get(sym); if(!p) return;
-  log(`🔔 Rastgele kapanış: ${sym}`);
-  if(B.dry){ finishTrade(sym,p.entry,p.entry,0); return; }
-  try{
-    const res=await placeOrder(sym,0,"0","ioc",true,true,'t-close');
-    const fee=feeFromOrder(res);
-    const exit = res?.fill_price? +res.fill_price : p.entry;
-    try{ if(p.tpId) await cancelTrigger(p.tpId); }catch(_){}
-    try{ if(p.slId) await cancelTrigger(p.slId); }catch(_){}
-    finishTrade(sym,p.entry,exit,fee);
-  }catch(e){ log(`close err: ${e?.message||e}`); }
-}
-
-/* reuse (declared earlier) */
-function openModal(id){ document.getElementById(id).classList.add('open'); }
 </script>
 </body>
 </html>
