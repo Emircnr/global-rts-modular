@@ -157,7 +157,7 @@
       </header>
       <div class="content">
         <div class="grp">
-          <label class="lbl">Coin ekle / çıkar (örn: ETH veya ETH_USDT)</label>
+          <label class="lbl">Coin ekle / çıkar (örn: ETH veya ETHUSDT)</label>
           <div class="row">
             <input id="addSym" type="text" placeholder="Sembol"/>
             <button id="btnAdd" class="btn">Ekle</button>
@@ -181,7 +181,7 @@
     <div class="overlay" data-close="1"></div>
     <div class="panel">
       <header>
-        <h3>Limit IOC Bot — Eşit Notional (MEXC)</h3>
+        <h3>Limit IOC Bot — Eşit Notional</h3>
         <button class="btn iconbtn" title="Kapat" data-close="1">✖</button>
       </header>
       <div class="content">
@@ -213,7 +213,7 @@
             </label>
             <label> Cooldown (sn) <input id="botCooldown" type="number" step="1" value="0" style="width:90px"/></label>
           </div>
-          <div class="warn">Aynı sembolde aynı anda tek işlem. LONG sinyalde tam kapanış.</div>
+          <div class="warn">Aynı sembolde aynı anda tek işlem. LONG sinyali → tam kapanış.</div>
         </div>
         <div class="grp">
           <label class="lbl">API & Proxy</label>
@@ -229,7 +229,7 @@
             <input id="proxyUrl" value="http://localhost:8787/" placeholder="Proxy URL (örn: http://localhost:8787/ veya Cloudflare/Vercel)" style="flex:1 1 320px"/>
             <input id="proxyToken" placeholder="Proxy Token (opsiyonel)" style="flex:1 1 220px"/>
           </div>
-          <div class="warn">CORS için proxy zorunludur. Spot & Futures aynı proxy'yi kullanır.</div>
+          <div class="warn">CORS için proxy zorunludur. Tek API anahtarını iki pazarda da kullanabilirsiniz.</div>
         </div>
         <div class="grp">
           <label class="lbl">Log</label>
@@ -250,17 +250,17 @@ const pctStr = v => isFinite(v) ? ((v>=0?'+':'') + v.toFixed(3) + '%') : '—';
 const clamp = (x,a,b)=>Math.min(b,Math.max(a,x));
 const roundTo = (x,dec=6)=> Number.parseFloat(x).toFixed(dec);
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
-const fmtDec = (x, d)=> Number(x).toFixed(Math.max(0, d||0));
-const spotSym = s=> s.replace('_','');
+const fmtPx = p => String(Number(p).toFixed(8));
+function roundDown(x, step){ if(!step || step<=0) return x; return Math.floor(x/step)*step; }
 
 /*** ===== Durum ===== ***/
 const CANCEL_BLOCK_MS = 30_000;
-const POLL_MS = 700;       // genel tarama periyodu (public REST için güvenli)
+const SPOT_FAST_MS = 150; // agresif & çok hızlı
 const S = {
-  coins: new Set(JSON.parse(localStorage.getItem('mexc:list')||'["BTC_USDT","ETH_USDT"]')),
+  coins: new Set(JSON.parse(localStorage.getItem('mexc:list')||'["BTCUSDT","ETHUSDT"]')),
   ui: { thresh:+(localStorage.getItem('mexc:thresh')||0.10), theme: localStorage.getItem('mexc:theme') || 'dark', showTop: JSON.parse(localStorage.getItem('mexc:showTop')||'true') },
   spot: new Map(),  fut: new Map(), rowEls: new Map(),
-  rafScheduled:false, lastTop:null,
+  wsFut:null, rafScheduled:false, lastTop:null,
   locks:new Map(), active:new Map(), blockedUntil:new Map(),
   bot:{
     enabled:false, dry:true, useTableThresh:true,
@@ -270,7 +270,8 @@ const S = {
     spotKey:'', spotSec:'', futKey:'', futSec:'',
     proxy:'http://localhost:8787/', proxyToken:'',
     futSetup:new Set()
-  }
+  },
+  meta:{ spot:new Map(), fut:new Map() }
 };
 function saveList(){ localStorage.setItem('mexc:list', JSON.stringify([...S.coins])); }
 function saveUI(){ localStorage.setItem('mexc:thresh', S.ui.thresh); localStorage.setItem('mexc:theme', S.ui.theme); localStorage.setItem('mexc:showTop', S.ui.showTop); }
@@ -300,7 +301,7 @@ $('#botDry').onchange = e=>{ S.bot.dry = e.target.checked; };
 $('#botUseTableThresh').onchange = e=>{ S.bot.useTableThresh = e.target.checked; };
 $('#botOpenThresh').onchange = e=>{ S.bot.openThresh = +e.target.value; };
 $('#botCloseThresh').onchange = e=>{ S.bot.closeThresh = +e.target.value; };
-$('#botNotional').onchange = e=>{ S.bot.notional = Math.max(5, +e.target.value||0); };
+$('#botNotional').onchange = e=>{ S.bot.notional = Math.max(10, +e.target.value||0); };
 $('#botLev').onchange = e=>{ S.bot.lev = clamp(+e.target.value||1, 1, 125); };
 $('#botMargin').onchange = e=>{ S.bot.margin = e.target.value; };
 $('#botCooldown').onchange = e=>{ S.bot.cooldown = Math.max(0, +e.target.value||0); };
@@ -311,15 +312,19 @@ $('#futSec').oninput  = e=>S.bot.futSec = e.target.value.trim();
 $('#proxyUrl').oninput = e=>S.bot.proxy = e.target.value.trim();
 $('#proxyToken').oninput = e=>S.bot.proxyToken = e.target.value.trim();
 
+/*** ===== Sembol yardımcıları ===== ***/
+const futOf = spotSym => spotSym.replace(/USDT$/,'_USDT'); // BTCUSDT -> BTC_USDT
+const spotOf = futSym => futSym.replace('_',''); // BTC_USDT -> BTCUSDT
+
 /*** ===== Coin UI ===== ***/
 function renderChips(){
-  const wrap = $('#chipWrap'); wrap.innerHTML = '';
+  const wrap = $('#chipWrap'); wrap.innerHTML='';
   const frag = document.createDocumentFragment();
   [...S.coins].forEach(sym=>{
     const d = document.createElement('div'); d.className='chipx';
-    const b = document.createElement('b'); b.textContent = sym.replace('_','');
+    const b = document.createElement('b'); b.textContent = sym;
     const x = document.createElement('button'); x.textContent='✕';
-    x.onclick=()=>{ S.coins.delete(sym); saveList(); S.rowEls.get(sym)?.tr.remove(); S.rowEls.delete(sym); scheduleDraw(); };
+    x.onclick=()=>{ S.coins.delete(sym); saveList(); unsub(sym); S.rowEls.get(sym)?.tr.remove(); S.rowEls.delete(sym); scheduleDraw(); };
     d.append(b,x); frag.appendChild(d);
   });
   wrap.appendChild(frag);
@@ -328,30 +333,101 @@ renderChips();
 $('#btnAdd').onclick = ()=>{
   const raw=$('#addSym').value.trim().toUpperCase();
   if(!raw) return;
-  let sym = raw.includes('_')? raw : raw.replace('USDT','_USDT');
-  sym = sym.replace(/[^A-Z0-9_]/g,'');
-  if(!sym.endsWith('_USDT')) return alert('Sadece *_USDT sembolleri.');
-  if(!S.coins.has(sym)){ S.coins.add(sym); saveList(); renderChips(); ensureRow(sym); }
+  let sym = raw.endsWith('USDT') ? raw : (raw + 'USDT');
+  sym = sym.replace(/[^A-Z0-9]/g,'');
+  if(!sym.endsWith('USDT')) return alert('Sadece *USDT çiftleri.');
+  if(!S.coins.has(sym)){ S.coins.add(sym); saveList(); renderChips(); ensureRow(sym); sub(sym); }
   $('#addSym').value='';
 };
 $('#btnClear').onclick = ()=>{
   if(confirm('Tüm coinleri sil?')){
+    [...S.coins].forEach(s=>unsub(s));
     S.coins.clear(); saveList();
     S.rowEls.forEach(el=>el.tr.remove()); S.rowEls.clear();
     scheduleDraw();
   }
 };
 
-/*** ===== Çizim ===== ***/
-function ensureRow(sym){
-  if(S.rowEls.has(sym)) return;
-  const tr=document.createElement('tr'); tr.dataset.sym=sym;
+/*** ===== WS: Futures ===== ***/
+function wsFutConnect(){
+  try{ S.wsFut?.close?.(); }catch{}
+  const ws = new WebSocket('wss://contract.mexc.com/edge'); S.wsFut = ws;
+  ws.onopen = ()=>{
+    // her sembol için ticker
+    for(const sym of S.coins){
+      const fut = futOf(sym);
+      ws.send(JSON.stringify({ method:'sub.ticker', param:{ symbol:fut } }));
+    }
+    // ping
+    setInterval(()=>{ if(ws.readyState===1) ws.send(JSON.stringify({method:'ping'})); }, 15000);
+  };
+  ws.onmessage = (ev)=>{
+    try{
+      const j=JSON.parse(ev.data);
+      if(j && j.channel==='push.ticker' && j.data && j.data.symbol){
+        const sym = j.data.symbol; // BTC_USDT
+        const bid = toNum(j.data.bid1), ask = toNum(j.data.ask1);
+        if(isFinite(bid)||isFinite(ask)) S.fut.set(sym,{bid,ask,ts:Date.now()});
+        scheduleDraw();
+      }
+    }catch(_){}
+  };
+  ws.onclose = ()=>{ setTimeout(wsFutConnect, 300 + Math.random()*500); };
+}
+function sub(spotSym){
+  // futures ws subscribe
+  if(S.wsFut?.readyState===1){
+    S.wsFut.send(JSON.stringify({ method:'sub.ticker', param:{ symbol:futOf(spotSym) } }));
+  }
+}
+function unsub(spotSym){
+  if(S.wsFut?.readyState===1){
+    S.wsFut.send(JSON.stringify({ method:'unsub.ticker', param:{ symbol:futOf(spotSym) } }));
+  }
+  S.fut.delete(futOf(spotSym)); S.spot.delete(spotSym);
+}
 
-  const tdC=document.createElement('td'); tdC.className='sym'; tdC.textContent=sym.replace('_','');
+/*** ===== SPOT: Çok hızlı REST polling (bookTicker) ===== ***/
+let spotTimer = null;
+const SPOT_HOST = 'https://api.mexc.com';
+async function spotBookTicker(sym){
+  const url = `${SPOT_HOST}/api/v3/ticker/bookTicker?symbol=${encodeURIComponent(sym)}`;
+  try{
+    const f = await fetch(url, { cache:'no-store', keepalive:true });
+    if(!f.ok) return;
+    const d = await f.json();
+    const bid=toNum(d.bidPrice), ask=toNum(d.askPrice);
+    if(isFinite(bid)||isFinite(ask)) S.spot.set(sym,{bid,ask,ts:Date.now()});
+  }catch(_){}
+}
+function startSpotLoop(){
+  if(spotTimer) clearInterval(spotTimer);
+  spotTimer = setInterval(()=>{
+    for(const sym of S.coins){ spotBookTicker(sym); }
+  }, SPOT_FAST_MS);
+}
+
+/*** ===== Hesaplama & Çizim ===== ***/
+function cmpFor(spotSym){
+  const sp=S.spot.get(spotSym), fu=S.fut.get(futOf(spotSym));
+  if(!sp || !fu) return null;
+  const askS=sp.ask, bidS=sp.bid, bidF=fu.bid, askF=fu.ask;
+  const okShort = isFinite(askS)&&isFinite(bidF)&&askS>0;
+  const okLong  = isFinite(bidS)&&isFinite(askF)&&askF>0;
+  const shortPct = okShort ? ( (bidF - askS) / askS * 100 ) : NaN;
+  const longPct  = okLong  ? ( (bidS - askF) / askF * 100 ) : NaN;
+  return {sym:spotSym, askS, bidS, bidF, askF, shortPct, longPct};
+}
+
+function ensureRow(spotSym){
+  if(S.rowEls.has(spotSym)) return;
+  const tr=document.createElement('tr'); tr.dataset.sym=spotSym;
+
+  const tdC=document.createElement('td'); tdC.className='sym'; tdC.textContent=spotSym;
   const tdStatus=document.createElement('td'); tdStatus.className='status';
   const statusBadge=document.createElement('span'); statusBadge.className='badge'; statusBadge.textContent='—';
   const cancelBtn=document.createElement('button'); cancelBtn.className='btn-mini'; cancelBtn.textContent='İptal'; cancelBtn.style.display='none';
-  cancelBtn.onclick=()=> cancelWaiting(sym);
+  cancelBtn.onclick=()=> cancelWaiting(spotSym);
   tdStatus.append(statusBadge, cancelBtn);
 
   const tdSAsk=document.createElement('td'); tdSAsk.className='mono src-spotAsk'; tdSAsk.textContent='—';
@@ -363,13 +439,13 @@ function ensureRow(sym){
 
   tr.append(tdC,tdStatus,tdSAsk,tdFBid,tdShort,tdSBid,tdFAsk,tdLong);
   $('#tbody').appendChild(tr);
-  S.rowEls.set(sym,{tr, tdStatus, statusBadge, cancelBtn, tdSAsk, tdFBid, tdShort, tdSBid, tdFAsk, tdLong});
+  S.rowEls.set(spotSym,{tr, tdStatus, statusBadge, cancelBtn, tdSAsk, tdFBid, tdShort, tdSBid, tdFAsk, tdLong});
 }
-function updateStatusUI(sym){
-  const el = S.rowEls.get(sym); if(!el) return;
-  const locked = !!S.locks.get(sym);
-  const active = S.active.has(sym);
-  const until = S.blockedUntil.get(sym) || 0;
+function updateStatusUI(spotSym){
+  const el = S.rowEls.get(spotSym); if(!el) return;
+  const locked = !!S.locks.get(spotSym);
+  const active = S.active.has(spotSym);
+  const until = S.blockedUntil.get(spotSym) || 0;
   const blocked = Date.now() < until;
 
   el.statusBadge.className='badge'; el.statusBadge.textContent='—'; el.cancelBtn.style.display='none';
@@ -378,33 +454,29 @@ function updateStatusUI(sym){
   else if(blocked){ el.statusBadge.classList.add('block'); el.statusBadge.textContent='⏸ Blok (30s)'; }
 }
 function scheduleDraw(){ if(!S.rafScheduled){ S.rafScheduled=true; requestAnimationFrame(draw); } }
-function draw(){
+
+async function draw(){
   S.rafScheduled=false;
   let any=false;
-  for(const sym of S.coins){
-    ensureRow(sym); updateStatusUI(sym);
-    const sp=S.spot.get(sym), fu=S.fut.get(sym);
-    if(sp && fu){
-      const askS=sp.ask, bidS=sp.bid, bidF=fu.bid, askF=fu.ask;
-      const okShort = isFinite(askS)&&isFinite(bidF)&&askS>0;
-      const okLong  = isFinite(bidS)&&isFinite(askF)&&askF>0;
-      const shortPct = okShort ? ( (bidF - askS) / askS * 100 ) : NaN;
-      const longPct  = okLong  ? ( (bidS - askF) / askF * 100 ) : NaN;
-
+  for(const spotSym of S.coins){
+    ensureRow(spotSym);
+    const r = cmpFor(spotSym);
+    updateStatusUI(spotSym);
+    if(r){
       const thr = Number(S.ui.thresh)||0;
-      const sh = isFinite(shortPct) && shortPct>0 && shortPct>=thr;
-      const lo = isFinite(longPct)  && longPct>0  && longPct>=thr;
+      const sh = isFinite(r.shortPct) && r.shortPct>0 && r.shortPct>=thr;
+      const lo = isFinite(r.longPct)  && r.longPct>0  && r.longPct>=thr;
 
-      const el=S.rowEls.get(sym);
-      el.tdSAsk.textContent = isFinite(askS) ? nf.format(askS) : '—';
-      el.tdFBid.textContent = isFinite(bidF) ? nf.format(bidF) : '—';
-      el.tdSBid.textContent = isFinite(bidS) ? nf.format(bidS) : '—';
-      el.tdFAsk.textContent = isFinite(askF) ? nf.format(askF) : '—';
-      el.tdShort.innerHTML = isFinite(shortPct) ? `<span class="${sh?'pctPos':''}">${pctStr(shortPct)}</span>` : '—';
-      el.tdLong.innerHTML  = isFinite(longPct)  ? `<span class="${lo?'pctPos':''}">${pctStr(longPct)}</span>`  : '—';
+      const el=S.rowEls.get(spotSym);
+      el.tdSAsk.textContent = isFinite(r.askS) ? nf.format(r.askS) : '—';
+      el.tdFBid.textContent = isFinite(r.bidF) ? nf.format(r.bidF) : '—';
+      el.tdSBid.textContent = isFinite(r.bidS) ? nf.format(r.bidS) : '—';
+      el.tdFAsk.textContent = isFinite(r.askF) ? nf.format(r.askF) : '—';
+      el.tdShort.innerHTML = isFinite(r.shortPct) ? `<span class="${sh?'pctPos':''}">${pctStr(r.shortPct)}</span>` : '—';
+      el.tdLong .innerHTML = isFinite(r.longPct)  ? `<span class="${lo?'pctPos':''}">${pctStr(r.longPct)}</span>`  : '—';
 
       any=true;
-      maybeBot(sym, {askS,bidS,bidF,askF, shortPct,longPct});
+      await maybeBot(spotSym, r);
     }
   }
   $('#emptyNote').style.display = S.coins.size===0 || !any ? '' : 'none';
@@ -414,29 +486,28 @@ function draw(){
   else{
     let best=null;
     for(const sym of S.coins){
-      const sp=S.spot.get(sym), fu=S.fut.get(sym); if(!sp||!fu) continue;
-      const askS=sp.ask, bidS=sp.bid, bidF=fu.bid, askF=fu.ask;
-      const shortPct = isFinite(bidF) && isFinite(askS) && askS>0 ? ( (bidF-askS)/askS*100 ) : -Infinity;
-      const longPct  = isFinite(bidS) && isFinite(askF) && askF>0 ? ( (bidS-askF)/askF*100 ) : -Infinity;
+      const r = cmpFor(sym); if(!r) continue;
       const thr = Number(S.ui.thresh)||0;
-      const shOK = shortPct>=thr; const loOK = longPct>=thr;
-      if(shOK||loOK){
-        const bestPct = Math.max(shOK?shortPct:-Infinity, loOK?longPct:-Infinity);
-        if(!best || bestPct>best.bestPct) best={sym, askS,bidS,bidF,askF, bestPct, isLong: bestPct===longPct};
+      const sh = isFinite(r.shortPct) && r.shortPct>0 && r.shortPct>=thr;
+      const lo = isFinite(r.longPct)  && r.longPct>0  && r.longPct>=thr;
+      if(sh || lo){
+        const bestPct = Math.max(sh?r.shortPct:-Infinity, lo?r.longPct:-Infinity);
+        if(!best || bestPct>best.bestPct) best={r, bestPct, isLong: bestPct===r.longPct};
       }
     }
     if(!best){ top.classList.add('hidden'); }
     else{
-      $('#topSym').textContent = best.sym.replace('_','');
-      $('#topSide').textContent = best.isLong ? 'FUTURES LONG' : 'FUTURES SHORT';
-      $('#topSide').className = 'pill ' + (best.isLong ? 'good' : 'bad');
-      $('#topDesc').textContent = best.isLong
-        ? `Spot BID ${nf.format(best.bidS)} ↔ Fut ASK ${nf.format(best.askF)}`
-        : `Spot ASK ${nf.format(best.askS)} ↔ Fut BID ${nf.format(best.bidF)}`;
+      const t=best.r; const isLong=best.isLong;
+      $('#topSym').textContent = t.sym;
+      $('#topSide').textContent = isLong ? 'FUTURES LONG' : 'FUTURES SHORT';
+      $('#topSide').className = 'pill ' + (isLong ? 'good' : 'bad');
+      $('#topDesc').textContent = isLong
+        ? `Spot BID ${nf.format(t.bidS)} ↔ Fut ASK ${nf.format(t.askF)}`
+        : `Spot ASK ${nf.format(t.askS)} ↔ Fut BID ${nf.format(t.bidF)}`;
       const pctEl = $('#topPct'); pctEl.textContent = pctStr(best.bestPct); pctEl.className='mono good';
-      if(!S.lastTop || S.lastTop.sym!==best.sym || S.lastTop.side!==(best.isLong?'L':'S') || Math.abs(S.lastTop.pct-best.bestPct)>0.0005){
+      if(!S.lastTop || S.lastTop.sym!==t.sym || S.lastTop.side!==(isLong?'L':'S') || Math.abs(S.lastTop.pct-best.bestPct)>0.0005){
         top.classList.add('blink'); setTimeout(()=>top.classList.remove('blink'), 220);
-        S.lastTop = {sym:best.sym, side:best.isLong?'L':'S', pct:best.bestPct};
+        S.lastTop = {sym:t.sym, side:isLong?'L':'S', pct:best.bestPct};
       }
       top.classList.remove('hidden');
     }
@@ -445,213 +516,106 @@ function draw(){
 }
 
 /*** ===== Bekleme iptali ===== ***/
-function cancelWaiting(sym){
-  if(!S.active.has(sym)){ botLog(`ℹ ${sym}: aktif bekleme yok.`); return; }
-  S.active.delete(sym);
-  S.blockedUntil.set(sym, Date.now()+CANCEL_BLOCK_MS);
-  botLog(`🛑 ${sym}: Bekleme iptal edildi, ${CANCEL_BLOCK_MS/1000}s blok.`);
-  updateStatusUI(sym);
+function cancelWaiting(spotSym){
+  if(!S.active.has(spotSym)){ botLog(`ℹ ${spotSym}: aktif bekleme yok.`); return; }
+  S.active.delete(spotSym);
+  S.blockedUntil.set(spotSym, Date.now()+CANCEL_BLOCK_MS);
+  botLog(`🛑 ${spotSym}: Bekleme iptal edildi, ${CANCEL_BLOCK_MS/1000}s blok.`);
+  updateStatusUI(spotSym);
 }
 
-/*** ===== REST & İmzalama ===== ***/
-const HOST = {
-  spot: 'https://api.mexc.com',
-  fut:  'https://contract.mexc.com'
-};
-
-async function sha256Hex(str){
-  const data=new TextEncoder().encode(str);
-  const d=await crypto.subtle.digest('SHA-256',data);
-  return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-async function hmacSHA256Hex(secret, msg){
-  const key=await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), {name:'HMAC',hash:'SHA-256'}, false, ['sign']);
-  const sig=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(msg));
+/*** ===== SPOT & FUT: imza/fetch (proxy) ===== ***/
+async function hmac256Hex(key, msg){
+  const ckey = await crypto.subtle.importKey('raw', new TextEncoder().encode(key), {name:'HMAC',hash:'SHA-256'}, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', ckey, new TextEncoder().encode(msg));
   return [...new Uint8Array(sig)].map(b=>b.toString(16).padStart(2,'0')).join('');
 }
-function proxyTarget(){ const p=S.bot.proxy||''; return p ? (p.endsWith('/')? p.slice(0,-1):p) : null; }
-
-async function viaProxy(url, method, headers, body){
-  const proxy = proxyTarget();
-  if(!proxy){
-    const f = await fetch(url,{method,headers,body});
-    if(!f.ok) throw new Error(`HTTP ${f.status}: ${await f.text()}`);
-    const ct=(f.headers.get('content-type')||''); return ct.includes('application/json')? f.json(): f.text();
-  }
+async function proxyFetch({url, method='GET', headers={}, body=null}){
+  const target = (S.bot.proxy||'').endsWith('/')? S.bot.proxy.slice(0,-1) : (S.bot.proxy||'');
+  if(!target) throw new Error('Proxy gerekli');
   const h={'Content-Type':'application/json'}; if(S.bot.proxyToken) h['x-proxy-token']=S.bot.proxyToken;
-  const f = await fetch(proxy,{method:'POST',headers:h, body:JSON.stringify({url,method,headers,body})});
-  if(!f.ok) throw new Error(`Proxy ${f.status}: ${await f.text()}`);
-  const ct=(f.headers.get('content-type')||''); return ct.includes('application/json')? f.json(): f.text();
+  const res = await fetch(target, { method:'POST', headers:h, body:JSON.stringify({ url, method, headers, body }) });
+  if(!res.ok) throw new Error(`Proxy ${res.status}: ${await res.text()}`);
+  const ct = res.headers.get('content-type')||'';
+  return ct.includes('application/json') ? res.json() : res.text();
 }
 
-/*** Public fetch (Spot bookTicker, Futures depth) ***/
-async function spotBookTicker(symbolNoUnderscore){
-  const url = `${HOST.spot}/api/v3/ticker/bookTicker?symbol=${encodeURIComponent(symbolNoUnderscore)}`;
-  return viaProxy(url,'GET',{'Accept':'application/json'}, null);
+/*** ===== SPOT private ===== ***/
+const SPOT_API = 'https://api.mexc.com';
+function spotCreds(){ return { key:S.bot.spotKey || S.bot.futKey, sec:S.bot.spotSec || S.bot.futSec }; }
+async function spotSigned({path, method='GET', qs={}, body=null}){
+  const {key, sec} = spotCreds();
+  const ts = Date.now();
+  const params = new URLSearchParams(Object.entries({...qs, timestamp:ts})).toString();
+  const sig = await hmac256Hex(sec, params + (body||''));
+  const url = `${SPOT_API}${path}?${params}&signature=${sig}`;
+  const headers = { 'X-MEXC-APIKEY': key, 'Content-Type':'application/json', 'Accept':'application/json' };
+  return proxyFetch({ url, method, headers, body });
 }
-async function futDepth(symUnderscore){
-  const url = `${HOST.fut}/api/v1/contract/depth/${encodeURIComponent(symUnderscore)}?limit=1`;
-  return viaProxy(url,'GET',{'Accept':'application/json'}, null);
-}
-
-/*** Spot SIGNED ***/
-async function spotSigned(method, path, paramsObj={}){
-  const {spotKey:key, spotSec:sec} = S.bot; if(!(key&&sec)) throw new Error('Spot API anahtarı eksik');
-  const t = Date.now();
-  const q = new URLSearchParams({...paramsObj, timestamp:String(t)}).toString();
-  const sig = await hmacSHA256Hex(sec, q);
-  const url = `${HOST.spot}${path}?${q}&signature=${sig}`;
-  const headers = {'X-MEXC-APIKEY': key, 'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded'};
-  return viaProxy(url, method, headers, null);
-}
-
-/*** Futures SIGNED ***/
-// Signature = HMAC_SHA256(secret, Request-Time + method + requestPath + bodyJSON)
-async function futSigned(method, path, bodyObj={}){
-  const {futKey:key, futSec:sec} = S.bot; if(!(key&&sec)) throw new Error('Futures API anahtarı eksik');
-  const reqTime = String(Date.now());
-  const body = (method==='GET'||!bodyObj) ? '' : JSON.stringify(bodyObj);
-  const signBase = reqTime + method.toUpperCase() + path + body;
-  const sig = await hmacSHA256Hex(sec, signBase);
-  const url = `${HOST.fut}${path}`;
-  const headers = {'ApiKey': key, 'Request-Time': reqTime, 'Content-Type':'application/json', 'Signature': sig, 'Accept':'application/json'};
-  return viaProxy(url, method, headers, body||null);
-}
-
-/*** ===== Meta ===== ***/
-const FutMeta = new Map();
-async function getFutMeta(sym){ // returns {contractSize, priceScale, volScale, minVol, maxVol, volUnit}
-  if(FutMeta.has(sym)) return FutMeta.get(sym);
-  const out = await viaProxy(`${HOST.fut}/api/v1/contract/detail?symbol=${encodeURIComponent(sym)}`, 'GET', {'Accept':'application/json'}, null);
-  const m = (out?.data && Array.isArray(out.data) ? out.data[0] : out) || {};
-  const meta = {
-    contractSize: Number(m.contractSize||1), priceScale: Number(m.priceScale||2), volScale: Number(m.volScale||0),
-    minVol: Number(m.minVol||1), maxVol: Number(m.maxVol||5000000), volUnit: Number(m.volUnit||1)
-  };
-  FutMeta.set(sym, meta); return meta;
-}
-
-const SpotMeta = new Map();
-async function getSpotMeta(symUnderscore){ // returns {base,quote,basePrecision,quotePrecision,minQuoteFallback}
-  if(SpotMeta.has(symUnderscore)) return SpotMeta.get(symUnderscore);
-  const symbol = spotSym(symUnderscore);
-  const info = await viaProxy(`${HOST.spot}/api/v3/exchangeInfo?symbol=${encodeURIComponent(symbol)}`, 'GET', {'Accept':'application/json'}, null);
-  const s = (info?.symbols && info.symbols[0]) || {};
-  const meta = {
-    base: (s.baseAsset||symbol.replace('USDT','')).toUpperCase(),
-    quote:(s.quoteAsset||'USDT').toUpperCase(),
-    basePrecision: Number(s.baseAssetPrecision ?? 6),
-    quotePrecision: Number(s.quotePrecision ?? 6),
-    minQuoteFallback: 5 // min notional yoksa 5 USDT varsayalım
-  };
-  SpotMeta.set(symUnderscore, meta); return meta;
-}
-
-/*** ===== Futures Ayarları / Pozisyon ===== ***/
-async function ensureFuturesSettings(sym){
-  const openType = S.bot.margin==='cross' ? 2 : 1;
-  const lev = S.bot.lev;
-
-  // Position mode: one-way (2) - opsiyonel; çağrı başarısız olursa devam.
-  try{ await futSigned('POST', '/api/v1/private/position/change_position_mode', { positionMode: 2 }); }catch{}
-
-  // Kaldıraç ayarı (pozisyon yokken sembol bazlı)
-  try{
-    await futSigned('POST','/api/v1/private/position/change_leverage',{
-      symbol: sym, leverage: String(lev), openType, positionType: 2 // short tarafı için
+async function spotExchangeInfo(symbols){
+  const u = `${SPOT_API}/api/v3/exchangeInfo?symbols=${symbols.join(',')}`;
+  const f = await fetch(u); const j = await f.json();
+  const arr = Array.isArray(j.symbols)? j.symbols : (j.data||[]);
+  arr.forEach(s=>{
+    S.meta.spot.set(s.symbol, {
+      base: s.baseAsset, quote: s.quoteAsset,
+      baseStep: parseFloat(s.baseSizePrecision||'0'), // step size
+      minQuote: parseFloat(s.quoteAmountPrecision||'0'), // min quote amt
+      baseDecimals: parseInt(s.baseAssetPrecision||'6',10)
     });
-  }catch(e){ /* bazı hesaplarda mevcut moda göre kısıt olabilir */ }
+  });
 }
 
-async function getFuturesShortVol(sym){
-  try{
-    const res = await futSigned('GET', `/api/v1/private/position/open_positions`, { });
-    const list = res?.data || res || [];
-    const row = (Array.isArray(list)? list:[]).find(x=> (x.symbol||'')===sym && Number(x.positionType)===2);
-    const hv = row ? Number(row.holdVol||row.vol||0) : 0;
-    return hv>0? hv : 0;
-  }catch{ return 0; }
+/*** ===== FUTURES private ===== ***/
+const FUT_API = 'https://contract.mexc.com';
+function futCreds(){ return { key:S.bot.futKey || S.bot.spotKey, sec:S.bot.futSec || S.bot.spotSec }; }
+async function futSigned({path, method='GET', params=null, bodyObj=null}){
+  const {key, sec} = futCreds();
+  const reqTime = String(Date.now());
+  let requestParam = '';
+  let body = '';
+  if(method==='GET' || method==='DELETE'){
+    if(params && Object.keys(params).length){
+      // sözlük sıralı & URL-encode
+      const entries = Object.entries(params).filter(([_,v])=>v!==undefined&&v!==null);
+      entries.sort((a,b)=> a[0]<b[0]?-1:1);
+      requestParam = entries.map(([k,v])=> `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join('&');
+    }
+  } else if(bodyObj){
+    body = JSON.stringify(bodyObj);
+    requestParam = body; // futures POST: JSON string imzaya girer
+  }
+  const signStr = (S.bot.futKey||'') + reqTime + requestParam;
+  const signature = await hmac256Hex(sec, signStr);
+  let url = `${FUT_API}${path}`;
+  if(requestParam && (method==='GET' || method==='DELETE')) url += `?${requestParam}`;
+  const headers = { 'ApiKey': key, 'Request-Time': reqTime, 'Signature': signature, 'Content-Type':'application/json', 'Accept':'application/json' };
+  return proxyFetch({ url, method, headers, body: body||null });
 }
-
-/*** ===== Futures LIMIT IOC — EŞİT NOTIONAL ===== ***/
-async function placeFuturesShortIOC(sym, usdtNotional, limitPx){
-  const meta = await getFutMeta(sym);
-  // vol ≈ N / (contractSize * price)
-  let vol = usdtNotional / (meta.contractSize * limitPx);
-  // vol adımı
-  const step = meta.volUnit>0 ? meta.volUnit : 1;
-  vol = Math.ceil(vol/step)*step;
-  vol = Math.max(meta.minVol, Math.min(vol, meta.maxVol));
-  vol = Math.ceil(vol); // genelde tamsayı sözleşme
-  if(!(vol>0)) vol = meta.minVol;
-
-  const body = {
-    symbol: sym, price: fmtDec(limitPx, meta.priceScale), vol, side: 3, // open short
-    openType: S.bot.margin==='cross'?2:1, leverage: String(S.bot.lev),
-    orderType: 3 // IOC
+async function getContractMeta(futSym){
+  if(S.meta.fut.has(futSym)) return S.meta.fut.get(futSym);
+  const url = `${FUT_API}/api/v1/contract/detail?symbol=${encodeURIComponent(futSym)}`;
+  const f = await fetch(url); const j = await f.json();
+  let rec = null;
+  if(j && j.data && Array.isArray(j.data)) rec = j.data.find(x=>x.symbol===futSym) || j.data[0];
+  const m = {
+    contractSize: Number(rec?.contractSize||1),
+    volUnit: Number(rec?.volUnit||1),
+    minVol: Number(rec?.minVol||1),
+    maxVol: Number(rec?.maxVol||5_000_000),
+    volScale: Number(rec?.volScale||0),
+    priceUnit: Number(rec?.priceUnit||0.5)
   };
-  const res = await futSigned('POST','/api/v1/private/order/submit', body);
-  return { id: res?.data?.orderId || res?.orderId || null, vol };
-}
-async function closeFuturesShortIOC_All(sym, limitPx){
-  const meta = await getFutMeta(sym);
-  const openShort = await getFuturesShortVol(sym);
-  if(openShort<=0) return { id:null, closed:0 };
-  const body = {
-    symbol: sym, price: fmtDec(limitPx, meta.priceScale), vol: openShort, side: 2, // close short
-    orderType: 3
-  };
-  const res = await futSigned('POST','/api/v1/private/order/submit', body);
-  return { id: res?.data?.orderId || res?.orderId || null, closed: openShort };
+  S.meta.fut.set(futSym, m); return m;
 }
 
-/*** ===== Spot LIMIT IOC — EŞİT NOTIONAL ===== ***/
-async function getSpotAvailable(base){
-  try{
-    const acc = await spotSigned('GET','/api/v3/account',{});
-    const rec = (acc?.balances||[]).find(x=>(x.asset||'').toUpperCase()===base);
-    return rec ? Number(rec.free||0) : 0;
-  }catch{ return 0; }
-}
-function roundDown(x, decimals){ const f = Math.pow(10, decimals); return Math.floor(x * f) / f; }
-
-async function placeSpotBuyIOC(symUnderscore, usdtNotional, limitPx){
-  const symbol = spotSym(symUnderscore);
-  const meta = await getSpotMeta(symUnderscore);
-
-  let qty = usdtNotional / limitPx;
-  qty = roundDown(qty, meta.basePrecision);
-  // min notional fallback (5 USDT) – API hata dönerse loglanır.
-  if(qty*limitPx < meta.minQuoteFallback) qty = roundDown(meta.minQuoteFallback/limitPx, meta.basePrecision);
-  if(!(qty>0)) qty = 1/Math.pow(10, meta.basePrecision);
-
-  const params = {
-    symbol, side:'BUY', type:'IMMEDIATE_OR_CANCEL',
-    quantity: String(qty), price: String(limitPx)
-  };
-  const res = await spotSigned('POST','/api/v3/order', params);
-  return { id: res?.orderId || null, basePlaced: qty };
-}
-async function placeSpotSellIOC_All(symUnderscore, limitPx){
-  const symbol = spotSym(symUnderscore);
-  const meta = await getSpotMeta(symUnderscore);
-  let avail = await getSpotAvailable(meta.base);
-  avail = roundDown(avail, meta.basePrecision);
-  if(!(avail>0)) return { id:null, sold:0 };
-
-  const params = { symbol, side:'SELL', type:'IMMEDIATE_OR_CANCEL', quantity:String(avail), price:String(limitPx) };
-  const res = await spotSigned('POST','/api/v3/order', params);
-  return { id: res?.orderId || null, sold: avail };
-}
-
-/*** ===== Lock helpers ===== ***/
+/*** ===== Bot tetik ===== ***/
 function isLocked(sym){ return !!S.locks.get(sym); }
 function lock(sym){ S.locks.set(sym, true); updateStatusUI(sym); }
 function unlock(sym){ S.locks.delete(sym); updateStatusUI(sym); }
 
-/*** ===== Bot tetik ===== ***/
-async function maybeBot(sym, r){
-  if(!S.bot.enabled || isLocked(sym)) return;
+async function maybeBot(spotSym, r){
+  if(!S.bot.enabled || isLocked(spotSym)) return;
 
   const openRef  = S.bot.useTableThresh ? S.ui.thresh : S.bot.openThresh;
   const closeRef = S.bot.closeThresh;
@@ -659,130 +623,177 @@ async function maybeBot(sym, r){
   const shortOK = isFinite(r.shortPct) && r.shortPct>=openRef && r.shortPct>0;
   const longOK  = isFinite(r.longPct)  && r.longPct>=closeRef && r.longPct>0;
 
-  const hasActive = S.active.has(sym);
-  const blockUntil = S.blockedUntil.get(sym) || 0;
+  const hasActive = S.active.has(spotSym);
+  const blockUntil = S.blockedUntil.get(spotSym) || 0;
   const isBlocked = Date.now() < blockUntil;
 
   if(longOK && hasActive){
-    lock(sym);
-    try{ await closePairFull(sym, r); } finally{ unlock(sym); }
+    lock(spotSym);
+    try{ await closePairFull(spotSym, r); } finally{ unlock(spotSym); }
     return;
   }
   if(shortOK && !hasActive && !isBlocked){
-    const last = S.bot.lastExecBySym.get(sym) || 0;
+    const last = S.bot.lastExecBySym.get(spotSym) || 0;
     if(Date.now() - last >= S.bot.cooldown*1000){
-      lock(sym);
-      try{ await openPairEqualNotional(sym, r); } finally{ unlock(sym); }
+      lock(spotSym);
+      try{ await openPairEqualNotional(spotSym, r); } finally{ unlock(spotSym); }
     }
   }
 }
 
 /*** ===== Açılış: EŞİT NOTIONAL iki bacak ===== ***/
-async function openPairEqualNotional(sym, r){
-  S.bot.lastExecBySym.set(sym, Date.now());
+async function openPairEqualNotional(spotSym, r){
+  S.bot.lastExecBySym.set(spotSym, Date.now());
   const ask = r?.askS||0, bidF=r?.bidF||0;
-  if(!(ask>0 && bidF>0)){ botLog(`⏩ [OPEN] ${sym} fiyat eksik (ask/bidF)`); return; }
+  const futSym = futOf(spotSym);
+  if(!(ask>0 && bidF>0)){ botLog(`⏩ [OPEN] ${spotSym} fiyat eksik (ask/bidF)`); return; }
 
   const N = S.bot.notional; // USDT
-  botLog(`⏩ [OPEN] ${sym} hedef notional=${N} USDT | Fiyatlar: spotAsk=${ask} futBid=${bidF} | fark=${pctStr(r.shortPct)}`);
+  botLog(`⏩ [OPEN] ${spotSym} hedef N=${N} USDT | Fiyat: spotAsk=${fmtPx(ask)} futBid=${fmtPx(bidF)} | fark=${pctStr(r.shortPct)}`);
 
   if(S.bot.dry){
-    S.active.set(sym, { openedAt: Date.now(), targetN: N });
-    updateStatusUI(sym);
+    S.active.set(spotSym, { openedAt: Date.now(), targetN: N });
+    updateStatusUI(spotSym);
     botLog(`(dry-run) → iki bacak simüle (eşit notional)`);
     return;
   }
 
-  await ensureFuturesSettings(sym);
+  // Futures ayar (kaldıraç/marjin) — MEXC: change_leverage gerekiyor (position yoksa openType + symbol + positionType)
+  try{
+    await futSigned({ path:'/api/v1/private/position/change_leverage', method:'POST',
+      bodyObj:{ openType: (S.bot.margin==='cross')?2:1, leverage: S.bot.lev, symbol: futSym, positionType: 2 } // 2: short
+    });
+  }catch(_){}
 
-  const futP  = placeFuturesShortIOC(sym, N, bidF);
-  const spotP = placeSpotBuyIOC(sym, N, ask);
+  // Futures: vol hesapla (IOC short @ bid1)
+  const m = await getContractMeta(futSym);
+  const per = m.contractSize>0 ? m.contractSize : 1;
+  let vol = N / (per * bidF);
+  // adım/limit
+  vol = Math.ceil(vol / (m.volUnit||1)) * (m.volUnit||1);
+  if(m.volScale>0){ const step = Math.pow(10, -m.volScale); vol = Math.ceil(vol/step)*step; }
+  vol = Math.max(m.minVol||1, Math.min(vol, m.maxVol||5_000_000));
+  vol = Math.floor(vol); if(!(vol>0)) vol = m.minVol||1;
+
+  const futBody = {
+    symbol: futSym, price: fmtPx(bidF),
+    vol, leverage: S.bot.lev,
+    side: 3, // open short
+    type: 3, // IOC
+    openType: (S.bot.margin==='cross')?2:1
+  };
+
+  // Spot: miktar ≈ N / price → adım/min quote düzelt
+  const sm = await getSpotPairMeta(spotSym);
+  let amt = N / ask;
+  amt = roundDown(amt, sm.baseStep || Math.pow(10, - (sm.baseDecimals||6)));
+  if(sm.minQuote && amt*ask < sm.minQuote){
+    const need = sm.minQuote/ask;
+    amt = roundDown(need, sm.baseStep || Math.pow(10, - (sm.baseDecimals||6)));
+  }
+  if(!(amt>0)) amt = sm.baseStep || Math.pow(10, - (sm.baseDecimals||6));
+
+  const spotBody = new URLSearchParams({
+    symbol: spotSym, side:'BUY', type:'LIMIT',
+    quantity: String(amt), price: fmtPx(ask), timeInForce:'IOC', recvWindow:'60000'
+  }).toString();
+
+  // Paralel dene
+  const futP = futSigned({ path:'/api/v1/private/order/submit', method:'POST', bodyObj:futBody });
+  const spotP = spotSigned({ path:'/api/v3/order', method:'POST', qs:{}, body: spotBody });
+
   const [futRes, spotRes] = await Promise.allSettled([futP, spotP]);
 
   let futOk=false, spotOk=false;
-  if(futRes.status==='fulfilled'){ futOk=true; botLog(`✅ Futures SHORT IOC OK: ${futRes.value?.id||'—'} | vol=${futRes.value?.vol}`); }
+  if(futRes.status==='fulfilled'){ futOk=true; botLog(`✅ Futures SHORT IOC OK: id=${futRes.value?.data||'—'} | vol=${vol} | N≈${(vol*per*bidF).toFixed(4)}`); }
   else botLog(`❌ Futures hata [OPEN]: ${futRes.reason?.message||String(futRes.reason)}`);
 
-  if(spotRes.status==='fulfilled'){ spotOk=true; botLog(`✅ Spot BUY IOC OK: ${spotRes.value?.id||'—'} | base≈${roundTo(spotRes.value.basePlaced,6)}`); }
+  if(spotRes.status==='fulfilled'){ spotOk=true; botLog(`✅ Spot BUY IOC OK: ${spotRes.value?.orderId||'—'} | qty≈${roundTo(amt,6)} | N≈${(amt*ask).toFixed(4)}`); }
   else botLog(`❌ Spot hata [OPEN]: ${spotRes.reason?.message||String(spotRes.reason)}`);
 
   if(futOk && spotOk){
-    S.active.set(sym, { openedAt: Date.now(), targetN: N });
-    updateStatusUI(sym);
-    botLog(`📌 [OPEN] ${sym} AKTİF (eşit notional). LONG sinyalde tam kapanış bekleniyor.`);
+    S.active.set(spotSym, { openedAt: Date.now(), targetN: N });
+    updateStatusUI(spotSym);
+    botLog(`📌 [OPEN] ${spotSym} AKTİF (eşit notional). LONG sinyalde tam kapanış bekleniyor.`);
   } else {
+    // Fail-safe
     if(futOk && !spotOk){
       botLog(`↩ Fail-safe: Spot FAIL → futures short’u kapat`);
-      try{ await closeFuturesShortIOC_All(sym, r.askF||bidF); botLog(`✅ Fail-safe futures kapandı`); }catch(e){ botLog(`💥 Fail-safe fut close hata: ${e?.message||e}`); }
+      try{ await closeFuturesShortIOC(futSym, r.askF||bidF); botLog(`✅ Fail-safe futures kapandı`); }catch(e){ botLog(`💥 Fail-safe fut close hata: ${e?.message||e}`); }
     }
     if(!futOk && spotOk){
       botLog(`↩ Fail-safe: Futures FAIL → spot’u sat`);
-      try{ await placeSpotSellIOC_All(sym, r.bidS||ask); botLog(`✅ Fail-safe spot satıldı`); }catch(e){ botLog(`💥 Fail-safe spot close hata: ${e?.message||e}`); }
+      try{ await placeSpotSellLimitAllIOC(spotSym, r.bidS||ask); botLog(`✅ Fail-safe spot satıldı`); }catch(e){ botLog(`💥 Fail-safe spot close hata: ${e?.message||e}`); }
     }
   }
 }
 
 /*** ===== Kapanış: LONG sinyali → tam kapanış ===== ***/
-async function closePairFull(sym, r){
+async function closePairFull(spotSym, r){
+  const futSym = futOf(spotSym);
   const askF=r?.askF||0, bidS=r?.bidS||0;
-  if(!(askF>0 && bidS>0)){ botLog(`⏹ [CLOSE] ${sym} fiyat eksik`); return; }
+  if(!(askF>0 && bidS>0)){ botLog(`⏹ [CLOSE] ${spotSym} fiyat eksik`); return; }
 
-  botLog(`⏹ [CLOSE] ${sym} → fut BUY reduce @${askF} + spot SELL ALL @${bidS} | fark=${pctStr(r.longPct)}`);
+  botLog(`⏹ [CLOSE] ${spotSym} → fut BUY (close short) IOC @${fmtPx(askF)} + spot SELL ALL IOC @${fmtPx(bidS)} | fark=${pctStr(r.longPct)}`);
 
   if(S.bot.dry){
-    S.active.delete(sym); updateStatusUI(sym);
+    S.active.delete(spotSym); updateStatusUI(spotSym);
     botLog(`(dry-run) → tüm pozisyon varsayımsal kapatıldı`);
     return;
   }
 
-  const futP  = closeFuturesShortIOC_All(sym, askF);
-  const spotP = placeSpotSellIOC_All(sym, bidS);
+  const futP  = closeFuturesShortIOC(futSym, askF);
+  const spotP = placeSpotSellLimitAllIOC(spotSym, bidS);
   const [futRes, spotRes] = await Promise.allSettled([futP, spotP]);
 
   let futOk=false, spotOk=false;
-  if(futRes.status==='fulfilled'){ futOk=true; botLog(`✅ Futures close OK: ${futRes.value?.id||'—'} (closed=${futRes.value?.closed})`); }
+  if(futRes.status==='fulfilled'){ futOk=true; botLog(`✅ Futures close OK: ${JSON.stringify(futRes.value)}`); }
   else botLog(`❌ Futures close hata: ${futRes.reason?.message||String(futRes.reason)}`);
 
-  if(spotRes.status==='fulfilled'){ spotOk=true; botLog(`✅ Spot SELL ALL OK: ${spotRes.value?.id||'—'} (sold=${spotRes.value?.sold})`); }
+  if(spotRes.status==='fulfilled'){ spotOk=true; botLog(`✅ Spot SELL ALL OK: ${spotRes.value?.orderId||'—'}`); }
   else botLog(`❌ Spot SELL ALL hata: ${spotRes.reason?.message||String(spotRes.reason)}`);
 
   if(futOk || spotOk){
-    S.active.delete(sym); updateStatusUI(sym);
-    botLog(`🏁 [DONE] ${sym} kapatma tamamlandı (>=1 bacak başarı)`);
+    S.active.delete(spotSym); updateStatusUI(spotSym);
+    botLog(`🏁 [DONE] ${spotSym} kapatma tamamlandı (>=1 bacak başarı)`);
   } else {
-    botLog(`⚠ [CLOSE] ${sym} iki bacak da başarısız oldu`);
+    botLog(`⚠ [CLOSE] ${spotSym} iki bacak da başarısız oldu`);
   }
 }
 
-/*** ===== Poller (Public REST) ===== ***/
-async function pollOnce(){
-  for(const sym of S.coins){
-    try{
-      // Spot bookTicker
-      const s = await spotBookTicker(spotSym(sym));
-      const bidS = toNum(s?.bidPrice), askS = toNum(s?.askPrice);
-      if(isFinite(bidS)||isFinite(askS)) S.spot.set(sym,{bid:bidS, ask:askS, ts:Date.now()});
-    }catch(e){ /* sessiz */ }
-
-    try{
-      // Futures depth -> en iyi bid/ask
-      const d = await futDepth(sym);
-      const bids = d?.bids||d?.data?.bids||[];
-      const asks = d?.asks||d?.data?.asks||[];
-      const bidF = toNum((Array.isArray(bids)&&bids[0]&&bids[0][0])||NaN);
-      const askF = toNum((Array.isArray(asks)&&asks[0]&&asks[0][0])||NaN);
-      if(isFinite(bidF)||isFinite(askF)) S.fut.set(sym,{bid:bidF, ask:askF, ts:Date.now()});
-    }catch(e){ /* sessiz */ }
-
-    await sleep(35); // rate limit'i rahatlat
-  }
-  scheduleDraw();
+/*** ===== Futures yardımcılar ===== ***/
+async function closeFuturesShortIOC(futSym, limitPx){
+  // one-way mod için reduceOnly=true güvenli; ayrıca side=2 (close short)
+  return futSigned({ path:'/api/v1/private/order/submit', method:'POST', bodyObj:{
+    symbol:futSym, price:fmtPx(limitPx), vol: 9_999_999, // büyük vol (IOC + reduceOnly ise sadece mevcut kadar doldurur)
+    side:2, type:3, openType:(S.bot.margin==='cross')?2:1, reduceOnly:true
+  }});
 }
-async function pollLoop(){
-  while(true){
-    try{ await pollOnce(); }catch(e){}
-    await sleep(POLL_MS);
-  }
+
+/*** ===== Spot yardımcılar ===== ***/
+async function getSpotPairMeta(spotSym){
+  if(S.meta.spot.has(spotSym)) return S.meta.spot.get(spotSym);
+  await spotExchangeInfo([spotSym]);
+  return S.meta.spot.get(spotSym) || { base:spotSym.replace('USDT',''), quote:'USDT', baseStep:0, minQuote:0, baseDecimals:6 };
+}
+async function getSpotAvailable(base){
+  const j = await spotSigned({ path:'/api/v3/account', method:'GET', qs:{} });
+  const arr = j?.balances||[];
+  const rec = arr.find(x => (x.asset||'').toUpperCase()===base.toUpperCase());
+  return rec ? Number(rec.free||0) : 0;
+}
+async function placeSpotSellLimitAllIOC(spotSym, limitPx){
+  const meta = await getSpotPairMeta(spotSym);
+  let avail = await getSpotAvailable(meta.base);
+  // adım & min düzelt
+  const step = meta.baseStep || Math.pow(10, -(meta.baseDecimals||6));
+  avail = roundDown(avail, step);
+  if(!(avail>0)) return { sold:0 };
+  const body = new URLSearchParams({
+    symbol: spotSym, side:'SELL', type:'LIMIT',
+    quantity:String(avail), price:fmtPx(limitPx), timeInForce:'IOC', recvWindow:'60000'
+  }).toString();
+  return spotSigned({ path:'/api/v3/order', method:'POST', qs:{}, body });
 }
 
 /*** ===== Start ===== ***/
@@ -798,9 +809,11 @@ function start(){
   $('#botCooldown').value = String(S.bot.cooldown);
 
   S.coins.forEach(sym=> ensureRow(sym));
+  wsFutConnect();
+  startSpotLoop();
+
   $('#clock').textContent = now();
   scheduleDraw();
-  pollLoop(); // public veriler için döngü
 }
 start();
 </script>
