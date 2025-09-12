@@ -1,673 +1,426 @@
-# mexc_mac_app.py
-# -*- coding: utf-8 -*-
-"""
-MEXC MAC (Moving Average Channel) — Tek Dosya Flask Uygulaması (Güncel)
-- Candlestick + MAC (HL / Envelope, SMA/EMA, n)
-- İzleme listesi (localStorage), manuel/oto yenileme
-- Firestore'a anlık log (üst/alt/mid, signal, inside, since_enter_sec)
-- Hızlı Emir: Flask backend üzerinden MEXC Spot /api/v3/order (HMAC imzalı)
-Kurulum:
-    pip install flask requests
-Çalıştırma:
-    python mexc_mac_app.py
-Aç:
-    http://127.0.0.1:5000
-"""
-from __future__ import annotations
-from typing import List, Dict, Optional
-from statistics import mean
-import os, time, hmac, hashlib
-import requests
-from flask import Flask, request, jsonify, render_template_string
-
-app = Flask(__name__)
-
-MEXC_BASE = "https://api.mexc.com"
-INTERVALS = ["1m","5m","15m","30m","60m","4h","1d","1W","1M"]  # Spot v3
-
-# ========= MA Helpers =========
-def sma(seq: List[float], n: int) -> List[Optional[float]]:
-    out: List[Optional[float]] = []
-    run = []
-    for v in seq:
-        run.append(v)
-        if len(run) > n:
-            run.pop(0)
-        out.append(mean(run) if len(run) == n else None)
-    return out
-
-def ema(seq: List[float], n: int) -> List[Optional[float]]:
-    out: List[Optional[float]] = []
-    k = 2.0 / (n + 1.0)
-    e_prev: Optional[float] = None
-    warm = []
-    for i, v in enumerate(seq):
-        warm.append(v)
-        if i + 1 < n:
-            out.append(None)
-            continue
-        if e_prev is None:
-            e_prev = mean(warm[-n:])
-        e_cur = (v - e_prev) * k + e_prev
-        out.append(e_cur)
-        e_prev = e_cur
-    return out
-
-def moving_average(seq: List[float], n: int, kind: str) -> List[Optional[float]]:
-    return ema(seq, n) if (kind or "sma").lower() == "ema" else sma(seq, n)
-
-# ========= Data Fetch =========
-def fetch_klines(symbol: str, interval: str, limit: int) -> List[Dict]:
-    if interval not in INTERVALS:
-        raise ValueError(f"Geçersiz interval '{interval}'. Kullanılabilir: {', '.join(INTERVALS)}")
-    url = f"{MEXC_BASE}/api/v3/klines"
-    params = {"symbol": symbol.upper(), "interval": interval, "limit": max(50, min(int(limit), 1000))}
-    r = requests.get(url, params=params, timeout=12)
-    try:
-        r.raise_for_status()
-    except requests.HTTPError as e:
-        try:
-            j = r.json()
-            raise requests.HTTPError(f"{e} | mexc_msg={j.get('msg')} mexc_code={j.get('code')}", response=r)
-        except Exception:
-            raise
-    data = r.json()
-    rows = []
-    # [openTime, open, high, low, close, volume, closeTime, quoteVol, ...]
-    for x in data:
-        rows.append({
-            "t": int(x[0]),
-            "open": float(x[1]),
-            "high": float(x[2]),
-            "low":  float(x[3]),
-            "close":float(x[4]),
-            "volume": float(x[5]),
-            "t_close": int(x[6]),
-        })
-    return rows
-
-# ========= MAC =========
-def compute_mac(rows: List[Dict], n: int, ma_type: str, mode: str, envelope_pct: float):
-    highs  = [r["high"] for r in rows]
-    lows   = [r["low"]  for r in rows]
-    closes = [r["close"]for r in rows]
-
-    mode = (mode or "hl").lower()
-    if mode == "envelope":
-        mid = moving_average(closes, n, ma_type)
-        upper = [None if m is None else m * (1.0 + envelope_pct) for m in mid]
-        lower = [None if m is None else m * (1.0 - envelope_pct) for m in mid]
-    else:
-        upper = moving_average(highs, n, ma_type)
-        lower = moving_average(lows,  n, ma_type)
-        mid = [None if (u is None or l is None) else (u + l) / 2.0 for u, l in zip(upper, lower)]
-
-    last_close = closes[-1]
-    u, l = upper[-1], lower[-1]
-    if u is None or l is None:
-        signal = "N/A"
-        inside_now = None
-    else:
-        if   last_close > u: signal = "LONG"
-        elif last_close < l: signal = "SHORT"
-        else:                signal = "FLAT"
-        inside_now = (l <= last_close <= u)
-
-    # İçeride kalma süresi
-    inside_flags: List[Optional[bool]] = []
-    for uu, ll, cc in zip(upper, lower, closes):
-        inside_flags.append( (uu is not None and ll is not None) and (ll <= cc <= uu) )
-    last_enter_idx: Optional[int] = None
-    if inside_flags[-1]:
-        i = len(inside_flags) - 1
-        while i > 0 and inside_flags[i-1]:
-            i -= 1
-        last_enter_idx = i
-    last_enter_time = rows[last_enter_idx]["t"] if last_enter_idx is not None else None
-    since_enter_sec = None
-    if last_enter_time is not None:
-        since_enter_sec = max(0, int((rows[-1]["t"] - last_enter_time) / 1000))
-
-    # Seriler
-    ohlc = [{"time": int(r["t"] // 1000), "open": r["open"], "high": r["high"], "low": r["low"], "close": r["close"]} for r in rows]
-    times = [int(r["t"] // 1000) for r in rows]
-    upper_points = [{"time": t, "value": v} for t, v in zip(times, upper) if v is not None]
-    mid_points   = [{"time": t, "value": v} for t, v in zip(times, mid)   if v is not None]
-    lower_points = [{"time": t, "value": v} for t, v in zip(times, lower) if v is not None]
-
-    return {
-        "times_ms": [r["t"] for r in rows],
-        "ohlc": ohlc,
-        "upper_points": upper_points,
-        "mid_points": mid_points,
-        "lower_points": lower_points,
-        "upper_last": upper[-1],
-        "mid_last": mid[-1],
-        "lower_last": lower[-1],
-        "last_close": last_close,
-        "last_signal": signal,
-        "inside_now": inside_now,
-        "last_enter_time": last_enter_time,
-        "since_enter_sec": since_enter_sec
-    }
-
-# ========= Signed MEXC Order (Spot) =========
-def mexc_sign(query_str: str, secret: str) -> str:
-    return hmac.new(secret.encode(), query_str.encode(), hashlib.sha256).hexdigest()
-
-def mexc_place_order(symbol: str, side: str, order_type: str, quantity: Optional[str], price: Optional[str], quote_order_qty: Optional[str], recv_window: int = 5000, dry_run: bool = False):
-    """
-    Spot order endpoint: POST /api/v3/order
-    Paramlar Binance benzeri; MEXC Spot v3 ile uyumlu.
-    """
-    api_key = os.getenv("MEXC_API_KEY", "")
-    api_secret = os.getenv("MEXC_API_SECRET", "")
-    if not api_key or not api_secret:
-        if dry_run or True:
-            # Anahtar yoksa otomatik dry-run
-            return {"ok": True, "dry_run": True, "msg": "API anahtarı bulunamadı; dry-run simülasyon."}
-        return {"ok": False, "error": "API anahtarları tanımlı değil."}
-
-    if dry_run:
-        return {"ok": True, "dry_run": True, "msg": "Dry-run: Emir simüle edildi."}
-
-    url = f"{MEXC_BASE}/api/v3/order"
-    ts = int(time.time() * 1000)
-    params = [
-        f"symbol={symbol.upper()}",
-        f"side={side.upper()}",
-        f"type={order_type.upper()}",
-        f"timestamp={ts}",
-        f"recvWindow={int(recv_window)}"
-    ]
-    if quantity:
-        params.append(f"quantity={quantity}")
-    if quote_order_qty:
-        params.append(f"quoteOrderQty={quote_order_qty}")
-    if price and order_type.upper() == "LIMIT":
-        params.append(f"price={price}")
-        params.append("timeInForce=GTC")
-
-    query = "&".join(params)
-    sig = mexc_sign(query, api_secret)
-    headers = {"X-MEXC-APIKEY": api_key, "Content-Type": "application/x-www-form-urlencoded"}
-    resp = requests.post(url, params={**{p.split('=')[0]: p.split('=')[1] for p in params}, "signature": sig}, headers=headers, timeout=12)
-
-    try:
-        resp.raise_for_status()
-    except requests.HTTPError as e:
-        try:
-            j = resp.json()
-            return {"ok": False, "error": f"{e}", "mexc": j}
-        except Exception:
-            return {"ok": False, "error": str(e), "text": resp.text}
-
-    try:
-        return {"ok": True, "dry_run": False, "data": resp.json()}
-    except Exception:
-        return {"ok": True, "dry_run": False, "text": resp.text}
-
-# ========= API =========
-@app.get("/api/mac")
-def api_mac():
-    try:
-        symbol = request.args.get("symbol", "BTCUSDT").upper()
-        interval = request.args.get("interval", "5m")
-        limit = int(request.args.get("limit", "500"))
-        n = max(2, int(request.args.get("n", "20")))
-        ma_type = request.args.get("ma", "sma").lower()
-        mode = request.args.get("mode", "hl").lower()
-        envelope_pct = float(request.args.get("envelope_pct", "0.01"))
-
-        rows = fetch_klines(symbol, interval, limit)
-        data = compute_mac(rows, n, ma_type, mode, envelope_pct)
-
-        return jsonify({"ok": True, "meta": {
-                "symbol": symbol, "interval": interval, "limit": limit,
-                "period": n, "ma": ma_type, "mode": mode, "envelope_pct": envelope_pct
-            }, "data": data})
-    except requests.HTTPError as e:
-        return jsonify({"ok": False, "error": f"MEXC HTTP hata: {e}"}), 502
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"Sunucu hata: {e}"}), 500
-
-@app.post("/api/order")
-def api_order():
-    """
-    JSON body:
-    {symbol, side, type, quantity?, price?, quoteOrderQty?, recvWindow?, dryRun?}
-    """
-    try:
-        body = request.get_json(force=True, silent=True) or {}
-        symbol = body.get("symbol", "BTCUSDT")
-        side = body.get("side", "BUY")
-        order_type = body.get("type", "MARKET")
-        quantity = body.get("quantity")           # string
-        price = body.get("price")                 # string
-        quote_qty = body.get("quoteOrderQty")     # string
-        recv = int(body.get("recvWindow", 5000))
-        dry = bool(body.get("dryRun", False))
-        res = mexc_place_order(symbol, side, order_type, quantity, price, quote_qty, recv, dry)
-        return jsonify(res), (200 if res.get("ok") else 400)
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"Sunucu hata: {e}"}), 500
-
-@app.get("/")
-def index():
-    return render_template_string(INDEX_HTML)
-
-# ========= UI (tek dosya) =========
-INDEX_HTML = r"""
 <!doctype html>
 <html lang="tr">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>MEXC MAC — Moving Average Channel (Tek Dosya)</title>
-<!-- Geçerli 1x1 şeffaf PNG favicon (data URL) -->
-<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8Xw8AAoMB4t1q+2kAAAAASUVORK5CYII=">
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Gate.io MAC Channel Bot — Single File (Proxy Uyumlu)</title>
+<link rel="icon" href="data:;base64,=">
 <style>
   :root{
     --bg:#0b0f19; --fg:#e8eef7; --muted:#9fb0c9;
     --panel:#0f162a; --panel2:#101a32; --glass:rgba(255,255,255,.06);
     --border:#1b2a4a; --acc:#60a5fa; --good:#22c55e; --bad:#ef4444; --warn:#f59e0b;
-    --radius:18px; --gap:14px; --padY:12px; --padX:14px; --font:16px; --maxW:1240px;
+    --radius:18px; --gap:14px; --font:16px; --maxW:1200px;
   }
   *{box-sizing:border-box} html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--fg);font:400 var(--font)/1.55 system-ui,Segoe UI,Inter,Roboto,Helvetica,Arial}
-  .wrap{max-width:var(--maxW);margin:34px auto;padding:0 14px}
-  h1{margin:0 0 16px;font-size:28px}
-  .grid{display:grid;grid-template-columns:300px 1fr;gap:16px}
+  body{margin:0;background:var(--bg);color:var(--fg);font:400 var(--font)/1.55 'Inter',system-ui,Segoe UI,Roboto,Helvetica,Arial}
+  .wrap{max-width:var(--maxW);margin:28px auto;padding:0 14px}
+  h1{margin:0 0 6px;font-size:26px}
+  .sub{margin:0 0 16px;color:var(--muted)}
+  .grid{display:grid;grid-template-columns:320px 1fr;gap:16px}
   .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 10px 30px rgba(0,0,0,.35)}
-  .side{padding:14px}
-  .side h3{margin:0 0 10px;font-size:16px;color:var(--muted)}
-  .watch{display:flex;gap:8px;margin-top:8px}
-  input,select,button{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:#0d1528;color:var(--fg)}
-  button{background:var(--acc);color:#071122;font-weight:700;border:none;cursor:pointer}
-  button.ghost{background:transparent;border:1px solid var(--border);color:var(--fg)}
-  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-  .chip{display:flex;gap:8px;align-items:center;padding:6px 10px;border-radius:999px;background:var(--glass);border:1px solid var(--border);font-size:14px}
-  .chip button{padding:4px 8px;border-radius:8px}
-  .controls{padding:14px;display:grid;grid-template-columns: repeat(8, minmax(0,1fr));gap:12px;border-bottom:1px dashed var(--border)}
+  .sec{padding:14px 14px 2px;color:var(--muted);font-size:13px;border-bottom:1px dashed var(--border)}
+  .form{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px}
+  .form.full{grid-template-columns:1fr}
   label{font-size:12px;color:var(--muted)}
-  .kpi{display:flex;gap:12px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px dashed var(--border)}
-  .tag{padding:6px 10px;border-radius:10px;background:var(--glass);border:1px solid var(--border);font-size:14px}
-  .tag.good{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.08)}
+  input,select,button,textarea{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:#0d1528;color:var(--fg)}
+  textarea{min-height:64px;resize:vertical}
+  button{background:var(--acc);color:#071122;font-weight:700;border:none;cursor:pointer}
+  button.ghost{background:transparent;border:1px solid var(--border);color:#fff;font-weight:600}
+  .row{display:flex;gap:10px;align-items:center}
+  .kpis{display:flex;flex-wrap:wrap;gap:10px;padding:12px 14px;border-top:1px dashed var(--border)}
+  .tag{padding:6px 10px;border-radius:12px;background:var(--glass);border:1px solid var(--border);font-size:14px}
+  .tag.good{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.1)}
   .tag.bad{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.08)}
-  .tag.warn{border-color:rgba(245,158,11,.45);background:rgba(245,158,11,.09)}
-  .main{display:grid;grid-template-rows:auto 1fr}
-  .chart{padding:14px;height:520px}
-  .err{color:#ffb4b4;padding:10px 14px}
-  .footer{opacity:.65;text-align:center;margin-top:16px;font-size:14px}
-  table{width:100%;border-collapse:collapse;font-size:14px}
-  th,td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:right}
-  th:first-child,td:first-child{text-align:left}
-  .tableWrap{padding:0 14px 14px}
-  .box{padding:12px;border:1px dashed var(--border);border-radius:14px;background:rgba(255,255,255,.03)}
+  .list{padding:14px}
+  .sym{display:grid;grid-template-columns:110px repeat(7,1fr);gap:8px;align-items:center;padding:8px;border-bottom:1px solid var(--border);font-size:14px}
+  .sym .badge{font-size:12px;color:var(--muted)}
+  .sym .s{font-weight:700}
+  .status{padding:10px 14px;color:#ffb4b4}
+  .muted{color:var(--muted);font-size:13px}
+  .footer{opacity:.65;text-align:center;margin-top:16px;font-size:13px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>MEXC MAC — Moving Average Channel</h1>
+  <h1>Gate.io MAC Channel Bot</h1>
+  <div class="sub">Kanal içindeyken üst banda <b>LONG</b>, alt banda <b>SHORT</b> bekleyen emirleri saniyede 1 günceller; biri dolunca diğeri iptal + <b>karşı banttan trailing STOP</b>.</div>
+
   <div class="grid">
-    <!-- Sol Panel: Watchlist + Hızlı Emir -->
-    <div class="card side">
-      <h3>İzleme Listesi</h3>
-      <div class="watch">
-        <input id="symInput" placeholder="BTCUSDT" value="BTCUSDT" spellcheck="false"/>
-        <button id="addBtn">Ekle</button>
-      </div>
-      <div class="chips" id="chips"></div>
-
-      <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
-      <div class="box" style="display:grid;gap:10px">
-        <h3>Hızlı Emir (Spot)</h3>
-        <label>Sembol</label>
-        <input id="ordSymbol" value="BTCUSDT" />
-        <label>Yön</label>
-        <select id="ordSide"><option>BUY</option><option>SELL</option></select>
-        <label>Tip</label>
-        <select id="ordType"><option>MARKET</option><option>LIMIT</option></select>
-        <label>Miktar (quantity, base)</label>
-        <input id="ordQty" placeholder="örn. 0.001"/>
-        <label>Limit Fiyat (opsiyonel)</label>
-        <input id="ordPrice" placeholder="Sadece LIMIT için"/>
-        <label>Quote Tutar (ops.)</label>
-        <input id="ordQuote" placeholder="örn. 50 (quoteOrderQty)"/>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input id="ordDry" type="checkbox" checked/>
-          <span>Dry-run (anahtar yoksa otomatik simülasyon)</span>
+    <!-- Sol Panel: Ayarlar -->
+    <div class="card">
+      <div class="sec">Bağlantı & Güvenlik</div>
+      <div class="form">
+        <div><label>Proxy Base URL</label><input id="proxy" placeholder="http://localhost:8787"/></div>
+        <div><label>Piyasa</label>
+          <select id="market">
+            <option value="um" selected>USDT-M Perp</option>
+            <option value="cm">Coin-M Perp</option>
+          </select>
         </div>
-        <button id="ordSend">Emir Gönder</button>
-        <div id="ordMsg" class="err" style="display:none"></div>
+        <div><label>Gate API Key</label><input id="apiKey" placeholder="Kamu anahtar"/></div>
+        <div><label>Gate API Secret</label><input id="apiSecret" placeholder="GİZLİ anahtar" type="password"/></div>
       </div>
 
-      <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
-      <div style="display:grid;gap:10px">
-        <div>
-          <label>Oto Yenile (sn)</label>
-          <div style="display:flex;gap:8px">
-            <input id="autoint" type="number" min="2" value="5" />
-            <button class="ghost" id="autobtn">Başlat</button>
-          </div>
+      <div class="sec">Sinyal (MAC Kanal)</div>
+      <div class="form">
+        <div><label>Interval</label>
+          <select id="interval">
+            <option>1m</option><option selected>5m</option><option>15m</option><option>30m</option>
+            <option>60m</option><option>4h</option><option>1d</option>
+          </select>
         </div>
-        <button class="ghost" id="refresh">Manuel Yenile</button>
+        <div><label>Periyot (n)</label><input id="n" type="number" min="2" value="20"/></div>
+        <div><label>MA Tipi</label>
+          <select id="ma"><option>SMA</option><option>EMA</option></select>
+        </div>
+        <div><label>Kanal Modu</label>
+          <select id="mode"><option value="hl" selected>High/Low</option><option value="envelope">Envelope</option></select>
+        </div>
+        <div><label>Envelope % (0.01 = %1)</label><input id="envPct" type="number" step="0.001" value="0.01"/></div>
+        <div><label>Kline Limit</label><input id="limit" type="number" min="100" max="1000" value="500"/></div>
+      </div>
+
+      <div class="sec">Risk / Emir</div>
+      <div class="form">
+        <div><label>Kaldıraç (x)</label><input id="lev" type="number" min="1" value="10"/></div>
+        <div><label>Tutar (USDT)</label><input id="usd" type="number" min="5" value="50"/></div>
+        <div><label>Tick Güncelleme (sn)</label><input id="tick" type="number" min="1" value="1"/></div>
+        <div><label>Slip/Buffer (bps)</label><input id="bps" type="number" min="0" value="2"/></div>
+      </div>
+
+      <div class="sec">Semboller</div>
+      <div class="form full">
+        <div><label>Semboller (virgül ile):</label>
+          <input id="symbols" placeholder="BTC_USDT,ETH_USDT" value="BTC_USDT"/>
+        </div>
+        <div class="row" style="padding:0 14px 14px;">
+          <button id="start">START</button>
+          <button id="stop" class="ghost">STOP</button>
+          <span class="muted">Uyarı: API Secret tarayıcıda risklidir; test amaçlı kullanınız.</span>
+        </div>
+      </div>
+
+      <div class="sec">Firestore (opsiyonel log)</div>
+      <div class="form">
+        <div><label>Project ID</label><input id="fs_projectId" value="macbot-b7b45"/></div>
+        <div><label>API Key</label><input id="fs_apiKey" value="AIzaSyAh6JbnjsZtD-d0g3iSb2maSerPntUP6To"/></div>
+        <div><label>App ID</label><input id="fs_appId" value="1:88494187419:web:9e0fd1a37e51332203373e"/></div>
+        <div><label>Auth Domain</label><input id="fs_authDomain" value="macbot-b7b45.firebaseapp.com"/></div>
+        <div><label>Log Koleksiyonu</label><input id="fs_col" value="gate_mac_logs"/></div>
+        <div class="row"><button id="fs_init" class="ghost">Firestore Bağlan</button><span id="fs_stat" class="muted">Bağlı değil</span></div>
       </div>
     </div>
 
-    <!-- Sağ Panel: Parametreler + Grafik -->
-    <div class="card main">
-      <div class="controls">
-        <div>
-          <label>Aktif Sembol</label>
-          <input id="symbol" value="BTCUSDT" spellcheck="false"/>
-        </div>
-        <div>
-          <label>Interval</label>
-          <select id="interval"></select>
-        </div>
-        <div>
-          <label>Limit (mum)</label>
-          <input id="limit" type="number" min="50" max="1000" value="500"/>
-        </div>
-        <div>
-          <label>Periyot (n)</label>
-          <input id="period" type="number" min="2" max="500" value="20"/>
-        </div>
-        <div>
-          <label>MA Tipi</label>
-          <select id="ma">
-            <option value="sma">SMA</option>
-            <option value="ema">EMA</option>
-          </select>
-        </div>
-        <div>
-          <label>Kanal Modu</label>
-          <select id="mode">
-            <option value="hl">High/Low Kanal</option>
-            <option value="envelope">Envelope (±%)</option>
-          </select>
-        </div>
-        <div>
-          <label>Envelope % (0.01 = %1)</label>
-          <input id="env" type="number" step="0.001" value="0.01"/>
-        </div>
-        <div style="align-self:end">
-          <button id="go">Hesapla / Göster</button>
-        </div>
+    <!-- Sağ Panel: Durum -->
+    <div class="card">
+      <div class="sec">Durum</div>
+      <div class="kpis" id="kpis">
+        <div class="tag">Loop: <span id="loop" class="badge">STOPPED</span></div>
+        <div class="tag">Son tick: <span id="lastTick" class="badge">-</span></div>
+        <div class="tag">Hata: <span id="err" class="badge">-</span></div>
       </div>
-
-      <div class="kpi">
-        <div class="tag" id="meta"></div>
-        <div class="tag" id="lastclose"></div>
-        <div class="tag" id="signal"></div>
-        <div class="tag" id="inside"></div>
-        <div class="tag" id="since"></div>
-        <div class="tag warn">Not: Sinyal = close üst/alt banda göre LONG/SHORT/FLAT; İçerideyse "içeri girme süresi" hesaplanır.</div>
-      </div>
-
-      <div class="chart">
-        <div id="tvchart" style="width:100%;height:100%"></div>
-      </div>
-
-      <div class="tableWrap">
-        <table id="table">
-          <thead><tr><th>Zaman</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Upper</th><th>Mid</th><th>Lower</th></tr></thead>
-          <tbody></tbody>
-        </table>
-        <div id="error" class="err"></div>
-      </div>
+      <div class="sec">Semboller</div>
+      <div class="list" id="symList"></div>
+      <div class="status" id="status"></div>
     </div>
   </div>
 
-  <div class="footer">Veri: MEXC /api/v3/klines • Eğitim amaçlı örnektir, yatırım tavsiyesi değildir.</div>
+  <div class="footer">Bu araç eğitim amaçlıdır. Gerçek işlem yüksek risk taşır.</div>
 </div>
 
-<!-- Lightweight Charts -->
-<script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
-
-<!-- Firebase (modular SDK) -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-  // Kullanıcı config
-  const firebaseConfig = {
-    apiKey: "AIzaSyAh6JbnjsZtD-d0g3iSb2maSerPntUP6To",
-    authDomain: "macbot-b7b45.firebaseapp.com",
-    databaseURL: "https://macbot-b7b45-default-rtdb.firebaseio.com",
-    projectId: "macbot-b7b45",
-    storageBucket: "macbot-b7b45.firebasestorage.app",
-    messagingSenderId: "88494187419",
-    appId: "1:88494187419:web:9e0fd1a37e51332203373e",
-    measurementId: "G-SVG851WK7Y"
-  };
-  const appFB = initializeApp(firebaseConfig);
-  const db = getFirestore(appFB);
-
-  // global erişim
-  window.__firedb = db;
-  window.__fireAdd = (pathParts, data) => addDoc(collection(db, ...pathParts), data);
-  window.__serverTimestamp = serverTimestamp;
-</script>
+<!-- Firebase (Firestore) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 
 <script>
-const intervals = ["1m","5m","15m","30m","60m","4h","1d","1W","1M"];
-const selInterval = document.getElementById('interval');
-intervals.forEach(i => { const o = document.createElement('option'); o.value=i; o.textContent=i; selInterval.appendChild(o); });
-selInterval.value = "5m";
+/* ===================== Yardımcılar ===================== */
+const qs = id => document.getElementById(id);
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const nowMs = ()=> Date.now();
+const fmt = n => (n==null||isNaN(n))?'-':(+n).toLocaleString(undefined,{maximumFractionDigits:8});
+const bpsToMult = bps => 1 + (bps/10000);
 
-const qs  = id => document.getElementById(id);
-const num = v => (v==null || isNaN(v)) ? "" : (+v).toLocaleString(undefined,{maximumFractionDigits:8});
-const fmtTime = ms => new Date(ms).toLocaleString();
-const LS_KEY = 'mac_watchlist_v3';
-
-function getList(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)) || ["BTCUSDT","ETHUSDT","SOLUSDT"]; } catch{ return ["BTCUSDT","ETHUSDT","SOLUSDT"]; } }
-function setList(arr){ localStorage.setItem(LS_KEY, JSON.stringify([...new Set(arr.map(s=>s.toUpperCase()))])); }
-function renderChips(){
-  const chips = qs('chips'); chips.innerHTML='';
-  getList().forEach(sym=>{
-    const div = document.createElement('div'); div.className='chip';
-    const name = document.createElement('span'); name.textContent = sym;
-    const btnShow = document.createElement('button'); btnShow.className='ghost'; btnShow.textContent='Göster';
-    btnShow.onclick = ()=>{ qs('symbol').value = sym; loadMAC(); };
-    const btnDel = document.createElement('button'); btnDel.className='ghost'; btnDel.textContent='Sil';
-    btnDel.onclick = ()=>{ const arr = getList().filter(s=>s!==sym); setList(arr); renderChips(); };
-    div.appendChild(name); div.appendChild(btnShow); div.appendChild(btnDel);
-    chips.appendChild(div);
-  });
+/* Basit MA */
+function sma(arr, n){
+  const out = new Array(arr.length).fill(null);
+  let sum=0;
+  for(let i=0;i<arr.length;i++){
+    sum += arr[i];
+    if(i>=n) sum -= arr[i-n];
+    if(i>=n-1) out[i] = sum/n;
+  }
+  return out;
 }
-qs('addBtn').addEventListener('click', ()=>{
-  const v = qs('symInput').value.trim().toUpperCase();
-  if(!v) return; const arr = getList(); arr.push(v); setList(arr); renderChips();
-});
-renderChips();
+function ema(arr, n){
+  const out = new Array(arr.length).fill(null);
+  const k = 2/(n+1);
+  let e = null;
+  for(let i=0;i<arr.length;i++){
+    const v = arr[i];
+    if(i<n-1){ out[i]=null; e = (e==null? v : (e*(i)+v)/(i+1)); continue; }
+    if(out[i-1]==null) e = arr.slice(0,n).reduce((a,b)=>a+b,0)/n;
+    e = (v - e)*k + e;
+    out[i]=e;
+  }
+  return out;
+}
+function movingAverage(arr, n, kind){ return (kind==='EMA')?ema(arr,n):sma(arr,n); }
 
-// Chart init
-let chart, candleSeries, uLine, mLine, lLine;
-function ensureChart(){
-  const el = qs('tvchart');
-  el.innerHTML = '';
-  chart = LightweightCharts.createChart(el, {
-    layout: { background: { type: 'solid', color: '#0b0f19' }, textColor: '#c7d2fe' },
-    rightPriceScale: { borderColor: '#1b2a4a' },
-    timeScale: { borderColor: '#1b2a4a', timeVisible: true, secondsVisible: false },
-    grid: { vertLines: { color: '#132035' }, horzLines: { color: '#132035' } }
-  });
-  candleSeries = chart.addCandlestickSeries({ upColor:'#22c55e', downColor:'#ef4444', borderUpColor:'#22c55e', borderDownColor:'#ef4444', wickUpColor:'#22c55e', wickDownColor:'#ef4444' });
-  uLine = chart.addLineSeries({ color:'#60a5fa', lineWidth:1.8 });
-  mLine = chart.addLineSeries({ color:'#f59e0b', lineWidth:1.4, lineStyle:1 });
-  lLine = chart.addLineSeries({ color:'#60a5fa', lineWidth:1.8 });
+/* MAC hesapla */
+function macFromKlines(klines, n, kind, mode, envPct){
+  const highs = klines.map(k=>k.h), lows = klines.map(k=>k.l), closes = klines.map(k=>k.c);
+  let upper, lower, mid;
+  if(mode==='envelope'){
+    mid = movingAverage(closes, n, kind);
+    upper = mid.map(x => x==null?null:x*(1+envPct));
+    lower = mid.map(x => x==null?null:x*(1-envPct));
+  }else{
+    upper = movingAverage(highs, n, kind);
+    lower = movingAverage(lows,  n, kind);
+    mid = upper.map((u,i)=> (u==null||lower[i]==null)?null:(u+lower[i])/2);
+  }
+  const c = closes[closes.length-1];
+  const u = upper[upper.length-1], l = lower[lower.length-1];
+  const inside = (u!=null && l!=null) ? (l<=c && c<=u) : null;
+  let pos = 'UNKNOWN';
+  if(u!=null && l!=null){
+    pos = (c>u)?'ABOVE':(c<l?'BELOW':'INSIDE');
+  }
+  // kesişim (son 2 bar)
+  let crossUp=false, crossDown=false;
+  if(upper.length>=2 && upper[upper.length-2]!=null && lower[lower.length-2]!=null){
+    const pc = closes[closes.length-2], pu = upper[upper.length-2], pl = lower[lower.length-2];
+    if(pc<=pu && c>u) crossUp=true;
+    if(pc>=pl && c<l) crossDown=true;
+  }
+  return {upper,mid,lower, c, u, l, inside, pos, crossUp, crossDown};
 }
 
-// Firestore helpers
-async function logToFirestore(meta, data){
+/* ===================== Firestore ===================== */
+let FS=null;
+async function fsInit(){
   try{
-    if(!window.__fireAdd) return;
-    const path = ['mac_logs', `${meta.symbol}_${meta.interval}`, 'events'];
-    const payload = {
-      ts: window.__serverTimestamp ? window.__serverTimestamp() : null,
-      symbol: meta.symbol, interval: meta.interval,
-      period: meta.period, ma: meta.ma, mode: meta.mode, envelope_pct: meta.envelope_pct,
-      candle_time: data.times_ms?.length ? data.times_ms[data.times_ms.length-1] : null,
-      last_close: data.last_close,
-      upper_last: data.upper_last, mid_last: data.mid_last, lower_last: data.lower_last,
-      signal: data.last_signal,
-      inside_now: data.inside_now,
-      last_enter_time: data.last_enter_time,
-      since_enter_sec: data.since_enter_sec
+    const cfg = {
+      apiKey: qs('fs_apiKey').value.trim(),
+      authDomain: qs('fs_authDomain').value.trim(),
+      projectId: qs('fs_projectId').value.trim(),
+      appId: qs('fs_appId').value.trim()
     };
-    await window.__fireAdd(path, payload);
-  }catch(e){ console.warn('Firestore yazma hatası:', e?.message || e); }
+    const app = firebase.initializeApp(cfg, 'gate-mac-bot-'+Math.random());
+    FS = firebase.firestore(app);
+    qs('fs_stat').textContent = 'Bağlı';
+  }catch(e){
+    qs('fs_stat').textContent = 'Hata: '+e.message;
+  }
 }
-async function logOrderToFirestore(obj){
+async function fsLog(symbol, payload){
+  if(!FS) return;
   try{
-    if(!window.__fireAdd) return;
-    const path = ['mac_orders', 'events', 'logs']; // düz koleksiyon altı path segmentleri
-    await window.__fireAdd(path, {
-      ts: window.__serverTimestamp ? window.__serverTimestamp() : null,
-      ...obj
-    });
-  }catch(e){ console.warn('Firestore order log hatası:', e?.message || e); }
-}
-
-// Tablo
-function fillTable(meta, data){
-  const tb = document.querySelector('#table tbody');
-  tb.innerHTML = '';
-  const n = data.ohlc.length;
-  const from = Math.max(0, n - 80);
-  // MAC noktalarını hızlı erişim için map’e al
-  const mapU = new Map(data.upper_points.map(p=>[p.time,p.value]));
-  const mapM = new Map(data.mid_points.map(p=>[p.time,p.value]));
-  const mapL = new Map(data.lower_points.map(p=>[p.time,p.value]));
-  for(let i=n-1; i>=from; i--){
-    const row = data.ohlc[i];
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${new Date(row.time*1000).toLocaleString()}</td>
-                    <td>${num(row.open)}</td>
-                    <td>${num(row.high)}</td>
-                    <td>${num(row.low)}</td>
-                    <td>${num(row.close)}</td>
-                    <td>${num(mapU.get(row.time))}</td>
-                    <td>${num(mapM.get(row.time))}</td>
-                    <td>${num(mapL.get(row.time))}</td>`;
-    tb.appendChild(tr);
+    const colName = qs('fs_col').value.trim() || 'gate_mac_logs';
+    await FS.collection(colName).add({ symbol, ts_ms: nowMs(), ...payload });
+  }catch(e){
+    qs('status').textContent = 'Firestore yazım hatası: '+e.message;
   }
 }
 
-// Yükleme
-async function loadMAC(){
-  const symbol = qs('symbol').value.trim().toUpperCase();
+/* ===================== Proxy API ===================== */
+async function proxyCall(path, body){
+  const base = qs('proxy').value.trim();
+  if(!base) throw new Error('Proxy Base URL boş');
+  const url = base.replace(/\/+$/,'') + path;
+  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const j = await r.json().catch(()=>({ok:false,error:'invalid json'}));
+  if(!r.ok || j.ok===false) throw new Error(j.error || r.status+' '+r.statusText);
+  return j;
+}
+
+/* ===================== Bot Döngüsü ===================== */
+let looping = false;
+const state = {}; // symbol -> durum
+
+function uiSetErr(msg){ qs('err').textContent = msg || '-'; }
+function uiSetTick(){ qs('lastTick').textContent = new Date().toLocaleTimeString(); }
+function renderSymRows(){
+  const list = qs('symList'); list.innerHTML = '';
+  Object.keys(state).forEach(sym=>{
+    const s = state[sym] || {};
+    const el = document.createElement('div'); el.className='sym';
+    el.innerHTML = `
+      <div class="s">${sym}</div>
+      <div><span class="badge">Fiyat</span><div>${fmt(s.price)}</div></div>
+      <div><span class="badge">U</span><div>${fmt(s.u)}</div></div>
+      <div><span class="badge">M</span><div>${fmt(s.m)}</div></div>
+      <div><span class="badge">L</span><div>${fmt(s.l)}</div></div>
+      <div><span class="badge">Poz</span><div>${s.position||'-'}</div></div>
+      <div><span class="badge">Çalışan</span><div>${s.working||'-'}</div></div>
+      <div><span class="badge">Stop</span><div>${fmt(s.stopPrice)}</div></div>
+    `;
+    list.appendChild(el);
+  });
+}
+
+async function cancelIfExists(apiKey, apiSecret, market, sym, orderId){
+  if(!orderId) return;
+  try{
+    await proxyCall('/gate/cancelOrder', { apiKey, apiSecret, market, orderId });
+  }catch(e){
+    // price_order vs normal ayrımında biri tutmayabilir; proxy zaten fallback yapıyor.
+  }
+}
+
+async function tickSymbol(sym){
+  const apiKey = qs('apiKey').value.trim();
+  const apiSecret = qs('apiSecret').value.trim();
+  const market = qs('market').value;
   const interval = qs('interval').value;
-  const limit = +qs('limit').value;
-  const n = +qs('period').value;
+  const limit = +qs('limit').value || 500;
+  const n = +qs('n').value || 20;
   const ma = qs('ma').value;
   const mode = qs('mode').value;
-  const env = +qs('env').value;
+  const envPct = +qs('envPct').value || 0.01;
+  const lev = +qs('lev').value || 10;
+  const usd = +qs('usd').value || 50;
+  const bps = +qs('bps').value || 0;
 
-  const url = new URL(location.origin + '/api/mac');
-  url.searchParams.set('symbol', symbol);
-  url.searchParams.set('interval', interval);
-  url.searchParams.set('limit', limit);
-  url.searchParams.set('n', n);
-  url.searchParams.set('ma', ma);
-  url.searchParams.set('mode', mode);
-  url.searchParams.set('envelope_pct', env);
+  // 1) Kline çek (contract!)
+  const K = await proxyCall('/gate/klines', { market, contract: sym, interval, limit });
+  const klines = K.data;
+  if(!klines || klines.length===0) throw new Error('Kline yok');
+  const mac = macFromKlines(klines, n, ma, mode, envPct);
+  const last = klines[klines.length-1];
+  const price = +last.c;
 
-  qs('error').textContent = '';
-  try{
-    const r = await fetch(url);
-    const j = await r.json();
-    if(!j.ok) throw new Error(j.error || 'Bilinmeyen hata');
+  // 2) State
+  if(!state[sym]) state[sym] = {position:'NONE', working:'-', stopPrice:null, orderLong:null, orderShort:null, entry:null, stopId:null};
+  const S = state[sym];
+  S.price = price; S.u=mac.u; S.m=mac.mid?.[mac.mid.length-1]??null; S.l=mac.l;
 
-    const {meta, data} = j;
+  // Miktar: USDT / price (short için negatif göndereceğiz)
+  const sizeAbs = Math.max(0.0001, usd / price);
 
-    // KPI
-    qs('meta').textContent =
-      `${meta.symbol} • ${meta.interval} • n=${meta.period} • ${meta.ma.toUpperCase()} • ${meta.mode}${meta.mode==='envelope' ? ' ±'+(meta.envelope_pct*100).toFixed(2)+'%' : ''}`;
-    qs('lastclose').textContent = `Close: ${num(data.last_close)}`;
-    const sig = qs('signal');
-    sig.textContent = `Sinyal: ${data.last_signal}`;
-    sig.className = 'tag ' + (data.last_signal==='LONG' ? 'good' : data.last_signal==='SHORT' ? 'bad' : '');
-    const ins = qs('inside');
-    ins.textContent = `Kanal: ${data.inside_now===null ? '-' : (data.inside_now ? 'İÇERİDE' : 'DIŞARIDA')}`;
-    ins.className = 'tag ' + (data.inside_now ? 'good' : 'bad');
-    qs('since').textContent = `İçeri girdikten sonra: ${data.since_enter_sec==null ? '-' : (data.since_enter_sec+' sn')}`;
+  // 3) Kanal içi: bekleyen çift emirler; kanal dışına çıkınca iptal
+  if(mac.inside){
+    const longPx  = +(mac.u * bpsToMult(+bps)).toFixed(8);
+    const shortPx = +(mac.l / bpsToMult(+bps)).toFixed(8);
 
-    // Chart
-    ensureChart();
-    candleSeries.setData(data.ohlc);
-    uLine.setData(data.upper_points);
-    mLine.setData(data.mid_points);
-    lLine.setData(data.lower_points);
-    chart.timeScale().fitContent();
+    // LONG bekleyen (size > 0)
+    if(!S.orderLong || Math.abs(S.orderLong.price - longPx) / longPx > 0.0001){
+      await cancelIfExists(apiKey, apiSecret, market, sym, S.orderLong?.id);
+      const pl = await proxyCall('/gate/placeOrder', {
+        apiKey, apiSecret, market, contract: sym, side:'buy',
+        price: longPx, size: +sizeAbs, leverage: lev,
+        type:'limit', reduceOnly:false, tif:'gtc'
+      });
+      S.orderLong = { id: pl.data?.id, price: longPx };
+    }
 
-    // Tablo
-    fillTable(meta, data);
-
-    // Firestore log
-    await logToFirestore(meta, data);
-
-  }catch(err){
-    qs('error').textContent = 'Hata: ' + err.message;
+    // SHORT bekleyen (size < 0)
+    if(!S.orderShort || Math.abs(S.orderShort.price - shortPx) / shortPx > 0.0001){
+      await cancelIfExists(apiKey, apiSecret, market, sym, S.orderShort?.id);
+      const ps = await proxyCall('/gate/placeOrder', {
+        apiKey, apiSecret, market, contract: sym, side:'sell',
+        price: shortPx, size: -sizeAbs, leverage: lev,
+        type:'limit', reduceOnly:false, tif:'gtc'
+      });
+      S.orderShort = { id: ps.data?.id, price: shortPx };
+    }
+    S.working = `L@${S.orderLong?.price ?? '-'} / S@${S.orderShort?.price ?? '-'}`;
+  }else{
+    // Kanal dışı → bekleyenler iptal
+    if(S.orderLong?.id){ await cancelIfExists(apiKey, apiSecret, market, sym, S.orderLong.id); S.orderLong=null; }
+    if(S.orderShort?.id){ await cancelIfExists(apiKey, apiSecret, market, sym, S.orderShort.id); S.orderShort=null; }
+    S.working = '-';
   }
+
+  // 4) Basit dolum tetik (gerçekte openOrders/positions ile teyit et)
+  if(S.orderLong && price >= S.orderLong.price){
+    // LONG fill → other cancel + stop (lower band)
+    if(S.orderShort?.id){ await cancelIfExists(apiKey, apiSecret, market, sym, S.orderShort.id); S.orderShort=null; }
+    S.position = 'LONG'; S.entry = S.orderLong.price; S.orderLong=null; S.working='-';
+    const stopPx = mac.l;
+    if(stopPx){
+      const st = await proxyCall('/gate/placeOrder', {
+        apiKey, apiSecret, market, contract: sym, side:'sell',
+        price: stopPx, size: +sizeAbs, leverage: lev,
+        type:'stop', stopPrice: stopPx, stopType:'down', reduceOnly:true, tif:'gtc'
+      });
+      S.stopId = st.data?.id; S.stopPrice = stopPx;
+    }
+  } else if(S.orderShort && price <= S.orderShort.price){
+    // SHORT fill → other cancel + stop (upper band)
+    if(S.orderLong?.id){ await cancelIfExists(apiKey, apiSecret, market, sym, S.orderLong.id); S.orderLong=null; }
+    S.position = 'SHORT'; S.entry = S.orderShort.price; S.orderShort=null; S.working='-';
+    const stopPx = mac.u;
+    if(stopPx){
+      const st = await proxyCall('/gate/placeOrder', {
+        apiKey, apiSecret, market, contract: sym, side:'buy',
+        price: stopPx, size: -sizeAbs, leverage: lev,
+        type:'stop', stopPrice: stopPx, stopType:'up', reduceOnly:true, tif:'gtc'
+      });
+      S.stopId = st.data?.id; S.stopPrice = stopPx;
+    }
+  }
+
+  // 5) Trailing stop (karşı bant değişirse)
+  if(S.position==='LONG' && S.stopId && mac.l && Math.abs(mac.l - (S.stopPrice||0))/(S.stopPrice||1) > 0.0005){
+    await cancelIfExists(apiKey, apiSecret, market, sym, S.stopId);
+    const st2 = await proxyCall('/gate/placeOrder', {
+      apiKey, apiSecret, market, contract: sym, side:'sell',
+      price: mac.l, size: +sizeAbs, leverage: lev,
+      type:'stop', stopPrice: mac.l, stopType:'down', reduceOnly:true, tif:'gtc'
+    });
+    S.stopId = st2.data?.id; S.stopPrice = mac.l;
+  }
+  if(S.position==='SHORT' && S.stopId && mac.u && Math.abs(mac.u - (S.stopPrice||0))/(S.stopPrice||1) > 0.0005){
+    await cancelIfExists(apiKey, apiSecret, market, sym, S.stopId);
+    const st2 = await proxyCall('/gate/placeOrder', {
+      apiKey, apiSecret, market, contract: sym, side:'buy',
+      price: mac.u, size: -sizeAbs, leverage: lev,
+      type:'stop', stopPrice: mac.u, stopType:'up', reduceOnly:true, tif:'gtc'
+    });
+    S.stopId = st2.data?.id; S.stopPrice = mac.u;
+  }
+
+  // 6) Firestore log (opsiyonel)
+  await fsLog(sym, {
+    interval, n, ma_type:ma, mode, envelope_pct:+envPct,
+    close:price, upper:mac.u, mid:mac.mid?.[mac.mid.length-1]??null, lower:mac.l,
+    in_channel: mac.inside, position: mac.pos
+  });
+
+  renderSymRows();
 }
 
-// Hızlı Emir UI
-qs('ordSend').addEventListener('click', async ()=>{
-  const payload = {
-    symbol: qs('ordSymbol').value.trim().toUpperCase() || qs('symbol').value.trim().toUpperCase(),
-    side: qs('ordSide').value,
-    type: qs('ordType').value,
-    quantity: qs('ordQty').value || null,
-    price: qs('ordPrice').value || null,
-    quoteOrderQty: qs('ordQuote').value || null,
-    dryRun: qs('ordDry').checked
-  };
-  const box = qs('ordMsg');
-  box.style.display = 'none'; box.textContent = '';
-  try{
-    const r = await fetch('/api/order', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-    const j = await r.json();
-    if(!j.ok){ throw new Error(j.error || (j.mexc && JSON.stringify(j.mexc)) || 'Emir hata'); }
-    // Firestore’a da yaz
-    await logOrderToFirestore({ req: payload, res: j, ok: true });
-    box.style.display = 'block';
-    box.style.color = '#c7f9cc';
-    box.textContent = j.dry_run ? 'Dry-run: Emir simüle edildi.' : 'Emir gönderildi.';
-  }catch(e){
-    await logOrderToFirestore({ req: payload, ok: false, err: String(e) });
-    box.style.display = 'block';
-    box.style.color = '#ffb4b4';
-    box.textContent = 'Emir gönderme hatası: ' + (e.message || e);
-  }
-});
+async function loop(){
+  if(looping) return;
+  looping = true;
+  qs('loop').textContent = 'RUNNING';
+  uiSetErr('-');
 
-// Auto refresh
-let timer = null;
-qs('autobtn').addEventListener('click', ()=>{
-  if(timer){ clearInterval(timer); timer=null; qs('autobtn').textContent='Başlat'; }
-  else{
-    const sec = Math.max(2, +qs('autoint').value || 5);
-    timer = setInterval(loadMAC, sec*1000);
-    qs('autobtn').textContent='Durdur';
-  }
-});
-qs('refresh').addEventListener('click', loadMAC);
-qs('go').addEventListener('click', loadMAC);
-window.addEventListener('load', loadMAC);
+  const syms = qs('symbols').value.split(',').map(s=>s.trim()).filter(Boolean);
+  syms.forEach(s=>{ if(!state[s]) state[s] = {}; });
+  renderSymRows();
 
-// Interval seçeneklerini doldur
-const sel = document.getElementById('interval');
-sel.innerHTML = '';
-intervals.forEach(i=>{ const o=document.createElement('option'); o.value=i; o.textContent=i; sel.appendChild(o); });
-sel.value='5m';
+  const tickSec = Math.max(1, +qs('tick').value || 1);
+  while(looping){
+    try{
+      for(const sym of syms){ await tickSymbol(sym); }
+      uiSetTick();
+      await sleep(tickSec*1000);
+    }catch(e){
+      uiSetErr(e.message||String(e));
+      await sleep(1000);
+    }
+  }
+  qs('loop').textContent = 'STOPPED';
+}
+function stopLoop(){ looping=false; }
+
+/* ===================== Events ===================== */
+qs('start').addEventListener('click', loop);
+qs('stop').addEventListener('click', stopLoop);
+qs('fs_init').addEventListener('click', fsInit);
 </script>
 </body>
 </html>
-"""
-
-if __name__ == "__main__":
-    # Yerel ağdan erişmek istersen host="0.0.0.0" yapabilirsin.
-    app.run(host="127.0.0.1", port=5000, debug=True, threaded=True)
