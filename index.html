@@ -3,37 +3,37 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Gate.io MAC Channel Bot — Single File (Proxy Uyumlu)</title>
+<title>Firestore ▶ Gate.io MAC Channel Bot</title>
 <link rel="icon" href="data:;base64,=">
 <style>
   :root{
     --bg:#0b0f19; --fg:#e8eef7; --muted:#9fb0c9;
     --panel:#0f162a; --panel2:#101a32; --glass:rgba(255,255,255,.06);
     --border:#1b2a4a; --acc:#60a5fa; --good:#22c55e; --bad:#ef4444; --warn:#f59e0b;
-    --radius:18px; --gap:14px; --font:16px; --maxW:1200px;
+    --radius:18px; --gap:14px; --font:16px; --maxW:1280px;
   }
   *{box-sizing:border-box} html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--fg);font:400 var(--font)/1.55 'Inter',system-ui,Segoe UI,Roboto,Helvetica,Arial}
   .wrap{max-width:var(--maxW);margin:28px auto;padding:0 14px}
   h1{margin:0 0 6px;font-size:26px}
   .sub{margin:0 0 16px;color:var(--muted)}
-  .grid{display:grid;grid-template-columns:320px 1fr;gap:16px}
+  .grid{display:grid;grid-template-columns:360px 1fr;gap:16px}
   .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 10px 30px rgba(0,0,0,.35)}
   .sec{padding:14px 14px 2px;color:var(--muted);font-size:13px;border-bottom:1px dashed var(--border)}
   .form{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px}
   .form.full{grid-template-columns:1fr}
   label{font-size:12px;color:var(--muted)}
-  input,select,button,textarea{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:#0d1528;color:var(--fg)}
+  input,select,button,textarea{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:#0d1528;color:#e8eef7}
   textarea{min-height:64px;resize:vertical}
   button{background:var(--acc);color:#071122;font-weight:700;border:none;cursor:pointer}
-  button.ghost{background:transparent;border:1px solid var(--border);color:#fff;font-weight:600}
+  button.ghost{background:transparent;border:1px solid var(--border);color:#e8eef7;font-weight:600}
   .row{display:flex;gap:10px;align-items:center}
   .kpis{display:flex;flex-wrap:wrap;gap:10px;padding:12px 14px;border-top:1px dashed var(--border)}
   .tag{padding:6px 10px;border-radius:12px;background:var(--glass);border:1px solid var(--border);font-size:14px}
   .tag.good{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.1)}
   .tag.bad{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.08)}
   .list{padding:14px}
-  .sym{display:grid;grid-template-columns:110px repeat(7,1fr);gap:8px;align-items:center;padding:8px;border-bottom:1px solid var(--border);font-size:14px}
+  .sym{display:grid;grid-template-columns:110px repeat(8,1fr);gap:8px;align-items:center;padding:8px;border-bottom:1px solid var(--border);font-size:14px}
   .sym .badge{font-size:12px;color:var(--muted)}
   .sym .s{font-weight:700}
   .status{padding:10px 14px;color:#ffb4b4}
@@ -43,81 +43,65 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Gate.io MAC Channel Bot</h1>
-  <div class="sub">Kanal içindeyken üst banda <b>LONG</b>, alt banda <b>SHORT</b> bekleyen emirleri saniyede 1 günceller; biri dolunca diğeri iptal + <b>karşı banttan trailing STOP</b>.</div>
+  <h1>Firestore ▶ Gate.io MAC Channel Bot</h1>
+  <div class="sub">Firestore’daki MAC kanal verilerine göre: kanal içindeyken üst banda <b>LONG</b>, alt banda <b>SHORT</b> emirleri 3 sn’de bir günceller; biri dolunca diğeri iptal + <b>karşı banttan trailing STOP</b>.</div>
 
   <div class="grid">
-    <!-- Sol Panel: Ayarlar -->
+    <!-- Sol Panel -->
     <div class="card">
-      <div class="sec">Bağlantı & Güvenlik</div>
+      <div class="sec">Proxy & Gate API</div>
       <div class="form">
         <div><label>Proxy Base URL</label><input id="proxy" placeholder="http://localhost:8787"/></div>
         <div><label>Piyasa</label>
-          <select id="market">
-            <option value="um" selected>USDT-M Perp</option>
-            <option value="cm">Coin-M Perp</option>
-          </select>
+          <select id="market"><option value="um" selected>USDT-M Perp</option><option value="cm">Coin-M Perp</option></select>
         </div>
         <div><label>Gate API Key</label><input id="apiKey" placeholder="Kamu anahtar"/></div>
         <div><label>Gate API Secret</label><input id="apiSecret" placeholder="GİZLİ anahtar" type="password"/></div>
       </div>
 
-      <div class="sec">Sinyal (MAC Kanal)</div>
-      <div class="form">
-        <div><label>Interval</label>
-          <select id="interval">
-            <option>1m</option><option selected>5m</option><option>15m</option><option>30m</option>
-            <option>60m</option><option>4h</option><option>1d</option>
-          </select>
-        </div>
-        <div><label>Periyot (n)</label><input id="n" type="number" min="2" value="20"/></div>
-        <div><label>MA Tipi</label>
-          <select id="ma"><option>SMA</option><option>EMA</option></select>
-        </div>
-        <div><label>Kanal Modu</label>
-          <select id="mode"><option value="hl" selected>High/Low</option><option value="envelope">Envelope</option></select>
-        </div>
-        <div><label>Envelope % (0.01 = %1)</label><input id="envPct" type="number" step="0.001" value="0.01"/></div>
-        <div><label>Kline Limit</label><input id="limit" type="number" min="100" max="1000" value="500"/></div>
-      </div>
-
-      <div class="sec">Risk / Emir</div>
-      <div class="form">
-        <div><label>Kaldıraç (x)</label><input id="lev" type="number" min="1" value="10"/></div>
-        <div><label>Tutar (USDT)</label><input id="usd" type="number" min="5" value="50"/></div>
-        <div><label>Tick Güncelleme (sn)</label><input id="tick" type="number" min="1" value="1"/></div>
-        <div><label>Slip/Buffer (bps)</label><input id="bps" type="number" min="0" value="2"/></div>
-      </div>
-
-      <div class="sec">Semboller</div>
-      <div class="form full">
-        <div><label>Semboller (virgül ile):</label>
-          <input id="symbols" placeholder="BTC_USDT,ETH_USDT" value="BTC_USDT"/>
-        </div>
-        <div class="row" style="padding:0 14px 14px;">
-          <button id="start">START</button>
-          <button id="stop" class="ghost">STOP</button>
-          <span class="muted">Uyarı: API Secret tarayıcıda risklidir; test amaçlı kullanınız.</span>
-        </div>
-      </div>
-
-      <div class="sec">Firestore (opsiyonel log)</div>
+      <div class="sec">Firestore Sinyal Kaynağı</div>
       <div class="form">
         <div><label>Project ID</label><input id="fs_projectId" value="macbot-b7b45"/></div>
         <div><label>API Key</label><input id="fs_apiKey" value="AIzaSyAh6JbnjsZtD-d0g3iSb2maSerPntUP6To"/></div>
         <div><label>App ID</label><input id="fs_appId" value="1:88494187419:web:9e0fd1a37e51332203373e"/></div>
         <div><label>Auth Domain</label><input id="fs_authDomain" value="macbot-b7b45.firebaseapp.com"/></div>
-        <div><label>Log Koleksiyonu</label><input id="fs_col" value="gate_mac_logs"/></div>
-        <div class="row"><button id="fs_init" class="ghost">Firestore Bağlan</button><span id="fs_stat" class="muted">Bağlı değil</span></div>
+        <div class="form full" style="padding-top:0">
+          <div><label>Collection adı</label><input id="fs_col" value="gate_mac_logs"/></div>
+          <div class="row">
+            <button id="fs_init" class="ghost">Firestore Bağlan</button>
+            <span id="fs_stat" class="muted">Bağlı değil</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">Sinyal → Emir Parametreleri</div>
+      <div class="form">
+        <div><label>Semboller (Gate kontrat formatı)</label><input id="symbols" value="BTC_USDT"/></div>
+        <div><label>FS Sembol Formatı</label>
+          <select id="fs_sym_fmt"><option value="auto" selected>Auto (BTC_USDT → BTCUSDT)</option><option value="same">Aynı</option></select>
+        </div>
+        <div><label>Kaldıraç (x)</label><input id="lev" type="number" min="1" value="10"/></div>
+        <div><label>Tutar (USDT)</label><input id="usd" type="number" min="5" value="50"/></div>
+        <div><label>Buffer (bps)</label><input id="bps" type="number" min="0" value="3"/></div>
+        <div><label>Tick (sn)</label><input id="tick" type="number" min="1" value="3"/></div>
+      </div>
+
+      <div class="form full">
+        <div class="row" style="padding:0 14px 14px;">
+          <button id="start">START</button>
+          <button id="stop" class="ghost">STOP</button>
+          <span class="muted">Uyarı: API Secret’ı tarayıcıda kullanmak risklidir—sadece yerel testte.</span>
+        </div>
       </div>
     </div>
 
-    <!-- Sağ Panel: Durum -->
+    <!-- Sağ Panel -->
     <div class="card">
       <div class="sec">Durum</div>
-      <div class="kpis" id="kpis">
+      <div class="kpis">
         <div class="tag">Loop: <span id="loop" class="badge">STOPPED</span></div>
         <div class="tag">Son tick: <span id="lastTick" class="badge">-</span></div>
+        <div class="tag">FS: <span id="fsBadge" class="badge">disconnected</span></div>
         <div class="tag">Hata: <span id="err" class="badge">-</span></div>
       </div>
       <div class="sec">Semboller</div>
@@ -126,200 +110,185 @@
     </div>
   </div>
 
-  <div class="footer">Bu araç eğitim amaçlıdır. Gerçek işlem yüksek risk taşır.</div>
+  <div class="footer">Eğitim amaçlıdır. Gerçek işlem yüksek risk taşır; sorumluluk size aittir.</div>
 </div>
 
-<!-- Firebase (Firestore) -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 
 <script>
-/* ===================== Yardımcılar ===================== */
+/* ============ Yardımcılar ============ */
 const qs = id => document.getElementById(id);
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 const nowMs = ()=> Date.now();
 const fmt = n => (n==null||isNaN(n))?'-':(+n).toLocaleString(undefined,{maximumFractionDigits:8});
 const bpsToMult = bps => 1 + (bps/10000);
+const toFsSymbol = (gateContract, fmtMode='auto')=>{
+  if(fmtMode==='same') return gateContract;
+  // "BTC_USDT" -> "BTCUSDT"
+  return (gateContract||'').toUpperCase().replace('_','');
+};
+const toGateContract = (symLike)=>{
+  if(!symLike) return symLike;
+  if(symLike.includes('_')) return symLike.toUpperCase();
+  if(symLike.toUpperCase().endsWith('USDT')){
+    const base = symLike.slice(0, -4);
+    return `${base.toUpperCase()}_USDT`;
+  }
+  return symLike.toUpperCase();
+};
 
-/* Basit MA */
-function sma(arr, n){
-  const out = new Array(arr.length).fill(null);
-  let sum=0;
-  for(let i=0;i<arr.length;i++){
-    sum += arr[i];
-    if(i>=n) sum -= arr[i-n];
-    if(i>=n-1) out[i] = sum/n;
-  }
-  return out;
-}
-function ema(arr, n){
-  const out = new Array(arr.length).fill(null);
-  const k = 2/(n+1);
-  let e = null;
-  for(let i=0;i<arr.length;i++){
-    const v = arr[i];
-    if(i<n-1){ out[i]=null; e = (e==null? v : (e*(i)+v)/(i+1)); continue; }
-    if(out[i-1]==null) e = arr.slice(0,n).reduce((a,b)=>a+b,0)/n;
-    e = (v - e)*k + e;
-    out[i]=e;
-  }
-  return out;
-}
-function movingAverage(arr, n, kind){ return (kind==='EMA')?ema(arr,n):sma(arr,n); }
+/* ============ Firestore ============ */
+let FS=null;                 // firestore instance
+let FS_OK=false;             // bağlandı mı
+let SNAP_MODE='listen';      // 'listen' ya da 'poll'
+const signals = {};          // symbol -> {ts_ms, close, upper, lower, mid, in_channel, ...}
 
-/* MAC hesapla */
-function macFromKlines(klines, n, kind, mode, envPct){
-  const highs = klines.map(k=>k.h), lows = klines.map(k=>k.l), closes = klines.map(k=>k.c);
-  let upper, lower, mid;
-  if(mode==='envelope'){
-    mid = movingAverage(closes, n, kind);
-    upper = mid.map(x => x==null?null:x*(1+envPct));
-    lower = mid.map(x => x==null?null:x*(1-envPct));
-  }else{
-    upper = movingAverage(highs, n, kind);
-    lower = movingAverage(lows,  n, kind);
-    mid = upper.map((u,i)=> (u==null||lower[i]==null)?null:(u+lower[i])/2);
-  }
-  const c = closes[closes.length-1];
-  const u = upper[upper.length-1], l = lower[lower.length-1];
-  const inside = (u!=null && l!=null) ? (l<=c && c<=u) : null;
-  let pos = 'UNKNOWN';
-  if(u!=null && l!=null){
-    pos = (c>u)?'ABOVE':(c<l?'BELOW':'INSIDE');
-  }
-  // kesişim (son 2 bar)
-  let crossUp=false, crossDown=false;
-  if(upper.length>=2 && upper[upper.length-2]!=null && lower[lower.length-2]!=null){
-    const pc = closes[closes.length-2], pu = upper[upper.length-2], pl = lower[lower.length-2];
-    if(pc<=pu && c>u) crossUp=true;
-    if(pc>=pl && c<l) crossDown=true;
-  }
-  return {upper,mid,lower, c, u, l, inside, pos, crossUp, crossDown};
-}
-
-/* ===================== Firestore ===================== */
-let FS=null;
 async function fsInit(){
   try{
-    const cfg = {
-      apiKey: qs('fs_apiKey').value.trim(),
-      authDomain: qs('fs_authDomain').value.trim(),
-      projectId: qs('fs_projectId').value.trim(),
-      appId: qs('fs_appId').value.trim()
-    };
-    const app = firebase.initializeApp(cfg, 'gate-mac-bot-'+Math.random());
+    const cfg = { apiKey:qs('fs_apiKey').value.trim(), authDomain:qs('fs_authDomain').value.trim(),
+                  projectId:qs('fs_projectId').value.trim(), appId:qs('fs_appId').value.trim() };
+    const app = firebase.initializeApp(cfg, 'fs-bot-'+Math.random());
     FS = firebase.firestore(app);
+    FS_OK = true;
     qs('fs_stat').textContent = 'Bağlı';
+    qs('fsBadge').textContent = 'connected';
   }catch(e){
+    FS_OK = false;
     qs('fs_stat').textContent = 'Hata: '+e.message;
-  }
-}
-async function fsLog(symbol, payload){
-  if(!FS) return;
-  try{
-    const colName = qs('fs_col').value.trim() || 'gate_mac_logs';
-    await FS.collection(colName).add({ symbol, ts_ms: nowMs(), ...payload });
-  }catch(e){
-    qs('status').textContent = 'Firestore yazım hatası: '+e.message;
+    qs('fsBadge').textContent = 'error';
   }
 }
 
-/* ===================== Proxy API ===================== */
+function attachFsListener(sym){
+  // symbol alanına göre en son doküman (onSnapshot) — index gerekebilir
+  const col = qs('fs_col').value.trim();
+  const symFS = toFsSymbol(sym, qs('fs_sym_fmt').value);
+  const ref = FS.collection(col).where('symbol','==',symFS).orderBy('ts_ms','desc').limit(1);
+  try{
+    return ref.onSnapshot(snap=>{
+      if(snap.empty) return;
+      const doc = snap.docs[0].data();
+      signals[sym] = doc;
+    }, err=>{
+      // Index yoksa fallback
+      SNAP_MODE='poll';
+    });
+  }catch(e){
+    SNAP_MODE='poll';
+    return null;
+  }
+}
+async function pollFsLatest(sym){
+  // Index yoksa: son 50 kaydı çek, symbol eşleşeni bul
+  const col = qs('fs_col').value.trim();
+  const symFS = toFsSymbol(sym, qs('fs_sym_fmt').value);
+  const ref = FS.collection(col).orderBy('ts_ms','desc').limit(50);
+  try{
+    const snap = await ref.get();
+    let found = null;
+    snap.forEach(d=>{
+      const x = d.data();
+      if((x.symbol||'').toUpperCase()===symFS) { if(!found || (x.ts_ms>found.ts_ms)) found=x; }
+    });
+    if(found) signals[sym] = found;
+  }catch(e){
+    // ignore; statusta göster
+    qs('status').textContent = 'Firestore polling hata: '+e.message;
+  }
+}
+
+/* ============ Proxy API ============ */
 async function proxyCall(path, body){
   const base = qs('proxy').value.trim();
   if(!base) throw new Error('Proxy Base URL boş');
   const url = base.replace(/\/+$/,'') + path;
   const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
   const j = await r.json().catch(()=>({ok:false,error:'invalid json'}));
-  if(!r.ok || j.ok===false) throw new Error(j.error || r.status+' '+r.statusText);
+  if(!r.ok || j.ok===false) throw new Error((j && j.error) ? (typeof j.error==='string'? j.error : JSON.stringify(j.error)) : (r.status+' '+r.statusText));
   return j;
 }
 
-/* ===================== Bot Döngüsü ===================== */
+/* ============ Bot State & UI ============ */
 let looping = false;
-const state = {}; // symbol -> durum
+const st = {};  // symbol -> { position, working, price, u,l,m, orderLong:{id,price}, orderShort:{id,price}, stopId, stopPrice }
 
 function uiSetErr(msg){ qs('err').textContent = msg || '-'; }
 function uiSetTick(){ qs('lastTick').textContent = new Date().toLocaleTimeString(); }
-function renderSymRows(){
-  const list = qs('symList'); list.innerHTML = '';
-  Object.keys(state).forEach(sym=>{
-    const s = state[sym] || {};
+function renderRows(){
+  const list = qs('symList'); list.innerHTML='';
+  Object.keys(st).forEach(sym=>{
+    const s = st[sym] || {};
+    const sig = signals[sym] || {};
     const el = document.createElement('div'); el.className='sym';
     el.innerHTML = `
       <div class="s">${sym}</div>
-      <div><span class="badge">Fiyat</span><div>${fmt(s.price)}</div></div>
-      <div><span class="badge">U</span><div>${fmt(s.u)}</div></div>
-      <div><span class="badge">M</span><div>${fmt(s.m)}</div></div>
-      <div><span class="badge">L</span><div>${fmt(s.l)}</div></div>
+      <div><span class="badge">Fiyat</span><div>${fmt(sig.close)}</div></div>
+      <div><span class="badge">U</span><div>${fmt(sig.upper)}</div></div>
+      <div><span class="badge">M</span><div>${fmt(sig.mid)}</div></div>
+      <div><span class="badge">L</span><div>${fmt(sig.lower)}</div></div>
       <div><span class="badge">Poz</span><div>${s.position||'-'}</div></div>
       <div><span class="badge">Çalışan</span><div>${s.working||'-'}</div></div>
       <div><span class="badge">Stop</span><div>${fmt(s.stopPrice)}</div></div>
+      <div><button class="ghost" onclick="flatten('${sym}')">Flatten</button></div>
     `;
     list.appendChild(el);
   });
 }
 
-async function cancelIfExists(apiKey, apiSecret, market, sym, orderId){
+/* ============ Emir Akışı ============ */
+async function cancelIf(apiKey, apiSecret, market, orderId){
   if(!orderId) return;
-  try{
-    await proxyCall('/gate/cancelOrder', { apiKey, apiSecret, market, orderId });
-  }catch(e){
-    // price_order vs normal ayrımında biri tutmayabilir; proxy zaten fallback yapıyor.
-  }
+  try{ await proxyCall('/gate/cancelOrder', { apiKey, apiSecret, market, orderId }); }
+  catch(e){ /* normal/price_order ayrımı, proxy zaten fallback dener */ }
 }
 
-async function tickSymbol(sym){
+async function manageSymbol(sym){
   const apiKey = qs('apiKey').value.trim();
   const apiSecret = qs('apiSecret').value.trim();
   const market = qs('market').value;
-  const interval = qs('interval').value;
-  const limit = +qs('limit').value || 500;
-  const n = +qs('n').value || 20;
-  const ma = qs('ma').value;
-  const mode = qs('mode').value;
-  const envPct = +qs('envPct').value || 0.01;
   const lev = +qs('lev').value || 10;
   const usd = +qs('usd').value || 50;
   const bps = +qs('bps').value || 0;
 
-  // 1) Kline çek (contract!)
-  const K = await proxyCall('/gate/klines', { market, contract: sym, interval, limit });
-  const klines = K.data;
-  if(!klines || klines.length===0) throw new Error('Kline yok');
-  const mac = macFromKlines(klines, n, ma, mode, envPct);
-  const last = klines[klines.length-1];
-  const price = +last.c;
+  const sig = signals[sym];
+  if(!sig || sig.upper==null || sig.lower==null || sig.close==null) return;
 
-  // 2) State
-  if(!state[sym]) state[sym] = {position:'NONE', working:'-', stopPrice:null, orderLong:null, orderShort:null, entry:null, stopId:null};
-  const S = state[sym];
-  S.price = price; S.u=mac.u; S.m=mac.mid?.[mac.mid.length-1]??null; S.l=mac.l;
+  // State init
+  if(!st[sym]) st[sym] = { position:'NONE', working:'-', stopId:null, stopPrice:null, orderLong:null, orderShort:null, entry:null };
+  const S = st[sym];
 
-  // Miktar: USDT / price (short için negatif göndereceğiz)
-  const sizeAbs = Math.max(0.0001, usd / price);
+  // Semboller
+  const contract = toGateContract(sym); // UI kontratı zaten Gate formatında; yine de normalize edelim
 
-  // 3) Kanal içi: bekleyen çift emirler; kanal dışına çıkınca iptal
-  if(mac.inside){
-    const longPx  = +(mac.u * bpsToMult(+bps)).toFixed(8);
-    const shortPx = +(mac.l / bpsToMult(+bps)).toFixed(8);
+  // Miktar: USDT / close
+  const sizeAbs = Math.max(0.0001, (+usd) / (+sig.close));
 
-    // LONG bekleyen (size > 0)
-    if(!S.orderLong || Math.abs(S.orderLong.price - longPx) / longPx > 0.0001){
-      await cancelIfExists(apiKey, apiSecret, market, sym, S.orderLong?.id);
+  // Kanal içinde mi?
+  const inside = !!sig.in_channel;
+
+  // Hedef fiyatlar (bps buffer)
+  const longPx  = +(sig.upper * bpsToMult(bps)).toFixed(8);
+  const shortPx = +(sig.lower / bpsToMult(bps)).toFixed(8);
+
+  // Kanal içi: iki limit emir → 3 sn’de update
+  if(inside){
+    // LONG limit (size > 0)
+    if(!S.orderLong || Math.abs(S.orderLong.price - longPx)/longPx > 0.0001){
+      await cancelIf(apiKey, apiSecret, market, S.orderLong?.id);
       const pl = await proxyCall('/gate/placeOrder', {
-        apiKey, apiSecret, market, contract: sym, side:'buy',
+        apiKey, apiSecret, market, contract, side:'buy',
         price: longPx, size: +sizeAbs, leverage: lev,
         type:'limit', reduceOnly:false, tif:'gtc'
       });
       S.orderLong = { id: pl.data?.id, price: longPx };
     }
-
-    // SHORT bekleyen (size < 0)
-    if(!S.orderShort || Math.abs(S.orderShort.price - shortPx) / shortPx > 0.0001){
-      await cancelIfExists(apiKey, apiSecret, market, sym, S.orderShort?.id);
+    // SHORT limit (size < 0)
+    if(!S.orderShort || Math.abs(S.orderShort.price - shortPx)/shortPx > 0.0001){
+      await cancelIf(apiKey, apiSecret, market, S.orderShort?.id);
       const ps = await proxyCall('/gate/placeOrder', {
-        apiKey, apiSecret, market, contract: sym, side:'sell',
+        apiKey, apiSecret, market, contract, side:'sell',
         price: shortPx, size: -sizeAbs, leverage: lev,
         type:'limit', reduceOnly:false, tif:'gtc'
       });
@@ -327,99 +296,145 @@ async function tickSymbol(sym){
     }
     S.working = `L@${S.orderLong?.price ?? '-'} / S@${S.orderShort?.price ?? '-'}`;
   }else{
-    // Kanal dışı → bekleyenler iptal
-    if(S.orderLong?.id){ await cancelIfExists(apiKey, apiSecret, market, sym, S.orderLong.id); S.orderLong=null; }
-    if(S.orderShort?.id){ await cancelIfExists(apiKey, apiSecret, market, sym, S.orderShort.id); S.orderShort=null; }
+    // Kanal dışına çıktı -> bekleyenleri kapat
+    if(S.orderLong?.id){ await cancelIf(apiKey, apiSecret, market, S.orderLong.id); S.orderLong=null; }
+    if(S.orderShort?.id){ await cancelIf(apiKey, apiSecret, market, S.orderShort.id); S.orderShort=null; }
     S.working = '-';
   }
 
-  // 4) Basit dolum tetik (gerçekte openOrders/positions ile teyit et)
+  // Basit dolum tetik (Firestore close ile)
+  const price = +sig.close;
   if(S.orderLong && price >= S.orderLong.price){
-    // LONG fill → other cancel + stop (lower band)
-    if(S.orderShort?.id){ await cancelIfExists(apiKey, apiSecret, market, sym, S.orderShort.id); S.orderShort=null; }
+    // LONG doldu → karşı taraf iptal + STOP (lower band)
+    if(S.orderShort?.id){ await cancelIf(apiKey, apiSecret, market, S.orderShort.id); S.orderShort=null; }
     S.position = 'LONG'; S.entry = S.orderLong.price; S.orderLong=null; S.working='-';
-    const stopPx = mac.l;
+    const stopPx = sig.lower;
     if(stopPx){
-      const st = await proxyCall('/gate/placeOrder', {
-        apiKey, apiSecret, market, contract: sym, side:'sell',
+      const stp = await proxyCall('/gate/placeOrder', {
+        apiKey, apiSecret, market, contract, side:'sell',
         price: stopPx, size: +sizeAbs, leverage: lev,
         type:'stop', stopPrice: stopPx, stopType:'down', reduceOnly:true, tif:'gtc'
       });
-      S.stopId = st.data?.id; S.stopPrice = stopPx;
+      S.stopId = stp.data?.id; S.stopPrice = stopPx;
     }
   } else if(S.orderShort && price <= S.orderShort.price){
-    // SHORT fill → other cancel + stop (upper band)
-    if(S.orderLong?.id){ await cancelIfExists(apiKey, apiSecret, market, sym, S.orderLong.id); S.orderLong=null; }
+    // SHORT doldu → karşı taraf iptal + STOP (upper band)
+    if(S.orderLong?.id){ await cancelIf(apiKey, apiSecret, market, S.orderLong.id); S.orderLong=null; }
     S.position = 'SHORT'; S.entry = S.orderShort.price; S.orderShort=null; S.working='-';
-    const stopPx = mac.u;
+    const stopPx = sig.upper;
     if(stopPx){
-      const st = await proxyCall('/gate/placeOrder', {
-        apiKey, apiSecret, market, contract: sym, side:'buy',
+      const stp = await proxyCall('/gate/placeOrder', {
+        apiKey, apiSecret, market, contract, side:'buy',
         price: stopPx, size: -sizeAbs, leverage: lev,
         type:'stop', stopPrice: stopPx, stopType:'up', reduceOnly:true, tif:'gtc'
       });
-      S.stopId = st.data?.id; S.stopPrice = stopPx;
+      S.stopId = stp.data?.id; S.stopPrice = stopPx;
     }
   }
 
-  // 5) Trailing stop (karşı bant değişirse)
-  if(S.position==='LONG' && S.stopId && mac.l && Math.abs(mac.l - (S.stopPrice||0))/(S.stopPrice||1) > 0.0005){
-    await cancelIfExists(apiKey, apiSecret, market, sym, S.stopId);
+  // Trailing STOP (band değişirse)
+  if(S.position==='LONG' && S.stopId && sig.lower && Math.abs(sig.lower - (S.stopPrice||0))/Math.max(S.stopPrice||1,1) > 0.0005){
+    await cancelIf(apiKey, apiSecret, market, S.stopId);
     const st2 = await proxyCall('/gate/placeOrder', {
-      apiKey, apiSecret, market, contract: sym, side:'sell',
-      price: mac.l, size: +sizeAbs, leverage: lev,
-      type:'stop', stopPrice: mac.l, stopType:'down', reduceOnly:true, tif:'gtc'
+      apiKey, apiSecret, market, contract, side:'sell',
+      price: sig.lower, size: +sizeAbs, leverage: lev,
+      type:'stop', stopPrice: sig.lower, stopType:'down', reduceOnly:true, tif:'gtc'
     });
-    S.stopId = st2.data?.id; S.stopPrice = mac.l;
+    S.stopId = st2.data?.id; S.stopPrice = sig.lower;
   }
-  if(S.position==='SHORT' && S.stopId && mac.u && Math.abs(mac.u - (S.stopPrice||0))/(S.stopPrice||1) > 0.0005){
-    await cancelIfExists(apiKey, apiSecret, market, sym, S.stopId);
+  if(S.position==='SHORT' && S.stopId && sig.upper && Math.abs(sig.upper - (S.stopPrice||0))/Math.max(S.stopPrice||1,1) > 0.0005){
+    await cancelIf(apiKey, apiSecret, market, S.stopId);
     const st2 = await proxyCall('/gate/placeOrder', {
-      apiKey, apiSecret, market, contract: sym, side:'buy',
-      price: mac.u, size: -sizeAbs, leverage: lev,
-      type:'stop', stopPrice: mac.u, stopType:'up', reduceOnly:true, tif:'gtc'
+      apiKey, apiSecret, market, contract, side:'buy',
+      price: sig.upper, size: -sizeAbs, leverage: lev,
+      type:'stop', stopPrice: sig.upper, stopType:'up', reduceOnly:true, tif:'gtc'
     });
-    S.stopId = st2.data?.id; S.stopPrice = mac.u;
+    S.stopId = st2.data?.id; S.stopPrice = sig.upper;
   }
-
-  // 6) Firestore log (opsiyonel)
-  await fsLog(sym, {
-    interval, n, ma_type:ma, mode, envelope_pct:+envPct,
-    close:price, upper:mac.u, mid:mac.mid?.[mac.mid.length-1]??null, lower:mac.l,
-    in_channel: mac.inside, position: mac.pos
-  });
-
-  renderSymRows();
 }
 
-async function loop(){
-  if(looping) return;
-  looping = true;
-  qs('loop').textContent = 'RUNNING';
-  uiSetErr('-');
+async function flatten(sym){
+  // Basit flatten: varsa stop ve bekleyenleri iptal et, ardından reduce_only market emri at (long ise sell, short ise buy).
+  const apiKey = qs('apiKey').value.trim();
+  const apiSecret = qs('apiSecret').value.trim();
+  const market = qs('market').value;
+  const lev = +qs('lev').value || 10;
+  const sig = signals[sym]; if(!sig) return;
+  const S = st[sym] || {};
+  const contract = toGateContract(sym);
+  const sizeAbs = Math.max(0.0001, (+qs('usd').value || 50) / (+sig.close || 1));
 
-  const syms = qs('symbols').value.split(',').map(s=>s.trim()).filter(Boolean);
-  syms.forEach(s=>{ if(!state[s]) state[s] = {}; });
-  renderSymRows();
+  // Bekleyenleri / stopu kapat
+  await cancelIf(apiKey, apiSecret, market, S.orderLong?.id);  S.orderLong=null;
+  await cancelIf(apiKey, apiSecret, market, S.orderShort?.id); S.orderShort=null;
+  await cancelIf(apiKey, apiSecret, market, S.stopId);         S.stopId=null; S.stopPrice=null;
 
-  const tickSec = Math.max(1, +qs('tick').value || 1);
-  while(looping){
-    try{
-      for(const sym of syms){ await tickSymbol(sym); }
-      uiSetTick();
-      await sleep(tickSec*1000);
-    }catch(e){
-      uiSetErr(e.message||String(e));
-      await sleep(1000);
+  if(S.position==='LONG'){
+    await proxyCall('/gate/placeOrder', { apiKey, apiSecret, market, contract, side:'sell',
+      price: "0", size: +sizeAbs, leverage: lev, type:'limit', reduceOnly:true, tif:'ioc' });
+  }else if(S.position==='SHORT'){
+    await proxyCall('/gate/placeOrder', { apiKey, apiSecret, market, contract, side:'buy',
+      price: "0", size: -sizeAbs, leverage: lev, type:'limit', reduceOnly:true, tif:'ioc' });
+  }
+  S.position='NONE'; st[sym]=S; renderRows();
+}
+
+/* ============ Döngüler ============ */
+const fsUnsubs = {}; // sym->unsubscribe func
+
+async function start(){
+  if(!FS){ await fsInit(); }
+  if(!FS_OK){ uiSetErr('Firestore bağlanamadı'); return; }
+
+  const symbols = qs('symbols').value.split(',').map(s=>s.trim()).filter(Boolean).map(toGateContract);
+  symbols.forEach(sym=>{ if(!st[sym]) st[sym]={}; });
+
+  // FS listeners/pollers
+  SNAP_MODE='listen';
+  for(const sym of symbols){
+    if(fsUnsubs[sym]) { fsUnsubs[sym](); fsUnsubs[sym]=null; }
+    const unsub = attachFsListener(sym);
+    if(unsub) fsUnsubs[sym]=unsub;
+  }
+
+  // Eğer index yoksa/patladıysa polling fallback
+  setTimeout(()=>{ if(SNAP_MODE==='poll'){ qs('fsBadge').textContent='polling'; } }, 1500);
+
+  let pollingTimer=null;
+  if(SNAP_MODE==='poll'){
+    pollingTimer = setInterval(async ()=>{
+      for(const sym of symbols) await pollFsLatest(sym);
+    }, 2000);
+  }
+
+  // Bot loop
+  looping = true; qs('loop').textContent = 'RUNNING'; uiSetErr('-'); renderRows();
+  const tickSec = Math.max(1, +qs('tick').value || 3);
+  (async function loop(){
+    while(looping){
+      try{
+        for(const sym of symbols){
+          // snapshot geldiyse manage
+          if(signals[sym]) await manageSymbol(sym);
+        }
+        uiSetTick(); renderRows();
+        await sleep(tickSec*1000);
+      }catch(e){
+        uiSetErr(e.message||String(e));
+        await sleep(1000);
+      }
     }
-  }
-  qs('loop').textContent = 'STOPPED';
+    if(pollingTimer) clearInterval(pollingTimer);
+  })();
 }
-function stopLoop(){ looping=false; }
 
-/* ===================== Events ===================== */
-qs('start').addEventListener('click', loop);
-qs('stop').addEventListener('click', stopLoop);
+function stop(){
+  looping=false; qs('loop').textContent='STOPPED';
+  for(const k in fsUnsubs){ try{ fsUnsubs[k](); }catch{} delete fsUnsubs[k]; }
+}
+
+qs('start').addEventListener('click', start);
+qs('stop').addEventListener('click', stop);
 qs('fs_init').addEventListener('click', fsInit);
 </script>
 </body>
