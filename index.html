@@ -33,9 +33,8 @@
   .switch{display:flex;gap:10px;align-items:center}
   .stack{display:flex;gap:10px}
   .pill{display:inline-flex;gap:8px;background:var(--glass);border:1px solid var(--border);padding:6px 8px;border-radius:999px;align-items:center}
-  .muted{color:var(--muted)}
   .log{white-space:pre-wrap;max-height:380px;overflow:auto;background:#0b1222;border:1px dashed var(--border);border-radius:12px;padding:12px}
-  .col-6{grid-column:span 6} .col-4{grid-column:span 4} .col-3{grid-column:span 3} .col-8{grid-column:span 8} .col-12{grid-column:span 12}
+  .col-6{grid-column:span 6} .col-4{grid-column:span 4} .col-3{grid-column:span 3} .col-5{grid-column:span 5} .col-8{grid-column:span 8} .col-12{grid-column:span 12}
   @media (max-width:900px){.row>[class^="col-"]{grid-column:span 12}}
 </style>
 </head>
@@ -63,7 +62,6 @@
       <div class="col-4">
         <label>Doğrudan API Host (proxy yoksa)</label>
         <input id="host" value="https://api.gateio.ws" placeholder="https://api.gateio.ws"/>
-        <div class="hint">Alternatif: <code>https://api.gateeu.com</code></div>
       </div>
 
       <div class="col-6">
@@ -156,7 +154,6 @@
   <div class="card">
     <label>Log</label>
     <div id="log" class="log"></div>
-    <div class="hint">404 alırsan logtaki <b>URL</b> & <b>PATH</b> değerini kontrol et. Testnet’te Proxy URL <code>/testnet</code> içermeli.</div>
   </div>
 </div>
 
@@ -175,7 +172,7 @@ function qs(obj){
     if(v===undefined || v===null || v==='') return;
     p.append(k, String(v));
   });
-  return p.toString(); // gönderdiğimiz string = imzaladığımız string
+  return p.toString();
 }
 async function sha512Hex(s){
   const buf = await crypto.subtle.digest('SHA-512', enc.encode(s||''));
@@ -191,18 +188,19 @@ function buildBase(){
   const env = $('env').value;          // mainnet | testnet
   const proxy = $('proxy').value.trim().replace(/\/+$/,'');
   const host = $('host').value.trim().replace(/\/+$/,'') || 'https://api.gateio.ws';
-  // Öncelik Proxy
   if(proxy){
     if(env==='testnet' && !/\/testnet$/.test(proxy)) return proxy + '/testnet';
     return proxy;
   }
-  // Proxy yoksa direkt host
+  if(env==='testnet'){
+    return 'https://api-testnet.gateapi.io';
+  }
   return host;
 }
 
 /* ---------- Sign + Request ---------- */
 async function signHeaders({method, urlPath, queryString, bodyString, apiKey, apiSecret}){
-  const ts = Math.floor(Date.now()/1000).toString(); // saniye
+  const ts = Math.floor(Date.now()/1000).toString();
   const bodyHash = await sha512Hex(bodyString || "");
   const sigStr = `${method.toUpperCase()}\n${urlPath}\n${queryString||""}\n${bodyHash}\n${ts}`;
   const SIGN = await hmac512Hex(apiSecret, sigStr);
@@ -212,7 +210,7 @@ async function signHeaders({method, urlPath, queryString, bodyString, apiKey, ap
 async function apiV4({method='GET', endpoint='', queryObj=null, bodyObj=null}){
   const base = buildBase();
   const prefix = '/api/v4';
-  const path = `${prefix}${endpoint}`;                         // imza PATH'i
+  const path = `${prefix}${endpoint}`;
   const queryString = qs(queryObj||{});
   const url = `${base}${path}${queryString?`?${queryString}`:''}`;
   const apiKey = $('apiKey').value.trim();
@@ -237,7 +235,6 @@ async function apiV4({method='GET', endpoint='', queryObj=null, bodyObj=null}){
 
 /* ---------- UI ---------- */
 (function init(){
-  // yerel ayarları yükle
   try{
     const s = JSON.parse(localStorage.getItem('gateio_bot_cfg')||'{}');
     if(s){
