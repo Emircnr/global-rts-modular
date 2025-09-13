@@ -3,20 +3,21 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Gate.io USDT‑M Futures — MA Channel Bot (Tek Dosya, Gizli Ayarlı)</title>
+  <title>Gate.io USDT‑M Futures — MA Channel Bot (Tek Dosya)</title>
   <style>
     :root{
       --bg:#0b0f19; --fg:#e6eef7; --muted:#9fb0c9;
       --panel:#0f162a; --panel2:#101a32; --glass:rgba(255,255,255,.06);
-      --border:#1b2a4a; --accent:#60a5fa; --good:#22c55e; --bad:#ef4444; --warn:#f59e0b;
+      --border:#1b2a4a; --accent:#60a5fa; --good:#22c55e; --bad:#ef4444;
+      --yellow:#f59e0b;
       --radius:16px; --gap:14px; --padY:12px; --padX:14px; --font:15px; --maxW:1280px;
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      --sans: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans";
+      --sans: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
     }
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:var(--font)}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:var(--font);}
     a{color:var(--accent);text-decoration:none}
-    .wrap{max-width:var(--maxW);margin:30px auto;padding:0 16px}
+    .wrap{max-width:var(--maxW);margin:30px auto;padding:0 16px;}
     h1{font-size:28px;margin:0 0 14px}
     .sub{color:var(--muted);margin-bottom:24px}
     .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:var(--gap)}
@@ -57,7 +58,7 @@
     .row .grow{flex:1}
     .sep{height:1px;background:var(--border);margin:10px 0}
     .tag{font-size:11px;border:1px solid var(--border);padding:2px 6px;border-radius:8px;color:#9fb0c9}
-    .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+      .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
     .chip{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;background:#0e162b;border:1px solid var(--border);border-radius:999px}
     .chip .x{background:transparent;border:none;color:#9fb0c9;font-size:14px;cursor:pointer}
     .chip .x:hover{color:#ff9b9b}
@@ -66,16 +67,28 @@
 <body>
   <div class="wrap">
     <h1>Gate.io USDT‑M Futures — MA Channel Bot</h1>
-    <div class="sub">Tek dosya (HTML+CSS+JS). Firestore canlı sinyal (⚠️ <span class="k">config arkaplanda kayıtlı</span>). Proxy (⚠️ <span class="k">arkaplanda</span>) ile <span class="k">/api/v4</span> imzalı emir. Strateji: kanal içinde üst banda <span class="pill ok">LONG</span>, alt banda <span class="pill bad">SHORT</span>. Dolan karşıda <span class="pill warn">reduce‑only STOP</span> mid’i takip eder.</div>
+    <div class="sub">Tek dosya (HTML+CSS+JS). Firestore canlı sinyal. Proxy ile <span class="k">/api/v4</span> imzalı emir. OCO benzeri strateji: kanal içinde üst banda <span class="pill ok">LONG</span>, alt banda <span class="pill bad">SHORT</span>; biri dolunca diğeri iptal + <span class="pill warn">reduce‑only STOP</span> mid’e takibi.</div>
 
     <div class="grid">
-      <!-- Gate.io Bağlantı (Proxy ayarları gizli) -->
+      <!-- Gate.io Bağlantı -->
       <div class="card col6">
         <div class="section-title">Gate.io Bağlantı</div>
         <div class="row" style="gap:12px">
           <label>Çevre</label>
           <label class="switch"><input id="envTestnet" type="checkbox"/><span>Testnet</span></label>
-          <span class="hint">Proxy & host arkaplanda saklanır. İstek yolu: <span class="k">BASE + /api/v4/...</span></span>
+          <span class="hint">(Testnet açıkken Base otomatik <span class="k">/testnet</span>)</span>
+        </div>
+        <div class="row" style="margin-top:10px;gap:12px">
+          <label class="switch"><input id="useProxy" type="checkbox" checked/><span>Proxy kullan</span></label>
+          <span class="hint">Proxy aktifse CORS sorunu yok.</span>
+        </div>
+        <div class="row" style="margin-top:8px;gap:8px">
+          <label style="width:150px">Proxy Base</label>
+          <input id="proxyBase" class="grow" placeholder="http://localhost:8787" value="http://localhost:8787"/>
+        </div>
+        <div class="row" style="margin-top:8px;gap:8px">
+          <label style="width:150px">Doğrudan Host</label>
+          <input id="directHost" class="grow" placeholder="https://api.gateio.ws" value="https://api.gateio.ws"/>
         </div>
         <div class="sep"></div>
         <div class="row" style="gap:8px">
@@ -97,9 +110,23 @@
         </div>
       </div>
 
-      <!-- Firestore (config gizli) -->
+      <!-- Firebase -->
       <div class="card col6">
-        <div class="section-title">Firestore — Canlı Sinyal (Config gizli, sadece kaynak & alan adları)</div>
+        <div class="section-title">Firebase (Firestore) — Canlı Sinyal</div>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          <div class="tag">Compat SDK</div>
+          <span class="hint">Alan adları UI’dan değiştirilebilir.</span>
+        </div>
+        <div class="row" style="margin-top:8px;gap:8px"><label style="width:160px">apiKey</label><input id="fb_apiKey" class="grow"/></div>
+        <div class="row" style="margin-top:8px;gap:8px"><label style="width:160px">authDomain</label><input id="fb_authDomain" class="grow"/></div>
+        <div class="row" style="margin-top:8px;gap:8px"><label style="width:160px">databaseURL</label><input id="fb_databaseURL" class="grow"/></div>
+        <div class="row" style="margin-top:8px;gap:8px"><label style="width:160px">projectId</label><input id="fb_projectId" class="grow"/></div>
+        <div class="row" style="margin-top:8px;gap:8px"><label style="width:160px">storageBucket</label><input id="fb_storageBucket" class="grow"/></div>
+        <div class="row" style="margin-top:8px;gap:8px"><label style="width:160px">messagingSenderId</label><input id="fb_msgSenderId" class="grow"/></div>
+        <div class="row" style="margin-top:8px;gap:8px"><label style="width:160px">appId</label><input id="fb_appId" class="grow"/></div>
+        <div class="row" style="margin-top:8px;gap:8px"><label style="width:160px">measurementId</label><input id="fb_measurementId" class="grow"/></div>
+
+        <div class="sep"></div>
         <div class="row" style="gap:14px;flex-wrap:wrap">
           <label>Kaynak tipi:</label>
           <label class="switch"><input id="srcDoc" type="radio" name="srcType" checked/><span>Doc pattern</span></label>
@@ -107,7 +134,7 @@
         </div>
         <div class="row" style="margin-top:8px;gap:8px">
           <label style="width:160px">Yol</label>
-          <input id="fb_path" class="grow" placeholder="signals/{symbol}" value="signals/{symbol}"/>
+          <input id="fb_path" class="grow" placeholder="signals/{symbol}  veya  signals" value="signals/{symbol}"/>
         </div>
         <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">
           <label>Alanlar:</label>
@@ -120,7 +147,9 @@
         </div>
         <div class="row" style="margin-top:12px;gap:10px;flex-wrap:wrap">
           <button class="btn green" id="btnFbConnect">Bağlan</button>
-          <span class="tiny">Config arkaplandan yüklenecek.</span>
+          <button class="btn" id="btnSaveFb">Kaydet</button>
+          <button class="btn" id="btnLoadFb">Yükle</button>
+          <span class="tiny">Her coin için canlı dinleme başlatır.</span>
         </div>
       </div>
 
@@ -185,7 +214,7 @@
           <div class="section-title">Log</div>
           <div class="row" style="gap:8px">
             <button class="btn" id="btnClearLog">Temizle</button>
-            <span class="tiny">İmza stringleri ve Gate yanıtları burada. (Gizli ayarlar log’a dökülmez)</span>
+            <span class="tiny">İmza stringleri ve Gate yanıtları burada.</span>
           </div>
         </div>
         <pre class="log" id="log"></pre>
@@ -199,37 +228,6 @@
 
   <script>
   // =============================
-  // HIDDEN CONFIG (Proxy + Firebase) — Arkaplanda saklanır
-  // =============================
-  const HIDDEN_KEY = 'hiddenCfg_v1';
-  const DEFAULT_HIDDEN = {
-    useProxy: true,
-    proxyBase: 'http://localhost:8787',
-    directHost: 'https://api.gateio.ws',
-    firebase: {
-      apiKey: 'AIzaSyAh6JbnjsZtD-d0g3iSb2maSerPntUP6To',
-      authDomain: 'macbot-b7b45.firebaseapp.com',
-      databaseURL: 'https://macbot-b7b45-default-rtdb.firebaseio.com',
-      projectId: 'macbot-b7b45',
-      storageBucket: 'macbot-b7b45.firebasestorage.app',
-      messagingSenderId: '88494187419',
-      appId: '1:88494187419:web:9e0fd1a37e51332203373e',
-      measurementId: 'G-SVG851WK7Y'
-    }
-  };
-  function loadHiddenCfg(){
-    try{ const j = localStorage.getItem(HIDDEN_KEY); if(j){ return JSON.parse(j); } }catch(e){}
-    localStorage.setItem(HIDDEN_KEY, JSON.stringify(DEFAULT_HIDDEN));
-    return JSON.parse(JSON.stringify(DEFAULT_HIDDEN));
-  }
-  function saveHiddenCfg(cfg){ localStorage.setItem(HIDDEN_KEY, JSON.stringify(cfg)); }
-  // Konsoldan düzenlemek için yardımcılar (UI'da görünmez)
-  window.__hiddenCfg = () => JSON.parse(localStorage.getItem(HIDDEN_KEY)||'{}');
-  window.__setHiddenCfg = (partial) => { const cur = loadHiddenCfg(); const next = {...cur, ...partial}; saveHiddenCfg(next); console.log('hiddenCfg updated'); return next; };
-
-  const HIDDEN = loadHiddenCfg();
-
-  // =============================
   // Util — UI & Logging
   // =============================
   const $ = sel => document.querySelector(sel);
@@ -238,19 +236,19 @@
     const ts = new Date().toISOString();
     const line = (typeof obj === 'string') ? obj : JSON.stringify(obj, null, 2);
     const prefix = level.toUpperCase();
-    logEl.textContent = `[${ts}] [${prefix}]
-` + line + "
-
-" + logEl.textContent;
+    logEl.textContent = `[${ts}] [${prefix}]\n` + line + "\n\n" + logEl.textContent;
   }
   $('#btnClearLog').onclick = () => { logEl.textContent = ''; };
 
   // =============================
-  // Persist (localStorage) — sadece Key/Secret
+  // Persist (localStorage)
   // =============================
   function saveConn(){
     const data = {
       envTestnet: $('#envTestnet').checked,
+      useProxy: $('#useProxy').checked,
+      proxyBase: $('#proxyBase').value.trim(),
+      directHost: $('#directHost').value.trim(),
       rememberKeys: $('#rememberKeys').checked,
     };
     if($('#rememberKeys').checked){
@@ -258,13 +256,16 @@
       data.apiSecret = $('#apiSecret').value;
     }
     localStorage.setItem('conn', JSON.stringify(data));
-    log({msg:'Bağlantı ayarları kaydedildi'});
+    log({msg:'Bağlantı ayarları kaydedildi', data});
   }
   function loadConn(){
     const raw = localStorage.getItem('conn');
     if(!raw){ log('Kayıtlı bağlantı bulunamadı'); return; }
     const d = JSON.parse(raw);
     $('#envTestnet').checked = !!d.envTestnet;
+    $('#useProxy').checked = !!d.useProxy;
+    $('#proxyBase').value = d.proxyBase || 'http://localhost:8787';
+    $('#directHost').value = d.directHost || 'https://api.gateio.ws';
     $('#rememberKeys').checked = !!d.rememberKeys;
     if(d.rememberKeys){
       $('#apiKey').value = d.apiKey || '';
@@ -275,50 +276,172 @@
   $('#btnSaveConn').onclick = saveConn;
   $('#btnLoadConn').onclick = loadConn;
 
+  function saveFb(){
+    const fb = {
+      apiKey: $('#fb_apiKey').value,
+      authDomain: $('#fb_authDomain').value,
+      databaseURL: $('#fb_databaseURL').value,
+      projectId: $('#fb_projectId').value,
+      storageBucket: $('#fb_storageBucket').value,
+      messagingSenderId: $('#fb_msgSenderId').value,
+      appId: $('#fb_appId').value,
+      measurementId: $('#fb_measurementId').value,
+      srcType: $('#srcDoc').checked ? 'doc' : 'col',
+      path: $('#fb_path').value,
+      fields: {
+        upper: $('#f_upper').value,
+        lower: $('#f_lower').value,
+        mid: $('#f_mid').value,
+        close: $('#f_close').value,
+        symbol: $('#f_symbol').value,
+        ts: $('#f_ts').value,
+      }
+    };
+    localStorage.setItem('fb', JSON.stringify(fb));
+    log({msg:'Firebase ayarları kaydedildi', fb});
+  }
+  function loadFb(){
+    const raw = localStorage.getItem('fb');
+    if(!raw){ log('Kayıtlı Firebase ayarı yok'); return; }
+    const fb = JSON.parse(raw);
+    $('#fb_apiKey').value = fb.apiKey || '';
+    $('#fb_authDomain').value = fb.authDomain || '';
+    $('#fb_databaseURL').value = fb.databaseURL || '';
+    $('#fb_projectId').value = fb.projectId || '';
+    $('#fb_storageBucket').value = fb.storageBucket || '';
+    $('#fb_msgSenderId').value = fb.messagingSenderId || '';
+    $('#fb_appId').value = fb.appId || '';
+    $('#fb_measurementId').value = fb.measurementId || '';
+    if((fb.srcType||'doc')==='doc'){ $('#srcDoc').checked = true; } else { $('#srcCol').checked = true; }
+    $('#fb_path').value = fb.path || 'signals/{symbol}';
+    $('#f_upper').value = fb.fields?.upper || 'upper';
+    $('#f_lower').value = fb.fields?.lower || 'lower';
+    $('#f_mid').value = fb.fields?.mid || 'mid';
+    $('#f_close').value = fb.fields?.close || 'close';
+    $('#f_symbol').value = fb.fields?.symbol || 'symbol';
+    $('#f_ts').value = fb.fields?.ts || 'ts_ms';
+    log('Firebase ayarları yüklendi');
+  }
+  $('#btnSaveFb').onclick = saveFb;
+  $('#btnLoadFb').onclick = loadFb;
+
+  // Prefill Firebase config from prompt
+  (function prefillFb(){
+    const cfg = {
+      apiKey: "AIzaSyAh6JbnjsZtD-d0g3iSb2maSerPntUP6To",
+      authDomain: "macbot-b7b45.firebaseapp.com",
+      databaseURL: "https://macbot-b7b45-default-rtdb.firebaseio.com",
+      projectId: "macbot-b7b45",
+      storageBucket: "macbot-b7b45.firebasestorage.app",
+      messagingSenderId: "88494187419",
+      appId: "1:88494187419:web:9e0fd1a37e51332203373e",
+      measurementId: "G-SVG851WK7Y"
+    };
+    $('#fb_apiKey').value = cfg.apiKey;
+    $('#fb_authDomain').value = cfg.authDomain;
+    $('#fb_databaseURL').value = cfg.databaseURL;
+    $('#fb_projectId').value = cfg.projectId;
+    $('#fb_storageBucket').value = cfg.storageBucket;
+    $('#fb_msgSenderId').value = cfg.messagingSenderId;
+    $('#fb_appId').value = cfg.appId;
+    $('#fb_measurementId').value = cfg.measurementId;
+  })();
+
   // =============================
   // Crypto helpers — SHA512 / HMAC‑SHA512 (hex)
   // =============================
   function encUtf8(str){ return new TextEncoder().encode(str); }
-  function buf2hex(buffer){ const b = new Uint8Array(buffer); let s=''; for(let i=0;i<b.length;i++){ s+=b[i].toString(16).padStart(2,'0'); } return s; }
-  async function sha512Hex(str){ const h = await crypto.subtle.digest('SHA-512', encUtf8(str)); return buf2hex(h); }
-  async function hmacSha512Hex(key, msg){ const k = await crypto.subtle.importKey('raw', encUtf8(key), {name:'HMAC', hash:'SHA-512'}, false, ['sign']); const sig = await crypto.subtle.sign('HMAC', k, encUtf8(msg)); return buf2hex(sig); }
+  function buf2hex(buffer){
+    const b = new Uint8Array(buffer);
+    let s = ''; for (let i=0;i<b.length;i++){ s += b[i].toString(16).padStart(2,'0'); }
+    return s;
+  }
+  async function sha512Hex(str){
+    const h = await crypto.subtle.digest('SHA-512', encUtf8(str));
+    return buf2hex(h);
+  }
+  async function hmacSha512Hex(key, msg){
+    const k = await crypto.subtle.importKey('raw', encUtf8(key), {name:'HMAC', hash:'SHA-512'}, false, ['sign']);
+    const sig = await crypto.subtle.sign('HMAC', k, encUtf8(msg));
+    return buf2hex(sig);
+  }
 
   // =============================
   // Gate API — signer + fetch
   // =============================
-  function buildQS(params){ if(!params) return ''; const entries = Object.entries(params).filter(([k,v])=> v!==undefined && v!==null && v!==''); if(entries.length===0) return ''; entries.sort((a,b)=> a[0].localeCompare(b[0])); return entries.map(([k,v])=> encodeURIComponent(k)+'='+encodeURIComponent(String(v))).join('&'); }
-  function symbolToContract(sym){ const s=(sym||'').toUpperCase().replace(/[^A-Z0-9_]/g,''); if(s.endsWith('USDT') && !s.includes('_')){ return s.replace('USDT','') + '_USDT'; } return s; }
-  function decimalsFromStep(step){ const t=String(step); const idx=t.indexOf('.'); return idx===-1?0:(t.length-idx-1); }
-  function floorToInc(x, inc){ const f=Number(inc); if(!isFinite(f)||f<=0) return x; const n=Math.floor(x/f)*f; const d=decimalsFromStep(inc); return Number(n.toFixed(d)); }
-  function roundToTick(x, tick){ const t=Number(tick); if(!isFinite(t)||t<=0) return x; const n=Math.round(x/t)*t; const d=decimalsFromStep(tick); return Number(n.toFixed(d)); }
+  function buildQS(params){
+    if(!params) return '';
+    const entries = Object.entries(params).filter(([k,v]) => v!==undefined && v!==null && v!=='');
+    if(entries.length===0) return '';
+    // stable order
+    entries.sort((a,b)=> a[0].localeCompare(b[0]));
+    return entries.map(([k,v]) => encodeURIComponent(k) + '=' + encodeURIComponent(String(v))).join('&');
+  }
+  function symbolToContract(sym){
+    const s = (sym||'').toUpperCase().replace(/[^A-Z0-9_]/g,'');
+    if(s.endsWith('USDT') && !s.includes('_')){
+      return s.replace('USDT','') + '_USDT';
+    }
+    return s;
+  }
+  function decimalsFromStep(step){
+    const t = String(step);
+    const idx = t.indexOf('.');
+    return idx === -1 ? 0 : (t.length - idx - 1);
+  }
+  function floorToInc(x, inc){
+    const f = Number(inc);
+    if(!isFinite(f) || f<=0) return x;
+    const n = Math.floor(x / f) * f;
+    // fix float drift
+    const d = decimalsFromStep(inc);
+    return Number(n.toFixed(d));
+  }
+  function roundToTick(x, tick){
+    const t = Number(tick);
+    if(!isFinite(t) || t<=0) return x;
+    const n = Math.round(x / t) * t;
+    const d = decimalsFromStep(tick);
+    return Number(n.toFixed(d));
+  }
 
   class Gate {
-    constructor(getBase, getKey, getSecret){ this.getBase=getBase; this.getKey=getKey; this.getSecret=getSecret; }
+    constructor(getBase, getKey, getSecret){
+      this.getBase = getBase; // function returning base like http://localhost:8787 or https://api.gateio.ws or /testnet appended
+      this.getKey = getKey; this.getSecret = getSecret;
+    }
     async req(method, path, params={}, bodyObj=null, forceUnsigned=false){
       const base = this.getBase();
       const qs = buildQS(params);
-      const url = base + path + (qs? ('?'+qs):'');
+      const url = base + path + (qs? ('?' + qs):'');
       const ts = Math.floor(Date.now()/1000).toString();
-      const bodyStr = bodyObj? JSON.stringify(bodyObj): '';
-      const headers = {'Accept':'application/json','Content-Type':'application/json'};
+      let bodyStr = bodyObj ? JSON.stringify(bodyObj) : '';
+      let headers = {'Accept':'application/json','Content-Type':'application/json'};
       const key = this.getKey(); const secret = this.getSecret();
       const shouldSign = !!(key && secret) && !forceUnsigned;
-      let sigStr=null; let bodyHex=null; let signHex=null;
+      let sigStr = null; let signHex = null; let bodyHex = null;
       if(shouldSign){
         bodyHex = await sha512Hex(bodyStr);
-        sigStr = [method.toUpperCase(), path, qs, bodyHex, ts].join('
-');
+        sigStr = [method.toUpperCase(), path, qs, bodyHex, ts].join('\n');
         signHex = await hmacSha512Hex(secret, sigStr);
         headers.KEY = key; headers.Timestamp = ts; headers.SIGN = signHex;
       }
       const infoForLog = {method, url, path, qs, body: bodyObj, timestamp: ts, signature_string: sigStr};
       log({send: infoForLog});
-      if($('#dryRun').checked){ return {ok:true,status:200,json:{dry:true}}; }
+      if($('#dryRun').checked){
+        return {ok:true, status:200, dry:true, dummy:true, json: {dry:true}};
+      }
       const res = await fetch(url, {method, headers, body: bodyStr || undefined});
-      let data=null; try{ data=await res.json(); }catch(e){ data={text: await res.text().catch(()=> res.statusText)} }
-      if(!res.ok){ log({error:'Gate hata', status: res.status, data}); } else { log({recv: data}); }
-      return {ok:res.ok, status:res.status, json:data};
+      let data = null;
+      try{ data = await res.json(); }catch(e){ data = {text: await res.text().catch(()=> res.statusText)} }
+      if(!res.ok){
+        log({error: 'Gate hata', status: res.status, data});
+      } else {
+        log({recv: data});
+      }
+      return {ok: res.ok, status: res.status, json: data};
     }
+    // Convenience wrappers
     get(path, params={}, forceUnsigned=false){ return this.req('GET', path, params, null, forceUnsigned); }
     post(path, bodyObj={}, params={}){ return this.req('POST', path, params, bodyObj); }
     del(path, params={}){ return this.req('DELETE', path, params, null); }
@@ -328,14 +451,19 @@
   // Bot State
   // =============================
   const state = {
+    fb: null,
+    db: null,
     listeners: {}, // symbol -> unsubscribe
     coins: {},     // contract -> per-coin state
-    coinSymbols: [],
+        coinSymbols: [],
     running: false,
     loopTimer: null,
     gate: new Gate(() => {
-      const base = HIDDEN.useProxy ? HIDDEN.proxyBase : HIDDEN.directHost;
-      const testnet = $('#envTestnet').checked; return base + (testnet? '/testnet': '');
+      const useProxy = $('#useProxy').checked;
+      const base = useProxy ? $('#proxyBase').value.trim() : $('#directHost').value.trim();
+      const testnet = $('#envTestnet').checked;
+      const withEnv = useProxy ? (base + (testnet ? '/testnet' : '')) : base;
+      return withEnv; // NOTE: must append /api/v4 in path per request
     }, () => $('#apiKey').value.trim(), () => $('#apiSecret').value.trim()),
   };
 
@@ -343,20 +471,36 @@
     if(!state.coins[contract]){
       state.coins[contract] = {
         contract,
-        tick_size: null, order_size_increment: null, quanto_multiplier: null,
-        priceDec: 8, sizeInc: 1, busy: false,
-        close: null, lower:null, upper:null, mid:null, ts:null, inside:false,
-        long:null, short:null, stop:null, posSize:0, lastStopPx:null,
+        // specs
+        tick_size: null,
+        order_size_increment: null,
+        quanto_multiplier: null,
+        priceDec: 8,
+        sizeInc: 1,
+        busy: false,
+        // signal
+        close: null, lower:null, upper:null, mid:null, ts:null,
+        inside: false,
+        // open orders we placed
+        long: null,   // {id, price, size}
+        short: null,  // {id, price, size}
+        stop: null,   // {id, price, size}
+        // position
+        posSize: 0,
+        // last stop price (rounded)
+        lastStopPx: null,
       };
     }
     return state.coins[contract];
   }
 
   function renderTable(){
-    const tbody = $('#tbody'); tbody.innerHTML='';
+    const tbody = $('#tbody');
+    tbody.innerHTML = '';
     Object.values(state.coins).forEach(c => {
-      const tr=document.createElement('tr'); const inside=c.inside? '<span class="pill ok">Evet</span>':'<span class="pill bad">Hayır</span>';
-      const ts=c.ts? new Date(c.ts).toLocaleTimeString(): '-';
+      const tr = document.createElement('tr');
+      const inside = c.inside ? '<span class="pill ok">Evet</span>' : '<span class="pill bad">Hayır</span>';
+      const ts = c.ts ? new Date(c.ts).toLocaleTimeString() : '-';
       tr.innerHTML = `
         <td class="mono">${c.contract}</td>
         <td class="mono">${fmtNum(c.close)}</td>
@@ -367,7 +511,8 @@
         <td class="mono">${c.short?.id||''}</td>
         <td class="mono">${c.stop?.id||''}</td>
         <td class="mono">${c.posSize}</td>
-        <td class="mono">${ts}</td>`;
+        <td class="mono">${ts}</td>
+      `;
       tbody.appendChild(tr);
     });
   }
@@ -384,26 +529,94 @@
   document.getElementById('coinInput').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); document.getElementById('btnAddCoin').click(); }});
 
   // =============================
-  // Firestore — connect & listeners (config HIDDEN.firebase)
+  // Firestore — connect & listeners
   // =============================
   let fbApp = null; let fbDb = null;
-  function getFieldsConfig(){ return { upper: $('#f_upper').value.trim(), lower: $('#f_lower').value.trim(), mid: $('#f_mid').value.trim(), close: $('#f_close').value.trim(), symbol: $('#f_symbol').value.trim(), ts: $('#f_ts').value.trim(), }; }
-  function getFirebaseSrc(){ const useDoc = $('#srcDoc').checked; const path = $('#fb_path').value.trim(); return {useDoc, path}; }
-  function attachListenerFor(sym, f, useDoc, path){ const contract = symbolToContract(sym); ensureCoin(contract); if(state.listeners[sym]){ try{ state.listeners[sym](); }catch(e){} } if(useDoc){ const realPath = path.replace('{symbol}', sym); state.listeners[sym] = fbDb.doc(realPath).onSnapshot(snap => { if(!snap.exists){ log({warn:`Doc yok: ${realPath}`}); return; } const d = snap.data(); applySignal(sym, contract, d, f); }); log({msg:'Doc dinleniyor', sym, path: realPath}); } else { const q = fbDb.collection(path).where(f.symbol,'==', sym).orderBy(f.ts,'desc').limit(1); state.listeners[sym] = q.onSnapshot(s => { s.forEach(doc=>{ const d = doc.data(); applySignal(sym, contract, d, f); }); }); log({msg:'Collection latest dinleniyor', sym, path}); } }
-
+  function getFieldsConfig(){
+    return {
+      upper: $('#f_upper').value.trim(),
+      lower: $('#f_lower').value.trim(),
+      mid: $('#f_mid').value.trim(),
+      close: $('#f_close').value.trim(),
+      symbol: $('#f_symbol').value.trim(),
+      ts: $('#f_ts').value.trim(),
+    };
+  }
+  function getFirebaseSrc(){
+    const useDoc = $('#srcDoc').checked; const path = $('#fb_path').value.trim();
+    return {useDoc, path};
+  }
+  function attachListenerFor(sym, f, useDoc, path){
+    const contract = symbolToContract(sym);
+    ensureCoin(contract);
+    if(state.listeners[sym]){ try{ state.listeners[sym](); }catch(e){} }
+    if(useDoc){
+      const realPath = path.replace('{symbol}', sym);
+      state.listeners[sym] = fbDb.doc(realPath).onSnapshot(snap => {
+        if(!snap.exists){ log({warn:`Doc yok: ${realPath}`}); return; }
+        const d = snap.data();
+        applySignal(sym, contract, d, f);
+      });
+      log({msg:'Doc dinleniyor', sym, path: realPath});
+    } else {
+      const q = fbDb.collection(path).where(f.symbol,'==', sym).orderBy(f.ts,'desc').limit(1);
+      state.listeners[sym] = q.onSnapshot(s => { s.forEach(doc=>{ const d = doc.data(); applySignal(sym, contract, d, f); }); });
+      log({msg:'Collection latest dinleniyor', sym, path});
+    }
+  }
   async function connectFirebase(){
     if(fbApp){ log('Firestore zaten bağlı'); return; }
-    const cfg = HIDDEN.firebase; // gizli konfig
+    const cfg = {
+      apiKey: $('#fb_apiKey').value.trim(),
+      authDomain: $('#fb_authDomain').value.trim(),
+      databaseURL: $('#fb_databaseURL').value.trim(),
+      projectId: $('#fb_projectId').value.trim(),
+      storageBucket: $('#fb_storageBucket').value.trim(),
+      messagingSenderId: $('#fb_msgSenderId').value.trim(),
+      appId: $('#fb_appId').value.trim(),
+      measurementId: $('#fb_measurementId').value.trim(),
+    };
     fbApp = firebase.initializeApp(cfg);
     fbDb = firebase.firestore();
-    log({msg:'Firebase bağlandı', projectId: cfg.projectId, note:'Ayrıntılar gizli tutulur'});
+    log({msg:'Firebase bağlandı', projectId: cfg.projectId});
 
-    const coins = state.coinSymbols.slice();
-    const f = getFieldsConfig();
-    const {useDoc, path} = getFirebaseSrc();
-    for(const sym of coins){ attachListenerFor(sym, f, useDoc, path); }
+    // Start listeners for coins
+    const coins = ($('#coins').value||'').split(',').map(s=>s.trim()).filter(Boolean);
+    const f = {
+      upper: $('#f_upper').value.trim(),
+      lower: $('#f_lower').value.trim(),
+      mid: $('#f_mid').value.trim(),
+      close: $('#f_close').value.trim(),
+      symbol: $('#f_symbol').value.trim(),
+      ts: $('#f_ts').value.trim(),
+    };
+    const useDoc = $('#srcDoc').checked;
+    const path = $('#fb_path').value.trim();
+
+    for(const sym of coins){
+      const contract = symbolToContract(sym);
+      ensureCoin(contract);
+      if(state.listeners[sym]){ state.listeners[sym](); }
+      if(useDoc){
+        const realPath = path.replace('{symbol}', sym);
+        state.listeners[sym] = fbDb.doc(realPath).onSnapshot(snap => {
+          if(!snap.exists){ log({warn:`Doc yok: ${realPath}`}); return; }
+          const d = snap.data();
+          applySignal(sym, contract, d, f);
+        });
+        log({msg:'Doc dinleniyor', sym, path: realPath});
+      } else {
+        const col = fbDb.collection(path).where(f.symbol,'==', sym).orderBy(f.ts,'desc').limit(1);
+        state.listeners[sym] = col.onSnapshot(q => {
+          q.forEach(doc => {
+            const d = doc.data();
+            applySignal(sym, contract, d, f);
+          });
+        });
+        log({msg:'Collection latest dinleniyor', sym, path});
+      }
+    }
   }
-  $('#btnFbConnect').onclick = connectFirebase;
 
   function applySignal(sym, contract, d, f){
     const c = ensureCoin(contract);
@@ -412,10 +625,16 @@
     const upper = Number(d[f.upper]);
     const mid = Number(d[f.mid]);
     const ts = Number(d[f.ts]);
-    if([close,lower,upper,mid].some(n => !isFinite(n))){ log({warn:'Geçersiz sinyal değerleri', sym, d}); return; }
-    c.close = close; c.lower=lower; c.upper=upper; c.mid=mid; c.ts= ts || Date.now(); c.inside = (lower < close && close < upper);
+    if([close,lower,upper,mid].some(n => !isFinite(n))){
+      log({warn:'Geçersiz sinyal değerleri', sym, d});
+      return;
+    }
+    c.close = close; c.lower=lower; c.upper=upper; c.mid=mid; c.ts= ts || Date.now();
+    c.inside = (lower < close && close < upper);
     renderTable();
   }
+
+  $('#btnFbConnect').onclick = connectFirebase;
 
   // =============================
   // Gate helpers — specs, orders, position
@@ -424,89 +643,241 @@
     const settle = $('#settle').value.trim();
     const r = await state.gate.get(`/api/v4/futures/${settle}/contracts/${encodeURIComponent(contract)}`);
     if(!r.ok){ return null; }
-    const d = r.json; const c = ensureCoin(contract);
-    c.tick_size = Number(d.tick_size); c.order_size_increment = Number(d.order_size_increment); c.quanto_multiplier = Number(d.quanto_multiplier || 1);
-    c.priceDec = decimalsFromStep(d.tick_size); c.sizeInc = Number(d.order_size_increment);
+    const d = r.json;
+    const c = ensureCoin(contract);
+    c.tick_size = Number(d.tick_size);
+    c.order_size_increment = Number(d.order_size_increment);
+    c.quanto_multiplier = Number(d.quanto_multiplier || 1);
+    c.priceDec = decimalsFromStep(d.tick_size);
+    c.sizeInc = Number(d.order_size_increment);
     log({msg:'Spec yüklendi', contract, tick_size:c.tick_size, order_size_increment:c.order_size_increment, quanto_multiplier:c.quanto_multiplier});
     return d;
   }
-  async function setLeverageFor(contract, lev){ const settle = $('#settle').value.trim(); return await state.gate.post(`/api/v4/futures/${settle}/positions/${encodeURIComponent(contract)}/leverage`, {}, { leverage: lev }); }
-  async function getPosition(contract){ const settle = $('#settle').value.trim(); const r = await state.gate.get(`/api/v4/futures/${settle}/positions/${encodeURIComponent(contract)}`); if(!r.ok){ return null; } return r.json; }
-  async function listOpenOrders(contract){ const settle = $('#settle').value.trim(); const r = await state.gate.get(`/api/v4/futures/${settle}/orders`, {contract, status:'open'}); return r.ok ? r.json : []; }
-  async function cancelAll(contract){ const settle = $('#settle').value.trim(); const r = await state.gate.del(`/api/v4/futures/${settle}/orders`, {contract}); return r.ok; }
-  async function cancelById(id){ if(!id) return false; const settle = $('#settle').value.trim(); const r = await state.gate.del(`/api/v4/futures/${settle}/orders/${encodeURIComponent(id)}`); return r.ok; }
-  async function placeLimit(contract, size, price, reduceOnly=false, tif='gtc', text=''){ const settle = $('#settle').value.trim(); const body = {contract, size: Number(size), price: Number(price), reduce_only: !!reduceOnly, tif, text}; const r = await state.gate.post(`/api/v4/futures/${settle}/orders`, body); if(!r.ok){ return null; } return r.json; }
+
+  async function setLeverageFor(contract, lev){
+    const settle = $('#settle').value.trim();
+    const r = await state.gate.post(`/api/v4/futures/${settle}/positions/${encodeURIComponent(contract)}/leverage`, {}, { leverage: lev });
+    return r;
+  }
+
+  async function getPosition(contract){
+    const settle = $('#settle').value.trim();
+    const r = await state.gate.get(`/api/v4/futures/${settle}/positions/${encodeURIComponent(contract)}`);
+    if(!r.ok){ return null; }
+    return r.json; // {size: '0', ...}
+  }
+
+  async function listOpenOrders(contract){
+    const settle = $('#settle').value.trim();
+    const r = await state.gate.get(`/api/v4/futures/${settle}/orders`, {contract, status:'open'});
+    return r.ok ? r.json : [];
+  }
+
+  async function cancelAll(contract){
+    const settle = $('#settle').value.trim();
+    const r = await state.gate.del(`/api/v4/futures/${settle}/orders`, {contract});
+    return r.ok;
+  }
+
+  async function cancelById(id){
+    if(!id) return false;
+    const settle = $('#settle').value.trim();
+    const r = await state.gate.del(`/api/v4/futures/${settle}/orders/${encodeURIComponent(id)}`);
+    return r.ok;
+  }
+
+  async function placeLimit(contract, size, price, reduceOnly=false, tif='gtc', text=''){
+    const settle = $('#settle').value.trim();
+    const body = {contract, size: Number(size), price: Number(price), reduce_only: !!reduceOnly, tif, text};
+    const r = await state.gate.post(`/api/v4/futures/${settle}/orders`, body);
+    if(!r.ok){ return null; }
+    return r.json; // order object {id, ...}
+  }
 
   // =============================
   // Sizing & rounding
   // =============================
-  function calcSizeFromUSDT(c, usdt){ if(!c || !isFinite(c.close) || !isFinite(c.quanto_multiplier) || !isFinite(c.order_size_increment)) return 0; const baseQty = Number(usdt) / Number(c.close); const rawSize = baseQty / Number(c.quanto_multiplier || 1); const floored = floorToInc(rawSize, c.order_size_increment); return floored; }
+  function calcSizeFromUSDT(c, usdt){
+    if(!c || !isFinite(c.close) || !isFinite(c.quanto_multiplier) || !isFinite(c.order_size_increment)) return 0;
+    const baseQty = Number(usdt) / Number(c.close);
+    const rawSize = baseQty / Number(c.quanto_multiplier || 1);
+    const floored = floorToInc(rawSize, c.order_size_increment);
+    return floored;
+  }
+
   function roundPrice(c, px){ return roundToTick(px, c.tick_size || 0.01); }
 
   // =============================
   // Main loop per coin
   // =============================
   async function tickCoin(contract){
-    const c = ensureCoin(contract); if(c.busy) return; c.busy = true;
+    const c = ensureCoin(contract);
+    if(c.busy) return; c.busy = true;
     try{
-      if(!c.tick_size || !c.order_size_increment || !c.quanto_multiplier){ await fetchSpec(contract); }
-      const pos = await getPosition(contract); if(pos){ c.posSize = Number(pos.size || 0); }
-      if(!isFinite(c.close) || !isFinite(c.lower) || !isFinite(c.upper) || !isFinite(c.mid)){ return; }
+      // 1) Ensure specs
+      if(!c.tick_size || !c.order_size_increment || !c.quanto_multiplier){
+        await fetchSpec(contract);
+      }
+      // 2) Ensure we have latest position
+      const pos = await getPosition(contract);
+      if(pos){ c.posSize = Number(pos.size || 0); }
+
+      // 3) If no signal yet, skip
+      if(!isFinite(c.close) || !isFinite(c.lower) || !isFinite(c.upper) || !isFinite(c.mid)){
+        return;
+      }
       c.inside = (c.lower < c.close && c.close < c.upper);
 
       const usdt = Number($('#usdtAmount').value || 0);
       const desiredSize = calcSizeFromUSDT(c, usdt);
-      const longPx = roundPrice(c, c.upper); const shortPx = roundPrice(c, c.lower);
+      const longPx = roundPrice(c, c.upper);
+      const shortPx = roundPrice(c, c.lower);
 
+      // If position open -> manage STOP only
       if(c.posSize !== 0){
+        // cancel entry orders if any
         if(c.long?.id){ await cancelById(c.long.id); c.long=null; }
         if(c.short?.id){ await cancelById(c.short.id); c.short=null; }
+
         if($('#optReduce').checked){
           const stopPx = roundPrice(c, c.mid);
           if(!c.stop || c.lastStopPx !== stopPx){
             if(c.stop?.id){ await cancelById(c.stop.id); c.stop=null; }
-            const sideSize = Math.abs(c.posSize) * (c.posSize>0 ? -1 : 1);
+            const sideSize = Math.abs(c.posSize) * (c.posSize>0 ? -1 : 1); // opposite sign
             const placed = await placeLimit(contract, sideSize, stopPx, true, 'gtc', `stop-${Date.now()}`);
             if(placed){ c.stop = {id: placed.id, price: stopPx, size: sideSize}; c.lastStopPx = stopPx; }
           }
         }
-        return; // pozisyondayken giriş emri yok
+        return; // while in position, no entry orders
       }
 
+      // No position: cancel stray stop
       if(c.stop?.id){ await cancelById(c.stop.id); c.stop=null; c.lastStopPx=null; }
-      if(!c.inside){ if(c.long?.id){ await cancelById(c.long.id); c.long=null; } if(c.short?.id){ await cancelById(c.short.id); c.short=null; } return; }
-      if(!(desiredSize>0) || desiredSize < (c.order_size_increment||1)){ log({warn:'Size çok küçük, emir atlanıyor', contract, desiredSize}); if(c.long?.id){ await cancelById(c.long.id); c.long=null; } if(c.short?.id){ await cancelById(c.short.id); c.short=null; } return; }
 
-      if(!c.long){ const placed = await placeLimit(contract, +desiredSize, longPx, false, 'gtc', `long-${Date.now()}`); if(placed){ c.long = {id: placed.id, price: longPx, size: +desiredSize}; } }
-      else if( (c.long.price !== longPx) || (Number(c.long.size) !== Number(desiredSize)) ){ await cancelById(c.long.id); const placed = await placeLimit(contract, +desiredSize, longPx, false, 'gtc', `long-${Date.now()}`); if(placed){ c.long = {id: placed.id, price: longPx, size: +desiredSize}; } }
+      // If not inside channel: cancel entry orders and skip
+      if(!c.inside){
+        if(c.long?.id){ await cancelById(c.long.id); c.long=null; }
+        if(c.short?.id){ await cancelById(c.short.id); c.short=null; }
+        return;
+      }
 
-      if(!c.short){ const placed = await placeLimit(contract, -desiredSize, shortPx, false, 'gtc', `short-${Date.now()}`); if(placed){ c.short = {id: placed.id, price: shortPx, size: -desiredSize}; } }
-      else if( (c.short.price !== shortPx) || (Number(c.short.size) !== Number(-desiredSize)) ){ await cancelById(c.short.id); const placed = await placeLimit(contract, -desiredSize, shortPx, false, 'gtc', `short-${Date.now()}`); if(placed){ c.short = {id: placed.id, price: shortPx, size: -desiredSize}; } }
-    } catch(e){ log({error:String(e)}); } finally { renderTable(); c.busy=false; }
+      // Ensure size is valid
+      if(!(desiredSize>0) || desiredSize < (c.order_size_increment||1)){
+        log({warn:'Size çok küçük, emir atlanıyor', contract, desiredSize});
+        // cancel if any existing
+        if(c.long?.id){ await cancelById(c.long.id); c.long=null; }
+        if(c.short?.id){ await cancelById(c.short.id); c.short=null; }
+        return;
+      }
+
+      // place/update LONG at upper
+      if(!c.long){
+        const placed = await placeLimit(contract, +desiredSize, longPx, false, 'gtc', `long-${Date.now()}`);
+        if(placed){ c.long = {id: placed.id, price: longPx, size: +desiredSize}; }
+      } else if( (c.long.price !== longPx) || (Number(c.long.size) !== Number(desiredSize)) ){
+        await cancelById(c.long.id);
+        const placed = await placeLimit(contract, +desiredSize, longPx, false, 'gtc', `long-${Date.now()}`);
+        if(placed){ c.long = {id: placed.id, price: longPx, size: +desiredSize}; }
+      }
+
+      // place/update SHORT at lower
+      if(!c.short){
+        const placed = await placeLimit(contract, -desiredSize, shortPx, false, 'gtc', `short-${Date.now()}`);
+        if(placed){ c.short = {id: placed.id, price: shortPx, size: -desiredSize}; }
+      } else if( (c.short.price !== shortPx) || (Number(c.short.size) !== Number(-desiredSize)) ){
+        await cancelById(c.short.id);
+        const placed = await placeLimit(contract, -desiredSize, shortPx, false, 'gtc', `short-${Date.now()}`);
+        if(placed){ c.short = {id: placed.id, price: shortPx, size: -desiredSize}; }
+      }
+
+      // Check if any side filled by polling position already (next tick will cancel opposite)
+    } catch(e){
+      log({error:String(e)});
+    } finally {
+      renderTable();
+      c.busy = false;
+    }
   }
 
   // =============================
   // Master loop
   // =============================
-  async function loop(){ const coins = Object.keys(state.coins); for(const contract of coins){ if(!state.running) return; await tickCoin(contract); } }
-  function startLoop(){ if(state.running) return; state.running = true; const hz = Number($('#hz').value || 1); const interval = Math.max(250, Math.round(1000/Math.max(0.1, hz))); state.loopTimer = setInterval(loop, interval); log({msg:'Bot başlatıldı', hz, interval_ms: interval}); }
-  function stopLoop(){ state.running = false; if(state.loopTimer){ clearInterval(state.loopTimer); state.loopTimer=null; } log('Bot durduruldu'); }
-  $('#btnStart').onclick = startLoop; $('#btnStop').onclick = stopLoop;
+  async function loop(){
+    const coins = Object.keys(state.coins);
+    for(const contract of coins){
+      if(!state.running) return;
+      await tickCoin(contract);
+    }
+  }
+
+  function startLoop(){
+    if(state.running) return;
+    state.running = true;
+    const hz = Number($('#hz').value || 1);
+    const interval = Math.max(250, Math.round(1000/Math.max(0.1, hz))); // safety
+    state.loopTimer = setInterval(loop, interval);
+    log({msg:'Bot başlatıldı', hz, interval_ms: interval});
+  }
+  function stopLoop(){
+    state.running = false;
+    if(state.loopTimer){ clearInterval(state.loopTimer); state.loopTimer=null; }
+    log('Bot durduruldu');
+  }
+  $('#btnStart').onclick = startLoop;
+  $('#btnStop').onclick = stopLoop;
 
   // =============================
-  // UI Buttons
+  // UI Actions
   // =============================
-  $('#btnTime').onclick = async () => { const r = await state.gate.get('/api/v4/spot/time', {}, !($('#apiKey').value && $('#apiSecret').value)); log({endpoint:'/api/v4/spot/time', ok:r.ok, status:r.status, data:r.json}); };
-  $('#btnSetLeverage').onclick = async () => { const lev = Number($('#leverage').value||0); const coins = state.coinSymbols.slice(); for(const sym of coins){ const c = symbolToContract(sym); ensureCoin(c); const r = await setLeverageFor(c, lev); log({msg:'Kaldıraç ayarlandı', contract:c, status:r.status, ok:r.ok, resp:r.json}); } };
-  $('#btnCancelAll').onclick = async () => { const coins = state.coinSymbols.slice(); for(const sym of coins){ const c = symbolToContract(sym); ensureCoin(c); await cancelAll(c); const pc = state.coins[c]; if(pc){ if(pc.long?.id) pc.long=null; if(pc.short?.id) pc.short=null; if(pc.stop?.id){ await cancelById(pc.stop.id); pc.stop=null; } } renderTable(); log({msg:'Tüm açık emirler iptal edildi', contract:c}); } };
+  $('#btnTime').onclick = async () => {
+    const r = await state.gate.get('/api/v4/spot/time', {}, !($('#apiKey').value && $('#apiSecret').value));
+    log({endpoint:'/api/v4/spot/time', ok:r.ok, status:r.status, data:r.json});
+  };
+
+  $('#btnSetLeverage').onclick = async () => {
+    const lev = Number($('#leverage').value||0);
+    const coins = ($('#coins').value||'').split(',').map(s=>s.trim()).filter(Boolean);
+    for(const sym of coins){
+      const c = symbolToContract(sym);
+      ensureCoin(c);
+      const r = await setLeverageFor(c, lev);
+      log({msg:'Kaldıraç ayarlandı', contract:c, status:r.status, ok:r.ok, resp:r.json});
+    }
+  };
+
+  $('#btnCancelAll').onclick = async () => {
+    const coins = ($('#coins').value||'').split(',').map(s=>s.trim()).filter(Boolean);
+    for(const sym of coins){
+      const c = symbolToContract(sym);
+      ensureCoin(c);
+      await cancelAll(c);
+      const pc = state.coins[c];
+      if(pc.long?.id) pc.long=null;
+      if(pc.short?.id) pc.short=null;
+      if(pc.stop?.id) { await cancelById(pc.stop.id); pc.stop=null; }
+      renderTable();
+      log({msg:'Tüm açık emirler iptal edildi', contract:c});
+    }
+  };
 
   // =============================
-  // Bootstrap
+  // Bootstrap — initialize coins from input now (table rows), but listeners will start on connect
   // =============================
-  function bootstrapCoins(){ const hidden = ($('#coins').value||'').split(',').map(s=>s.trim()).filter(Boolean); state.coinSymbols = Array.from(new Set(hidden.map(s=>s.toUpperCase()))); state.coinSymbols.forEach(sym=> ensureCoin(symbolToContract(sym)) ); renderCoinChips(); renderTable(); }
+  function bootstrapCoins(){
+    const hidden = ($('#coins').value||'').split(',').map(s=>s.trim()).filter(Boolean);
+    state.coinSymbols = Array.from(new Set(hidden.map(s=>s.toUpperCase())));
+    state.coinSymbols.forEach(sym=> ensureCoin(symbolToContract(sym)) );
+    renderCoinChips();
+    renderTable();
+  }
+    renderTable();
+  }
   bootstrapCoins();
+
+  // Load saved preferences on startup
   loadConn();
-  log({msg:'Gizli ayarlar yüklendi', useProxy:HIDDEN.useProxy, base:HIDDEN.useProxy? HIDDEN.proxyBase : HIDDEN.directHost, firebase_project:HIDDEN.firebase?.projectId});
+  loadFb();
+
   </script>
 </body>
 </html>
