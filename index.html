@@ -2,835 +2,733 @@
 <html lang="tr">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Gate.io USDT-M “MA Channel Botu” — Tek Dosya</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Gate.io USDT‑M — MA Channel Bot (Tek Dosya)</title>
 <style>
   :root{
     --bg:#0b0f19; --fg:#e8eef7; --muted:#9fb0c9;
-    --panel:#0f162a; --panel2:#101a32; --glass:rgba(255,255,255,.06);
-    --border:#1b2a4a; --accent:#60a5fa; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444;
+    --panel:#0f162a; --panel2:#111a30; --glass:rgba(255,255,255,.06);
+    --border:#1b2a4a; --accent:#60a5fa; --good:#22c55e; --bad:#ef4444;
     --radius:16px; --gap:14px; --padY:12px; --padX:14px; --font:15px; --maxW:1200px;
   }
   *{box-sizing:border-box}
-  html,body{height:100%}
-  body{margin:0;background:linear-gradient(180deg,#0b0f19 0%,#0b0f19 60%,#0a0e17 100%);color:var(--fg);font:400 var(--font)/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}
-  a{color:var(--accent);text-decoration:none}
-  h1{font-size:22px;margin:0 0 6px}
-  h2{font-size:18px;margin:0 0 10px;color:var(--muted)}
-  .wrap{max-width:var(--maxW);margin:24px auto;padding:0 14px}
-  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:var(--gap)}
-  .card{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));border:1px solid var(--border);border-radius:var(--radius);padding:var(--padY) var(--padX); box-shadow:0 10px 30px rgba(0,0,0,.2)}
-  .card h3{margin:0 0 8px;font-size:16px;color:#cfe3ff;letter-spacing:.2px}
-  .row{display:flex;gap:10px;flex-wrap:wrap}
-  .row > *{flex:1 1 160px}
-  label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
-  input,select,button,textarea{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:var(--panel2);color:var(--fg);outline:none}
-  input[type="checkbox"]{width:auto}
-  textarea{min-height:80px;resize:vertical}
-  button{cursor:pointer;background:linear-gradient(180deg,#1a2645,#16213a);border-color:#21325b}
-  button:hover{filter:brightness(1.1)}
-  .btnRow{display:flex;gap:10px;flex-wrap:wrap}
-  .btn-danger{background:linear-gradient(180deg,#4a1010,#3a0e0e);border-color:#61202a}
-  .btn-ok{background:linear-gradient(180deg,#124021,#0e341b);border-color:#1d5b36}
-  .pill{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.06);border:1px solid var(--border);padding:6px 10px;border-radius:999px;color:#cfe3ff;font-size:12px}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto; font-size:var(--font)}
+  header{max-width:var(--maxW);margin:24px auto 0;padding:0 var(--padX)}
+  h1{font-size:20px;margin:0 0 8px 0;display:flex;align-items:center;gap:10px}
+  .hint{color:var(--muted);font-size:13px}
+  .wrap{max-width:var(--maxW);margin:16px auto;padding:0 var(--padX);display:grid;grid-template-columns:1.2fr .8fr;gap:var(--gap)}
+  .card{background:linear-gradient(180deg, var(--panel), var(--panel2)); border:1px solid var(--border); border-radius:var(--radius); box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .controls{padding:16px}
+  .grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+  label{display:block;color:var(--muted);font-size:12px;margin-bottom:8px}
+  input,select,textarea{width:100%;background:rgba(255,255,255,.04);color:var(--fg);border:1px solid var(--border);border-radius:12px;padding:10px 12px;outline:none}
+  textarea{min-height:64px;resize:vertical}
+  .row{display:flex;flex-wrap:wrap; gap:10px; align-items:center}
+  .btn{background:var(--glass);border:1px solid var(--border);color:var(--fg);padding:10px 14px;border-radius:12px;cursor:pointer;user-select:none}
+  .btn:hover{border-color:#2a4e85}
+  .btn.primary{background:#0f1f3d;border-color:#2d57a3}
+  .btn.danger{background:#35121a;border-color:#7a1e2b}
+  .switch{display:flex;align-items:center;gap:8px}
+  .switch input{width:auto}
   .muted{color:var(--muted)}
-  .kicker{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-  .kicker .left{display:flex;align-items:center;gap:10px}
-  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
-  .table{width:100%;border-collapse:collapse}
-  .table th,.table td{padding:10px;border-bottom:1px dashed #1d2b4d;text-align:left;font-size:14px}
-  .table th{color:#bcd2ff;font-weight:600}
-  .badge{padding:2px 8px;border-radius:999px;font-size:12px}
-  .badge.ok{background:#14331f;color:#9be6b3;border:1px solid #1f5b36}
-  .badge.err{background:#3a1515;color:#ffb3b3;border:1px solid #6a1f1f}
-  .badge.warn{background:#3a2a12;color:#ffd79f;border:1px solid #6a4f1f}
-  .log{height:280px;overflow:auto;background:radial-gradient(1200px 300px at 20% 0%,rgba(48,86,166,.12),transparent 60%) ,var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px}
-  .log .item{border-bottom:1px dotted #23345e;padding:6px 2px}
-  .log .time{color:#9fb0c9;font-size:12px;margin-right:6px}
-  .log pre{margin:6px 0 0;white-space:pre-wrap;word-break:break-word}
-  .footer{margin:18px 0 6px;color:#7592c3;font-size:12px}
-  .hl{color:#a2d2ff}
-  .sectionTitle{font-weight:600;color:#d6e6ff;letter-spacing:.2px}
+  .log{padding:0;overflow:auto;height:360px}
+  .log pre{margin:0;padding:12px;white-space:pre-wrap;word-break:break-word}
+  .log .line{padding:6px 12px;border-bottom:1px dashed rgba(255,255,255,.06)}
+  .tag{display:inline-block;padding:2px 6px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.04);font-size:12px;margin-right:6px}
+  .ok{color:var(--good)} .err{color:var(--bad)} .acc{color:var(--accent)}
+
+  /* PnL Modal */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50}
+  .modal{width:min(100%,var(--maxW));max-height:86vh;overflow:auto;background:linear-gradient(180deg, var(--panel), var(--panel2)); border:1px solid var(--border); border-radius:18px;padding:16px}
+  .modal h2{margin:0 0 10px 0;font-size:18px}
+  .modal .close{float:right}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:10px 0 16px}
+  .kpi{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:10px}
+  .kpi .v{font-weight:700;font-size:18px}
+  .tbl{width:100%;border-collapse:collapse}
+  .tbl th,.tbl td{border-bottom:1px solid rgba(255,255,255,.06);padding:8px 6px;text-align:left}
+  .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace}
+
+  @media(max-width:980px){
+    .wrap{grid-template-columns:1fr}
+    .grid{grid-template-columns:repeat(2,1fr)}
+  }
 </style>
 </head>
 <body>
+  <header>
+    <h1>Gate.io USDT‑M — MA Channel Bot <span class="tag">Tek Dosya</span><span class="tag">GTC + Takip Stop</span></h1>
+    <div class="hint">Proxy & Firestore & API anahtarları arka planda. İlk kurulum (tek seferlik) için DevTools Console'a şunu girin:
+      <span class="mono">localStorage.setItem('gateio.secure.v1', JSON.stringify({key:'K', secret:'S'}))</span>
+    </div>
+  </header>
+
   <div class="wrap">
-    <div class="kicker">
-      <div class="left">
-        <h1>Gate.io USDT‑M “MA Channel Botu”</h1>
-        <span class="pill">Tek dosya • Proxy + Firestore • OCO benzeri strateji</span>
+    <div class="card controls">
+      <div class="grid">
+        <div>
+          <label>Settle</label>
+          <select id="settle">
+            <option value="usdt" selected>usdt</option>
+            <option value="btc">btc</option>
+          </select>
+        </div>
+        <div>
+          <label>Kaldıraç</label>
+          <input id="leverage" type="number" min="1" max="100" step="1" value="10"/>
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <button id="btnLev" class="btn">Kaldıracı Uygula (Tüm Seçili)</button>
+        </div>
+        <div>
+          <label>Tutar (USDT)</label>
+          <input id="usdt" type="number" min="1" step="1" value="50"/>
+        </div>
+        <div>
+          <label>Frekans (Hz)</label>
+          <select id="hz">
+            <option value="0.5">0.5</option>
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+          </select>
+        </div>
+        <div>
+          <label>Seçenekler</label>
+          <div class="row">
+            <label class="switch"><input id="dry" type="checkbox">Dry‑run</label>
+            <label class="switch"><input id="roStop" type="checkbox" checked>Reduce‑only Stop</label>
+          </div>
+        </div>
       </div>
-      <div class="right muted">Dry‑run ile test edebilirsiniz.</div>
+      <div style="margin-top:12px">
+        <label>Coin listesi (virgüllü)</label>
+        <input id="coins" placeholder="BTCUSDT,ETHUSDT,VINEUSDT" value="BTCUSDT,ETHUSDT"/>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button id="start" class="btn primary">Başlat</button>
+        <button id="stop" class="btn">Durdur</button>
+        <button id="cancelSel" class="btn danger">Seçili coinlerde TÜM açık emirleri iptal</button>
+        <button id="pnlBtn" class="btn">PnL Pop‑up</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <span class="muted">Durum:</span>
+        <span id="status" class="tag">IDLE</span>
+        <span class="muted">Time:</span>
+        <span id="timeoff" class="tag">-</span>
+        <span class="muted">İstek/sn:</span>
+        <span id="rps" class="tag">0</span>
+      </div>
     </div>
 
-    <div class="grid">
-      <!-- Bağlantı -->
-      <div class="card" style="grid-column: span 12;">
-        <h3>1) Gate.io Bağlantı</h3>
-        <div class="row">
-          <div>
-            <label>Çevre</label>
-            <select id="env">
-              <option value="mainnet">Mainnet</option>
-              <option value="testnet">Testnet</option>
-            </select>
-          </div>
-          <div>
-            <label>Proxy Base URL</label>
-            <input id="baseUrl" placeholder="http://localhost:8787" value="http://localhost:8787"/>
-          </div>
-          <div>
-            <label>Doğrudan Host (proxy yoksa)</label>
-            <input id="directHost" placeholder="https://api.gateio.ws" value="https://api.gateio.ws"/>
-          </div>
-          <div>
-            <label>API Key</label>
-            <input id="apiKey" type="password" autocomplete="off"/>
-          </div>
-          <div>
-            <label>API Secret</label>
-            <input id="apiSecret" type="password" autocomplete="off"/>
-          </div>
-        </div>
-        <div class="btnRow" style="margin-top:10px">
-          <button id="btnSave">Kaydet (localStorage)</button>
-          <button id="btnLoad">Yükle</button>
-          <button id="btnTime">Sunucu Saati Test (GET /api/v4/spot/time)</button>
-        </div>
-      </div>
-
-      <!-- Firebase -->
-      <div class="card" style="grid-column: span 12;">
-        <h3>2) Firebase (Firestore canlı sinyal)</h3>
-        <div class="row">
-          <div>
-            <label>apiKey</label>
-            <input id="fb_apiKey" value="AIzaSyAh6JbnjsZtD-d0g3iSb2maSerPntUP6To"/>
-          </div>
-          <div>
-            <label>authDomain</label>
-            <input id="fb_authDomain" value="macbot-b7b45.firebaseapp.com"/>
-          </div>
-          <div>
-            <label>databaseURL</label>
-            <input id="fb_databaseURL" value="https://macbot-b7b45-default-rtdb.firebaseio.com"/>
-          </div>
-          <div>
-            <label>projectId</label>
-            <input id="fb_projectId" value="macbot-b7b45"/>
-          </div>
-          <div>
-            <label>storageBucket</label>
-            <input id="fb_storageBucket" value="macbot-b7b45.firebasestorage.app"/>
-          </div>
-          <div>
-            <label>messagingSenderId</label>
-            <input id="fb_messagingSenderId" value="88494187419"/>
-          </div>
-          <div>
-            <label>appId</label>
-            <input id="fb_appId" value="1:88494187419:web:9e0fd1a37e51332203373e"/>
-          </div>
-          <div>
-            <label>measurementId</label>
-            <input id="fb_measurementId" value="G-SVG851WK7Y"/>
-          </div>
-        </div>
-        <div class="row" style="margin-top:10px">
-          <div>
-            <label>Kaynak tipi</label>
-            <select id="sourceType">
-              <option value="doc">Doc pattern</option>
-              <option value="collection">Collection latest</option>
-            </select>
-          </div>
-          <div>
-            <label>Yol / Koleksiyon</label>
-            <input id="sourcePath" placeholder="signals/{SYMBOL}" value="signals/{SYMBOL}"/>
-          </div>
-          <div>
-            <label>Alan: upper</label>
-            <input id="f_upper" value="upper"/>
-          </div>
-          <div>
-            <label>Alan: lower</label>
-            <input id="f_lower" value="lower"/>
-          </div>
-          <div>
-            <label>Alan: mid</label>
-            <input id="f_mid" value="mid"/>
-          </div>
-          <div>
-            <label>Alan: close</label>
-            <input id="f_close" value="close"/>
-          </div>
-          <div>
-            <label>Alan: symbol</label>
-            <input id="f_symbol" value="symbol"/>
-          </div>
-          <div>
-            <label>Alan: ts_ms</label>
-            <input id="f_ts" value="ts_ms"/>
-          </div>
-        </div>
-        <div class="btnRow" style="margin-top:10px">
-          <button id="btnConnectFb" class="btn-ok">Bağlan (dinlemeyi başlat)</button>
-        </div>
-      </div>
-
-      <!-- Strateji & Emirler -->
-      <div class="card" style="grid-column: span 12;">
-        <h3>3) Strateji & Emir</h3>
-        <div class="row">
-          <div>
-            <label>Settle</label>
-            <input id="settle" value="usdt"/>
-          </div>
-          <div>
-            <label>Kaldıraç</label>
-            <input id="leverage" type="number" step="1" value="10"/>
-          </div>
-          <div>
-            <label>Tutar (USDT)</label>
-            <input id="usdtAmt" type="number" step="0.01" value="50"/>
-          </div>
-          <div>
-            <label>Güncelleme hızı (Hz)</label>
-            <select id="hz">
-              <option value="0.5">0.5</option>
-              <option value="1" selected>1</option>
-              <option value="1.5">1.5</option>
-              <option value="2">2</option>
-            </select>
-          </div>
-          <div>
-            <label>Coin listesi (virgüllü)</label>
-            <input id="symbols" value="BTCUSDT,ETHUSDT"/>
-          </div>
-          <div>
-            <label>&nbsp;</label>
-            <div style="display:flex;gap:16px;align-items:center">
-              <label class="row" style="align-items:center;gap:8px"><input id="optReduce" type="checkbox" checked/> Reduce‑only STOP</label>
-              <label class="row" style="align-items:center;gap:8px"><input id="optDry" type="checkbox"/> Dry‑run</label>
-            </div>
-          </div>
-        </div>
-        <div class="btnRow" style="margin-top:10px">
-          <button id="btnStart" class="btn-ok">Başlat</button>
-          <button id="btnStop" class="btn-danger">Durdur</button>
-          <button id="btnSetLev">Kaldıraç Ayarla (tüm seçili coinler)</button>
-          <button id="btnCancelAll" class="btn-danger">Seçili coinlerde tüm açık emirleri iptal</button>
-        </div>
-      </div>
-
-      <!-- Durum Tablosu -->
-      <div class="card" style="grid-column: span 12;">
-        <h3>4) Durum</h3>
-        <div class="muted" style="margin-bottom:8px">Kontrat, son sinyal ve emir/pozisyon durumu</div>
-        <div style="overflow:auto">
-          <table class="table" id="statusTable">
-            <thead>
-              <tr>
-                <th>Kontrat</th>
-                <th>Close</th>
-                <th>Lower</th>
-                <th>Mid</th>
-                <th>Upper</th>
-                <th>İçeride mi?</th>
-                <th>LongID</th>
-                <th>ShortID</th>
-                <th>StopID</th>
-                <th>Poz. Size</th>
-                <th>Son TS</th>
-              </tr>
-            </thead>
-            <tbody id="statusBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Log -->
-      <div class="card" style="grid-column: span 12;">
-        <h3>5) Log</h3>
-        <div class="log" id="log"></div>
-        <div class="footer">İmza stringleri ve Gate cevapları burada görünür. <span class="hl">Dry‑run</span> aktifken emir gönderilmez.</div>
-      </div>
-
+    <div class="card log">
+      <pre id="log"></pre>
     </div>
   </div>
 
-  <!-- Firebase compat SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <!-- PnL Modal -->
+  <div id="backdrop" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <button class="btn close" id="closeModal">Kapat (ESC)</button>
+      <h2>Canlı PnL ve Emir Durumu</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="muted">Toplam UPnL</div><div id="totUpnl" class="v">0</div></div>
+        <div class="kpi"><div class="muted">Toplam RPnL (Oturum)</div><div id="totRpnl" class="v">0</div></div>
+        <div class="kpi"><div class="muted">Açık Emir Sayısı</div><div id="totOpen" class="v">0</div></div>
+        <div class="kpi"><div class="muted">İstek/Sn (yaklaşık)</div><div id="totRps" class="v">0</div></div>
+      </div>
+      <table class="tbl mono" id="pnlTable">
+        <thead>
+          <tr>
+            <th>Sembol</th><th>Pos Size</th><th>Entry</th><th>Mark/Last</th><th>UPnL</th><th>RPnL (sess)</th><th>Fee~</th><th>Son Fill</th><th>Bekleyen (Long/Short)</th><th>Takip Stop</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
 
-<script>
-(() => {
-  // ===================== Yardımcılar =====================
-  const $ = (sel) => document.querySelector(sel);
-  const logBox = $('#log');
-  function nowStr(){ const d=new Date(); return d.toLocaleTimeString(); }
-  function log(title, obj){
-    const div=document.createElement('div');
-    div.className='item';
-    const t=document.createElement('div');
-    t.innerHTML = `<span class="time">${nowStr()}</span> <span class="sectionTitle">${title}</span>`;
-    div.appendChild(t);
-    if(obj!==undefined){
-      const pre=document.createElement('pre');
-      pre.className='mono';
-      try{ pre.textContent = typeof obj==='string' ? obj : JSON.stringify(obj,null,2); }
-      catch(e){ pre.textContent = String(obj); }
-      div.appendChild(pre);
+  <!-- Firebase compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+
+  <script>
+  // === CONFIG (UI'da YOK) ===
+  const CONFIG = {
+    env: 'mainnet', // testnet için 'testnet' yapın (UI'da görünmez)
+    proxyBaseMainnet: 'http://localhost:8787',
+    proxyBaseTestnet: 'http://localhost:8787/testnet',
+    firebase: {
+      apiKey: "AIzaSyAh6JbnjsZtD-d0g3iSb2maSerPntUP6To",
+      authDomain: "macbot-b7b45.firebaseapp.com",
+      databaseURL: "https://macbot-b7b45-default-rtdb.firebaseio.com",
+      projectId: "macbot-b7b45",
+      storageBucket: "macbot-b7b45.firebasestorage.app",
+      messagingSenderId: "88494187419",
+      appId: "1:88494187419:web:9e0fd1a37e51332203373e",
+      measurementId: "G-SVG851WK7Y"
+    },
+    firestore: {
+      collection: 'mac_stream',
+      docSuffix: '_5m',
+      fields: { upper:'upper', lower:'lower', mid:'mid', close:'close', symbol:'symbol', ts:'ts_ms', inChannel:'in_channel', position:'position' }
     }
-    logBox.prepend(div);
-    // sınırla
-    const max=500; while(logBox.children.length>max){ logBox.removeChild(logBox.lastChild); }
+  };
+
+  // === LocalStorage Anahtarları ===
+  const LS_SECURE = 'gateio.secure.v1'; // {key, secret}
+  const LS_CFG    = 'gateio.mac.config.v1'; // {coins, usdt, leverage, settle, hz, toggles}
+
+  // === UI Elemanları ===
+  const el = {
+    settle: document.getElementById('settle'),
+    leverage: document.getElementById('leverage'),
+    btnLev: document.getElementById('btnLev'),
+    usdt: document.getElementById('usdt'),
+    coins: document.getElementById('coins'),
+    hz: document.getElementById('hz'),
+    dry: document.getElementById('dry'),
+    roStop: document.getElementById('roStop'),
+    start: document.getElementById('start'),
+    stop: document.getElementById('stop'),
+    cancelSel: document.getElementById('cancelSel'),
+    log: document.getElementById('log'),
+    status: document.getElementById('status'),
+    timeoff: document.getElementById('timeoff'),
+    rps: document.getElementById('rps'),
+    pnlBtn: document.getElementById('pnlBtn'),
+    backdrop: document.getElementById('backdrop'),
+    closeModal: document.getElementById('closeModal'),
+    pnlTableBody: document.querySelector('#pnlTable tbody'),
+    totUpnl: document.getElementById('totUpnl'),
+    totRpnl: document.getElementById('totRpnl'),
+    totOpen: document.getElementById('totOpen'),
+    totRps: document.getElementById('totRps')
+  };
+
+  // === Global Durumlar ===
+  const state = {
+    running: false,
+    timer: null,
+    hz: 1,
+    serverOffsetMs: 0,
+    baseUrl: '',
+    requests: [], // zaman damgaları, RPS hesap
+    symbols: [],
+    coinStates: {}, // symbol -> {busy, signal, spec, pos, openOrders, desired, stopOrderId, lastStopPrice, rpnlSess, lastFillTs}
+  };
+
+  // === Yardımcılar ===
+  const sleep = ms => new Promise(r=>setTimeout(r,ms));
+  const ts = () => new Date().toLocaleTimeString();
+  const nowMs = () => Date.now();
+  const toHex = buf => Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  const enc = new TextEncoder();
+
+  function log(line, cls=''){
+    const div = document.createElement('div');
+    div.className = 'line ' + cls;
+    div.textContent = `[${ts()}] ${line}`;
+    el.log.appendChild(div);
+    el.log.scrollTop = el.log.scrollHeight;
   }
 
-  function saveSettings(){
-    const data = collectSettings();
-    localStorage.setItem('maChannelBot.settings.v1', JSON.stringify(data));
-    log('Ayarlar kaydedildi', data);
-  }
-  function loadSettings(){
-    const raw = localStorage.getItem('maChannelBot.settings.v1');
-    if(!raw){ log('Kayıtlı ayar bulunamadı'); return; }
-    const s = JSON.parse(raw);
-    $('#env').value = s.env||'mainnet';
-    $('#baseUrl').value = s.baseUrl||'http://localhost:8787';
-    $('#directHost').value = s.directHost||'https://api.gateio.ws';
-    $('#apiKey').value = s.apiKey||'';
-    $('#apiSecret').value = s.apiSecret||'';
-    // Firebase
-    $('#fb_apiKey').value = s.fb?.apiKey||'';
-    $('#fb_authDomain').value = s.fb?.authDomain||'';
-    $('#fb_databaseURL').value = s.fb?.databaseURL||'';
-    $('#fb_projectId').value = s.fb?.projectId||'';
-    $('#fb_storageBucket').value = s.fb?.storageBucket||'';
-    $('#fb_messagingSenderId').value = s.fb?.messagingSenderId||'';
-    $('#fb_appId').value = s.fb?.appId||'';
-    $('#fb_measurementId').value = s.fb?.measurementId||'';
-
-    $('#sourceType').value = s.sourceType||'doc';
-    $('#sourcePath').value = s.sourcePath||'signals/{SYMBOL}';
-
-    $('#f_upper').value = s.fields?.upper||'upper';
-    $('#f_lower').value = s.fields?.lower||'lower';
-    $('#f_mid').value = s.fields?.mid||'mid';
-    $('#f_close').value = s.fields?.close||'close';
-    $('#f_symbol').value = s.fields?.symbol||'symbol';
-    $('#f_ts').value = s.fields?.ts||'ts_ms';
-
-    $('#settle').value = s.settle||'usdt';
-    $('#leverage').value = s.leverage||10;
-    $('#usdtAmt').value = s.usdtAmt||50;
-    $('#hz').value = s.hz||'1';
-    $('#symbols').value = s.symbols||'BTCUSDT,ETHUSDT';
-    $('#optReduce').checked = !!s.optReduce;
-    $('#optDry').checked = !!s.optDry;
-
-    log('Ayarlar yüklendi');
-  }
-  function collectSettings(){
-    return {
-      env: $('#env').value.trim(),
-      baseUrl: $('#baseUrl').value.trim(),
-      directHost: $('#directHost').value.trim(),
-      apiKey: $('#apiKey').value,
-      apiSecret: $('#apiSecret').value,
-      fb:{
-        apiKey: $('#fb_apiKey').value.trim(),
-        authDomain: $('#fb_authDomain').value.trim(),
-        databaseURL: $('#fb_databaseURL').value.trim(),
-        projectId: $('#fb_projectId').value.trim(),
-        storageBucket: $('#fb_storageBucket').value.trim(),
-        messagingSenderId: $('#fb_messagingSenderId').value.trim(),
-        appId: $('#fb_appId').value.trim(),
-        measurementId: $('#fb_measurementId').value.trim(),
-      },
-      sourceType: $('#sourceType').value,
-      sourcePath: $('#sourcePath').value.trim(),
-      fields:{
-        upper: $('#f_upper').value.trim(),
-        lower: $('#f_lower').value.trim(),
-        mid: $('#f_mid').value.trim(),
-        close: $('#f_close').value.trim(),
-        symbol: $('#f_symbol').value.trim(),
-        ts: $('#f_ts').value.trim(),
-      },
-      settle: $('#settle').value.trim(),
-      leverage: Number($('#leverage').value),
-      usdtAmt: Number($('#usdtAmt').value),
-      hz: $('#hz').value,
-      symbols: $('#symbols').value.trim(),
-      optReduce: $('#optReduce').checked,
-      optDry: $('#optDry').checked,
+  function saveUserCfg(){
+    const data = {
+      settle: el.settle.value,
+      leverage: Number(el.leverage.value||10),
+      usdt: Number(el.usdt.value||50),
+      hz: Number(el.hz.value||1),
+      toggles: { dry: el.dry.checked, roStop: el.roStop.checked },
+      coins: el.coins.value
     };
+    localStorage.setItem(LS_CFG, JSON.stringify(data));
+  }
+  function loadUserCfg(){
+    const raw = localStorage.getItem(LS_CFG);
+    if(!raw) return;
+    try{
+      const d = JSON.parse(raw);
+      if(d.settle) el.settle.value = d.settle;
+      if(d.leverage) el.leverage.value = d.leverage;
+      if(d.usdt) el.usdt.value = d.usdt;
+      if(d.hz) el.hz.value = d.hz;
+      if(d.toggles){ el.dry.checked = !!d.toggles.dry; el.roStop.checked = !!d.toggles.roStop; }
+      if(d.coins) el.coins.value = d.coins;
+    }catch(e){ console.warn('cfg parse',e); }
   }
 
-  // ============ Kripto yardımcıları (SHA512 / HMAC-SHA512) ============
-  const te = new TextEncoder();
-  function toHex(buffer){
-    const b = new Uint8Array(buffer);
-    let s=''; for(const x of b){ s += x.toString(16).padStart(2,'0'); }
-    return s;
+  function coinsFromInput(){
+    return (el.coins.value||'')
+      .split(',')
+      .map(s=>s.trim().toUpperCase())
+      .filter(s=>s.endsWith('USDT') && s.length>6);
   }
-  async function sha512Hex(input){
-    const data = (typeof input==='string') ? te.encode(input) : input;
-    const hash = await crypto.subtle.digest('SHA-512', data);
-    return toHex(hash);
+  const toContract = sym => sym.replace(/USDT$/,'_USDT');
+
+  function quantToTick(price, tick){
+    if(!isFinite(price)||!isFinite(tick)||tick<=0) return price;
+    const q = Math.round(price / tick) * tick;
+    const dp = (tick.toString().split('.')[1]||'').length;
+    return Number(q.toFixed(dp));
   }
-  async function hmacSha512Hex(secret, message){
-    const key = await crypto.subtle.importKey(
-      'raw', te.encode(secret), {name:'HMAC', hash:'SHA-512'}, false, ['sign']
-    );
-    const sig = await crypto.subtle.sign('HMAC', key, te.encode(message));
+  function floorToInc(sz, inc){
+    if(!isFinite(sz)||!isFinite(inc)||inc<=0) return 0;
+    const sign = sz>=0? 1 : -1;
+    const abs = Math.floor(Math.abs(sz)/inc)*inc;
+    const dp = (inc.toString().split('.')[1]||'').length;
+    return Number((abs*sign).toFixed(dp));
+  }
+
+  // === WebCrypto: SHA512 & HMAC‑SHA512 (hex) ===
+  async function sha512Hex(str){
+    const buf = await crypto.subtle.digest('SHA-512', enc.encode(str||''));
+    return toHex(buf);
+  }
+  async function hmac512Hex(secret, msg){
+    const key = await crypto.subtle.importKey('raw', enc.encode(secret), {name:'HMAC', hash:'SHA-512'}, false, ['sign']);
+    const sig = await crypto.subtle.sign('HMAC', key, enc.encode(msg));
     return toHex(sig);
   }
 
-  function sortedQueryString(params){
-    const keys = Object.keys(params||{}).filter(k=>params[k]!==undefined && params[k]!==null);
-    keys.sort();
-    const usp = new URLSearchParams();
-    for(const k of keys){ usp.append(k, String(params[k])); }
-    return usp.toString();
+  // === Gate.io İmza + İstek ===
+  function baseUrl(){
+    return CONFIG.env==='testnet' ? CONFIG.proxyBaseTestnet : CONFIG.proxyBaseMainnet;
   }
-
-  function symToContract(sym){
-    // "BTCUSDT" -> "BTC_USDT"
-    if(!sym) return '';
-    return sym.replace(/USDT$/,'_USDT');
+  function addReqTick(){
+    const t = nowMs();
+    state.requests.push(t);
+    // son 10s tut
+    while(state.requests.length && t - state.requests[0] > 10000) state.requests.shift();
+    // RPS yaklaşık (son 5s /5)
+    const last5 = state.requests.filter(x=>t-x<=5000).length;
+    const rps = (last5/5).toFixed(1);
+    el.rps.textContent = rps;
+    el.totRps.textContent = rps;
   }
-
-  function decimalsFromStep(step){
-    const s = String(step);
-    if(!s.includes('.')) return 0;
-    return s.length - s.indexOf('.') - 1;
-  }
-  function floorToIncrement(val, inc){
-    const d = decimalsFromStep(inc);
-    const res = Math.floor(val/inc) * inc;
-    return Number(res.toFixed(d));
-  }
-  function roundToTick(price, tick){
-    const d = decimalsFromStep(tick);
-    const res = Math.round(price/tick) * tick;
-    return Number(res.toFixed(d));
-  }
-
-  // ============ Gate.io İmzalı İstek ============
-  function baseRoot(env, baseUrl, directHost){
-    if(baseUrl){
-      // Proxy kullan: mainnet: /, testnet: /testnet
-      const suffix = (env==='testnet') ? '/testnet' : '';
-      return baseUrl.replace(/\/$/,'') + suffix;
-    }
-    return directHost?.replace(/\/$/,'')||'https://api.gateio.ws';
-  }
-
-  async function signedFetch({env, baseUrl, directHost, apiKey, apiSecret}, method, urlPath, queryParams, bodyObj){
-    const root = baseRoot(env, baseUrl, directHost);
-    const qs = sortedQueryString(queryParams||{});
-    const bodyStr = bodyObj? JSON.stringify(bodyObj) : '';
-    const bodyHash = await sha512Hex(bodyStr);
-    const ts = Math.floor(Date.now()/1000);
-    const signatureString = `${method.toUpperCase()}\n${urlPath}\n${qs}\n${bodyHash}\n${ts}`;
-    const sign = await hmacSha512Hex(apiSecret, signatureString);
-
-    const url = root + urlPath + (qs? ('?'+qs):'');
-    const headers = {
-      'Content-Type':'application/json',
-      'KEY': apiKey,
-      'Timestamp': String(ts),
-      'SIGN': sign,
-    };
-
-    log('İstek', {method, url, urlPath, query:qs, body: bodyStr||'(empty)', signature_string: signatureString});
-    if(state.optDry && method!=='GET' && method!=='DELETE'){
-      log('Dry‑run: fetch atlanıyor');
-      return { dryRun:true };
-    }
-
-    const res = await fetch(url, {method, headers, body: bodyStr||undefined});
-    const txt = await res.text();
-    let data; try{ data = JSON.parse(txt); }catch{ data = txt; }
-    log(`Cevap ${res.status}`, data);
-    if(!res.ok){ throw new Error(typeof data==='object'? (data.label+': '+data.message) : String(data)); }
-    return data;
-  }
-
-  // ============ Gate API Kısa Yolları ============
-  const API = {
-    spotTime: (cfg) => signedFetch(cfg,'GET','/api/v4/spot/time',null,null),
-    contractSpec: (cfg, settle, contract) => signedFetch(cfg,'GET',`/api/v4/futures/${settle}/contracts/${contract}`,null,null),
-    openOrders: (cfg, settle, contract) => signedFetch(cfg,'GET',`/api/v4/futures/${settle}/orders`,{contract,status:'open'},null),
-    cancelById: (cfg, settle, id) => signedFetch(cfg,'DELETE',`/api/v4/futures/${settle}/orders/${id}`,null,null),
-    cancelByContract: (cfg, settle, contract) => signedFetch(cfg,'DELETE',`/api/v4/futures/${settle}/orders`,{contract},null),
-    createOrder: (cfg, settle, body) => signedFetch(cfg,'POST',`/api/v4/futures/${settle}/orders`,null,body),
-    position: (cfg, settle, contract) => signedFetch(cfg,'GET',`/api/v4/futures/${settle}/positions/${contract}`,null,null),
-    setLeverage: (cfg, settle, contract, lev) => signedFetch(cfg,'POST',`/api/v4/futures/${settle}/positions/${contract}/leverage`,{leverage:String(lev)},null),
-  };
-
-  // ============ Durum & Bellek ============
-  const state = {
-    running:false,
-    optReduce:true,
-    optDry:false,
-    cfg: null,
-    settle:'usdt',
-    usdtAmt:50,
-    hz:1,
-    leverage:10,
-    coins: {}, // contract -> { symbol, contract, spec, last, ids, timers, busy }
-    fields:null,
-    fb:{ app:null, db:null, listeners:{} },
-  };
-
-  function getCfg(){
-    const s = collectSettings();
-    return {
-      env: s.env,
-      baseUrl: s.baseUrl,
-      directHost: s.directHost,
-      apiKey: s.apiKey,
-      apiSecret: s.apiSecret,
-    };
-  }
-
-  // ============ UI Bağlama ============
-  $('#btnSave').onclick = saveSettings;
-  $('#btnLoad').onclick = loadSettings;
-  $('#btnTime').onclick = async() => {
+  function summarizeError(e, json){
     try{
-      const cfg = getCfg();
-      const data = await API.spotTime(cfg);
-      log('Sunucu Saati', data);
-    }catch(e){ log('Sunucu Saati Hatası', String(e)); }
-  };
-
-  $('#btnConnectFb').onclick = connectFirestore;
-  $('#btnStart').onclick = startBot;
-  $('#btnStop').onclick = stopBot;
-  $('#btnSetLev').onclick = setLeverageAll;
-  $('#btnCancelAll').onclick = cancelAllSelected;
-
-  // ============ Firestore Dinleme ============
-  function buildFbConfig(){
-    const s = collectSettings();
-    return {
-      apiKey: s.fb.apiKey,
-      authDomain: s.fb.authDomain,
-      databaseURL: s.fb.databaseURL,
-      projectId: s.fb.projectId,
-      storageBucket: s.fb.storageBucket,
-      messagingSenderId: s.fb.messagingSenderId,
-      appId: s.fb.appId,
-      measurementId: s.fb.measurementId,
-    };
+      if(json && (json.label || json.message)){
+        const lab = json.label||'err';
+        const msg = (json.message||'').toLowerCase().replace(/\s+/g,'_').slice(0,60);
+        return `${lab}:${msg}`;
+      }
+    }catch{}
+    const s = (''+e).toLowerCase();
+    if(s.includes('403')) return 'forbidden';
+    if(s.includes('429')) return 'too_many_requests';
+    if(s.includes('insufficient')) return 'insufficient_balance';
+    if(s.includes('5')) return 'http_5xx';
+    return 'http_err';
   }
 
-  function connectFirestore(){
-    const s = collectSettings();
-    state.fields = s.fields;
-    if(!state.fb.app){
-      state.fb.app = firebase.initializeApp(buildFbConfig());
-      state.fb.db = firebase.firestore();
-      log('Firebase başlatıldı');
+  async function gateReq(method, path, {query=null, body=null, auth=true}={}){
+    const sec = JSON.parse(localStorage.getItem(LS_SECURE)||'{}');
+    const key = sec.key||''; const secret = sec.secret||'';
+    const urlBase = baseUrl();
+    const qs = query ? new URLSearchParams(query).toString() : '';
+    const url = urlBase + path + (qs? ('?'+qs):'');
+
+    const tsSec = Math.floor((nowMs()+state.serverOffsetMs)/1000).toString();
+    const bodyStr = body ? JSON.stringify(body) : '';
+    const bodyHex = await sha512Hex(bodyStr);
+    const sigStr = `${method.toUpperCase()}\n${path}\n${qs}\n${bodyHex}\n${tsSec}`;
+    const sign = auth ? await hmac512Hex(secret, sigStr) : '';
+
+    const headers = { 'Content-Type':'application/json' };
+    if(auth){ headers['KEY']=key; headers['Timestamp']=tsSec; headers['SIGN']=sign; }
+
+    addReqTick();
+    const res = await fetch(url, {method, headers, body: bodyStr||undefined});
+    let json=null; try{ json = await res.json(); }catch{}
+    if(!res.ok){
+      const s = summarizeError(res.statusText, json);
+      throw new Error(`ERR:${s}`);
     }
-    const symbols = s.symbols.split(',').map(x=>x.trim()).filter(Boolean);
-    // Her symbol için listener kur
-    symbols.forEach(sym => attachListener(sym, s.sourceType, s.sourcePath));
+    return json;
   }
 
-  function attachListener(symbol, sourceType, path){
-    const db = state.fb.db;
-    if(state.fb.listeners[symbol]){ state.fb.listeners[symbol](); }
-
-    if(sourceType==='doc'){
-      const docPath = path.replace('{SYMBOL}', symbol);
-      const unsub = db.doc(docPath).onSnapshot(snap => {
-        if(!snap.exists){ return; }
-        const data = snap.data();
-        onSignal(symbol, data);
-      });
-      state.fb.listeners[symbol] = unsub;
-      log('Firestore dinleme (doc)', {symbol, docPath});
-    } else {
-      // collection latest: path = collection adı (örn: "signals"); where('symbol','==',SYMBOL).orderBy('ts_ms','desc').limit(1)
-      const colRef = db.collection(path);
-      const q = colRef.where(state.fields.symbol,'==',symbol).orderBy(state.fields.ts,'desc').limit(1);
-      const unsub = q.onSnapshot(snap => {
-        snap.forEach(doc => onSignal(symbol, doc.data()));
-      });
-      state.fb.listeners[symbol] = unsub;
-      log('Firestore dinleme (collection latest)', {symbol, collection:path});
+  // === Zaman Senkronu ===
+  async function syncTime(){
+    try{
+      const url = '/api/v4/spot/time';
+      const t0 = nowMs();
+      const r = await gateReq('GET', url, {auth:false});
+      const t1 = nowMs();
+      const oneWay = (t1 - t0)/2;
+      let server = r.server_time; // saniye ya da ms olabilir
+      if(server < 1e12) server = server*1000; // saniyeyse ms'e çevir
+      state.serverOffsetMs = (server + oneWay) - t1; // yaklaşık ofset
+      const tag = Math.abs(state.serverOffsetMs) < 1500 ? 'TIME OK' : 'TIME OFF';
+      el.timeoff.textContent = `${tag}: ${(state.serverOffsetMs>=0?'+':'')}${Math.round(state.serverOffsetMs)}ms`;
+      log(`${tag}: ${(state.serverOffsetMs>=0?'+':'')}${Math.round(state.serverOffsetMs)}ms`);
+    }catch(e){
+      log(`TIME OFF: ölçülemedi`, 'err');
     }
   }
 
-  // ============ Sinyal Akışı ============
-  function ensureCoin(sym){
-    const contract = symToContract(sym);
-    if(!state.coins[contract]){
-      state.coins[contract] = {
-        symbol: sym, contract,
-        spec: null,
-        last: null, // {close,lower,mid,upper,ts}
-        ids: { long:null, short:null, stop:null },
-        lastPlaced: { upper:null, lower:null, mid:null },
+  // === Firestore Dinleme ===
+  let fb=null, db=null; let unsubMap = {};
+  function initFirebase(){
+    if(fb) return; // bir kez
+    fb = firebase.initializeApp(CONFIG.firebase);
+    db = firebase.firestore();
+  }
+  function startSignalListeners(symbols){
+    initFirebase();
+    stopSignalListeners();
+    for(const sym of symbols){
+      const docId = `${sym}${CONFIG.firestore.docSuffix}`;
+      const ref = db.collection(CONFIG.firestore.collection).doc(docId);
+      unsubMap[sym] = ref.onSnapshot(snap=>{
+        if(snap.exists){
+          const d = snap.data();
+          const f = CONFIG.firestore.fields;
+          const sig = {
+            symbol: d[f.symbol]||sym,
+            ts: d[f.ts]||0,
+            upper: Number(d[f.upper]),
+            lower: Number(d[f.lower]),
+            mid: Number(d[f.mid]),
+            close: Number(d[f.close]),
+            inChannel: !!d[f.inChannel] || (d[f.position]==='INSIDE') || ((Number(d[f.lower])<Number(d[f.close])) && (Number(d[f.close])<Number(d[f.upper])))
+          };
+          const cs = ensureCoinState(sym);
+          cs.signal = sig;
+        }
+      }, err=>{
+        log(`${sym} FS ERR`, 'err');
+      });
+    }
+  }
+  function stopSignalListeners(){
+    for(const k in unsubMap){ try{ unsubMap[k](); }catch{} }
+    unsubMap = {};
+  }
+
+  // === Coin Durum Nesnesi ===
+  function ensureCoinState(sym){
+    if(!state.coinStates[sym]){
+      state.coinStates[sym] = {
         busy:false,
-        posSize:0,
+        signal:null,
+        spec:null,
+        pos:null,
+        openOrders:[],
+        desired:{long:null, short:null},
+        stopOrderId:null,
+        lastStopPrice:null,
+        rpnlSess:0,
+        lastPosSize:0,
+        lastFillTs:null,
+        lastLongPrice:null,
+        lastShortPrice:null
       };
     }
-    return state.coins[contract];
+    return state.coinStates[sym];
   }
 
-  function onSignal(symbol, raw){
-    const f = state.fields;
-    const close = Number(raw[f.close]);
-    const upper = Number(raw[f.upper]);
-    const lower = Number(raw[f.lower]);
-    const mid = Number(raw[f.mid]);
-    const ts = Number(raw[f.ts]||0);
-    const sym = String(raw[f.symbol]||symbol);
-    const c = ensureCoin(sym);
-    c.last = {close, upper, lower, mid, ts};
-    renderStatus();
-  }
-
-  // ============ Bot Döngüsü ============
-  let loopTimer=null;
-  function startBot(){
-    const s = collectSettings();
-    state.cfg = getCfg();
-    state.optReduce = s.optReduce;
-    state.optDry = s.optDry;
-    state.settle = s.settle;
-    state.usdtAmt = s.usdtAmt;
-    state.hz = Number(s.hz);
-    state.leverage = Number(s.leverage);
-    const symbols = s.symbols.split(',').map(x=>x.trim()).filter(Boolean);
-    symbols.forEach(sym=>ensureCoin(sym));
-
-    if(loopTimer) clearInterval(loopTimer);
-    const intervalMs = Math.max(100, Math.round(1000/state.hz));
-    state.running = true;
-    loopTimer = setInterval(tickAll, intervalMs);
-    log('Bot başlatıldı', {hz: state.hz, intervalMs});
-  }
-  function stopBot(){
-    state.running = false;
-    if(loopTimer) clearInterval(loopTimer); loopTimer=null;
-    log('Bot durduruldu');
-  }
-
-  async function tickAll(){
-    if(!state.running) return;
-    for(const contract of Object.keys(state.coins)){
-      try{ await tickOne(contract); }
-      catch(e){ log(`Hata (${contract})`, String(e)); }
+  // === SPEC Önbellek ===
+  async function getSpec(sym){
+    const cs = ensureCoinState(sym);
+    if(cs.spec) return cs.spec;
+    const contract = toContract(sym);
+    try{
+      const j = await gateReq('GET', `/api/v4/futures/usdt/contracts/${contract}`);
+      const s = {
+        tick_size: Number(j.tick_size||j.order_price_round||'0.1'),
+        order_size_increment: Number(j.order_size_increment||'0.0001'),
+        quanto_multiplier: Number(j.quanto_multiplier||'1')
+      };
+      cs.spec = s;
+      log(`SPEC OK: ${contract} tick=${s.tick_size} inc=${s.order_size_increment} qm=${s.quanto_multiplier}`, 'acc');
+      return s;
+    }catch(e){
+      log(`SPEC ERR ${sym}: ${e.message}`, 'err');
+      throw e;
     }
   }
 
-  async function loadSpecIfNeeded(c){
-    if(c.spec) return;
-    const spec = await API.contractSpec(state.cfg, state.settle, c.contract);
-    c.spec = {
-      tick_size: Number(spec.tick_size||spec.tickSize||spec.order_price_round || 0.01),
-      order_size_increment: Number(spec.order_size_increment||spec.orderSizeIncrement||1),
-      quanto_multiplier: Number(spec.quanto_multiplier||spec.quantoMultiplier||1),
-      min_order_size: Number(spec.order_size_min||spec.orderSizeMin||0),
-    };
-    log('Kontrat spec', {contract:c.contract, spec:c.spec});
+  // === Pozisyon & Açık Emirler ===
+  async function getPosition(sym){
+    const contract = toContract(sym);
+    const j = await gateReq('GET', `/api/v4/futures/usdt/positions/${contract}`);
+    return j; // {size, entry_price, ...}
+  }
+  async function getOpenOrders(sym){
+    const contract = toContract(sym);
+    const j = await gateReq('GET', `/api/v4/futures/usdt/orders`, {query:{contract, status:'open'}});
+    return Array.isArray(j)? j: [];
   }
 
-  async function tickOne(contract){
-    const c = state.coins[contract];
-    if(!c || !c.last) return; // sinyal yok
-    if(c.busy) return; c.busy=true;
+  // === Emir İşlemleri ===
+  async function cancelAll(sym){
+    const contract = toContract(sym);
     try{
-      await loadSpecIfNeeded(c);
-      // 1) Pozisyon oku
-      const pos = await API.position(state.cfg, state.settle, contract);
-      const posSize = Number(pos.size||0);
-      c.posSize = posSize;
-
-      const {close, upper, lower, mid} = c.last;
-      const inside = (lower < close && close < upper);
-
-      // 2) Açık emirleri oku
-      const oo = await API.openOrders(state.cfg, state.settle, contract);
-      const openIds = new Set((Array.isArray(oo)?oo:[]).map(o=>String(o.id)));
-      // var olan id'leri doğrula
-      if(c.ids.long && !openIds.has(String(c.ids.long))) c.ids.long = null;
-      if(c.ids.short && !openIds.has(String(c.ids.short))) c.ids.short = null;
-      if(c.ids.stop && !openIds.has(String(c.ids.stop))) c.ids.stop = null;
-
-      // 3) Strateji
-      if(!inside){
-        // Kanal dışında: bekleyenleri temizle (pozisyon yoksa stop da temizlenir)
-        await cancelPairIfAny(c);
-        if(Math.abs(posSize)===0 && c.ids.stop){ await API.cancelById(state.cfg, state.settle, c.ids.stop); c.ids.stop=null; }
-        c.lastPlaced.upper=null; c.lastPlaced.lower=null; // zorla yeniden kur
-        renderStatus();
-        return;
-      }
-
-      // İçeride: pozisyon yoksa çift bekleyen emir; pozisyon varsa sadece stop takip
-      const spec = c.spec;
-      const priceUpper = roundToTick(upper, spec.tick_size);
-      const priceLower = roundToTick(lower, spec.tick_size);
-      const priceMid   = roundToTick(mid,   spec.tick_size);
-
-      const sizeAbs = computeOrderSizeAbsUSD(state.usdtAmt, close, spec);
-      if(sizeAbs <= 0){ log('Min size yetersiz', {contract, sizeAbs}); c.busy=false; return; }
-
-      if(Math.abs(posSize)===0){
-        // Çift emir kur / güncelle
-        await ensurePairLimits(c, priceUpper, priceLower, sizeAbs);
-        // Stop olmamalı
-        if(c.ids.stop){ await API.cancelById(state.cfg, state.settle, c.ids.stop); c.ids.stop=null; }
-      } else {
-        // Pozisyon var: karşı yöne reduce-only limit (mid) ile stop takip
-        if(state.optReduce){
-          await ensureReduceOnlyStop(c, posSize, priceMid);
-        }
-        // Pozisyon varken bekleyen çift emirleri sil
-        await cancelPairIfAny(c);
-      }
-
-      renderStatus();
-    } finally { c.busy=false; }
+      const dry = el.dry.checked;
+      if(dry){ log(`${sym} ORD CXL ALL (dry)`); return; }
+      await gateReq('DELETE', `/api/v4/futures/usdt/orders`, {query:{contract}});
+      log(`${sym} ORD CXL ALL`, 'acc');
+    }catch(e){ log(`${sym} ERR cancel_all: ${e.message}`, 'err'); }
+  }
+  async function cancelOne(sym, id){
+    const contract = toContract(sym);
+    try{
+      if(!id) return;
+      const dry = el.dry.checked;
+      if(dry){ log(`${sym} ORD CXL ${id} (dry)`); return; }
+      await gateReq('DELETE', `/api/v4/futures/usdt/orders/${id}`);
+      log(`${sym} ORD CXL ${id}`);
+    }catch(e){ log(`${sym} ERR cxl ${id}: ${e.message}`, 'err'); }
+  }
+  async function placeLimit(sym, size, price, {reduce_only=false, text=''}={}){
+    const contract = toContract(sym);
+    const body = { contract, size, price: Number(price), tif:'gtc' };
+    if(reduce_only) body.reduce_only = true;
+    if(text) body.text = text;
+    const dry = el.dry.checked;
+    if(dry){
+      log(`${sym} ORD NEW ${size}@${price}${reduce_only?' [RO]':''} (dry)`);
+      return { id: `dry-${Date.now()}`, ...body };
+    }
+    try{
+      const j = await gateReq('POST', `/api/v4/futures/usdt/orders`, {body});
+      log(`${sym} ORD NEW ${j.id||'?'} ${size}@${price}${reduce_only?' [RO]':''}`);
+      return j;
+    }catch(e){
+      log(`${sym} ERR new: ${e.message}`, 'err');
+      return null;
+    }
   }
 
-  function computeOrderSizeAbsUSD(usdt, price, spec){
-    // base_qty = USDT / price
-    // size = base_qty / quanto_multiplier
+  // === Kaldıraç ===
+  async function setLeverage(sym, lev){
+    const contract = toContract(sym);
+    try{
+      const dry = el.dry.checked;
+      if(dry){ log(`${sym} LEV set ${lev} (dry)`); return; }
+      await gateReq('POST', `/api/v4/futures/usdt/positions/${contract}/leverage`, {query:{leverage: lev}});
+      log(`${sym} LEV OK ${lev}`, 'acc');
+    }catch(e){ log(`${sym} ERR lev: ${e.message}`, 'err'); }
+  }
+
+  // === Ticker (Mark/Last) ===
+  async function getTicker(sym){
+    const contract = toContract(sym);
+    try{
+      const j = await gateReq('GET', `/api/v4/futures/usdt/tickers`, {query:{contract}});
+      if(Array.isArray(j) && j.length){
+        const t = j[0];
+        return { mark: Number(t.mark_price||t.last||t.last_price||0), last: Number(t.last||t.last_price||0) };
+      }
+    }catch(e){ /* sessiz */ }
+    return { mark:0, last:0 };
+  }
+
+  // === Boyut Hesabı ===
+  function computeOrderSize(usdt, price, qm, inc, side){
+    if(!price||!qm||!inc) return 0;
     const baseQty = usdt / price;
-    let size = baseQty / (spec.quanto_multiplier||1);
-    size = floorToIncrement(size, spec.order_size_increment||1);
-    if(spec.min_order_size && size < spec.min_order_size){ return 0; }
+    let size = baseQty / qm; // sözleşme adedi
+    size = floorToInc(size, inc);
+    if(side==='long') size = Math.abs(size);
+    if(side==='short') size = -Math.abs(size);
     return size;
   }
 
-  async function ensurePairLimits(c, priceUpper, priceLower, sizeAbs){
-    // Eğer fiyat değiştiyse mevcutları iptal + yeniden koy
-    const needNewLong = (!c.ids.long) || (c.lastPlaced.upper !== priceUpper);
-    const needNewShort = (!c.ids.short) || (c.lastPlaced.lower !== priceLower);
+  // === Ana Döngü: coin başına tek aktif ===
+  async function stepCoin(sym){
+    const cs = ensureCoinState(sym);
+    if(cs.busy) return; cs.busy = true;
+    try{
+      // 1) Spec
+      const spec = await getSpec(sym); // {tick_size, order_size_increment, quanto_multiplier}
+      // 2) Sinyal
+      const sig = cs.signal;
+      if(!sig){ cs.busy=false; return; }
+      // 3) Pozisyon & Açık Emirler & Ticker
+      const [pos, opens, tick] = await Promise.all([
+        getPosition(sym),
+        getOpenOrders(sym),
+        getTicker(sym)
+      ]);
+      cs.pos = pos; cs.openOrders = opens;
 
-    // Güncelleme sırası: önce iptaller
-    if(c.ids.long && needNewLong){ await API.cancelById(state.cfg, state.settle, c.ids.long); c.ids.long=null; }
-    if(c.ids.short && needNewShort){ await API.cancelById(state.cfg, state.settle, c.ids.short); c.ids.short=null; }
+      // PnL hesap (UPnL) ve RPnL approx
+      const sizeNow = Number(pos.size||0);
+      const entry = Number(pos.entry_price||0);
+      const mark = tick.mark||sig.close||0;
+      const upnl = sizeNow * (mark - entry) * spec.quanto_multiplier;
+      if(cs.lastPosSize && Math.abs(sizeNow) < Math.abs(cs.lastPosSize)){
+        // pozisyon azalınca, realize ettik say (yaklaşık)
+        const delta = Math.abs(cs.lastPosSize) - Math.abs(sizeNow);
+        const realized = (cs.lastPosSize>0 ? (mark - entry) : (entry - mark)) * spec.quanto_multiplier * delta;
+        cs.rpnlSess += realized;
+        cs.lastFillTs = new Date().toLocaleTimeString();
+      }
+      cs.lastPosSize = sizeNow;
+      // Log kısa
+      log(`${sym} POS sz=${sizeNow} entry=${entry} | PnL U=${upnl.toFixed(2)} R=${cs.rpnlSess.toFixed(2)}`);
 
-    // Açık kalan diğer taraf varsa dokunmadan bırak
-    if(needNewLong && !c.ids.long){
-      const body = {
-        contract: c.contract,
-        size: +Math.abs(sizeAbs), // BUY/LONG
-        price: String(priceUpper),
-        tif: 'gtc',
-        text: `long-${Date.now()}`,
-      };
-      const res = await API.createOrder(state.cfg, state.settle, body);
-      if(!res.dryRun) c.ids.long = res.id || res.order_id || res.client_id || null;
-      c.lastPlaced.upper = priceUpper;
+      const inChan = !!sig.inChannel;
+      const longPending = opens.find(o=>Number(o.size)>0 && !o.reduce_only);
+      const shortPending= opens.find(o=>Number(o.size)<0 && !o.reduce_only);
+      const stopPending = opens.find(o=>o.reduce_only);
+
+      // === Pozisyon varken: sadece takip stop ===
+      if(sizeNow !== 0){
+        // Karşıt bekleyenleri kaldır
+        if(longPending) await cancelOne(sym, longPending.id);
+        if(shortPending) await cancelOne(sym, shortPending.id);
+        if(!el.roStop.checked){ cs.busy=false; return; }
+        const stopSide = sizeNow>0 ? 'short' : 'long';
+        const stopPrice = quantToTick(sig.mid, spec.tick_size);
+        // Güncelleme ihtiyacı?
+        if(!stopPending || Number(stopPending.price)!==stopPrice){
+          if(stopPending) await cancelOne(sym, stopPending.id);
+          const szAbs = Math.abs(sizeNow); // tamamını kapatacak
+          const roSize = stopSide==='short'? -szAbs : szAbs;
+          const placed = await placeLimit(sym, roSize, stopPrice, {reduce_only:true, text:'follow-stop'});
+          if(placed){ cs.stopOrderId = placed.id; cs.lastStopPrice = stopPrice; log(`${sym} ORD STOP @${stopPrice}`, 'acc'); }
+        }
+        cs.busy=false; return;
+      }
+
+      // === Pozisyon yok ===
+      // Kanal dışında: varsa bekleyen çift emir iptal
+      if(!inChan){
+        if(longPending) await cancelOne(sym, longPending.id);
+        if(shortPending) await cancelOne(sym, shortPending.id);
+        cs.busy=false; return;
+      }
+
+      // Kanal içinde: iki bekleyen GTC limit
+      const tickSize = spec.tick_size;
+      const longPrice = quantToTick(sig.upper, tickSize);
+      const shortPrice= quantToTick(sig.lower, tickSize);
+      const orderUsdt = Number(el.usdt.value||0);
+      const longSz = computeOrderSize(orderUsdt, sig.mid||sig.close||longPrice, spec.quanto_multiplier, spec.order_size_increment, 'long');
+      const shortSz= computeOrderSize(orderUsdt, sig.mid||sig.close||shortPrice, spec.quanto_multiplier, spec.order_size_increment, 'short');
+
+      if(Math.abs(longSz) < spec.order_size_increment || Math.abs(shortSz) < spec.order_size_increment){
+        log(`${sym} SPEC OK ama size<inc, atlandı`);
+        cs.busy=false; return;
+      }
+
+      // Long bekleyen
+      if(!longPending || Number(longPending.price)!==longPrice || Number(longPending.size)!==longSz){
+        if(longPending) await cancelOne(sym, longPending.id);
+        await placeLimit(sym, longSz, longPrice, {text:'ch-long'});
+      }
+      // Short bekleyen
+      if(!shortPending || Number(shortPending.price)!==shortPrice || Number(shortPending.size)!==shortSz){
+        if(shortPending) await cancelOne(sym, shortPending.id);
+        await placeLimit(sym, shortSz, shortPrice, {text:'ch-short'});
+      }
+
+      cs.busy=false;
+    }catch(e){
+      log(`${sym} ERR step: ${e.message}`, 'err');
+      ensureCoinState(sym).busy=false;
     }
-    if(needNewShort && !c.ids.short){
-      const body = {
-        contract: c.contract,
-        size: -Math.abs(sizeAbs), // SELL/SHORT
-        price: String(priceLower),
-        tif: 'gtc',
-        text: `short-${Date.now()}`,
-      };
-      const res = await API.createOrder(state.cfg, state.settle, body);
-      if(!res.dryRun) c.ids.short = res.id || res.order_id || res.client_id || null;
-      c.lastPlaced.lower = priceLower;
+  }
+
+  // === Ana Döngüyü Başlat/Durdur ===
+  function start(){
+    saveUserCfg();
+    state.running = true;
+    state.hz = Number(el.hz.value||1);
+    el.status.textContent = 'RUNNING';
+    state.symbols = coinsFromInput();
+    startSignalListeners(state.symbols);
+    clearInterval(state.timer);
+    const iv = Math.max(250, Math.round(1000/state.hz)); // 0.5→2000ms, 2→500ms min clamp 250ms
+    state.timer = setInterval(()=>{
+      for(const sym of state.symbols) stepCoin(sym);
+      refreshPnLModal();
+    }, iv);
+  }
+  function stop(){
+    state.running = false;
+    el.status.textContent = 'IDLE';
+    clearInterval(state.timer);
+    state.timer = null;
+    stopSignalListeners();
+  }
+
+  // === PnL Modal ===
+  function openModal(){ el.backdrop.style.display='flex'; refreshPnLModal(); }
+  function closeModal(){ el.backdrop.style.display='none'; }
+  function refreshPnLModal(){
+    let totU=0, totR=0, totOpen=0;
+    const body = el.pnlTableBody; body.innerHTML='';
+    for(const sym of state.symbols){
+      const cs = ensureCoinState(sym);
+      const spec = cs.spec||{quanto_multiplier:1};
+      const pos = cs.pos||{size:0, entry_price:0};
+      const size = Number(pos.size||0);
+      const entry = Number(pos.entry_price||0);
+      const sig = cs.signal||{}; const mid = Number(sig.mid||0); const close = Number(sig.close||0);
+      const mark = mid||close||0;
+      const upnl = size * (mark - entry) * (spec.quanto_multiplier||1);
+      const opens = cs.openOrders||[]; totOpen += opens.length;
+      const longP = opens.find(o=>Number(o.size)>0 && !o.reduce_only);
+      const shortP= opens.find(o=>Number(o.size)<0 && !o.reduce_only);
+      const stopP = opens.find(o=>o.reduce_only);
+      totU += upnl; totR += (cs.rpnlSess||0);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${sym}</td>
+        <td>${size}</td>
+        <td>${entry||''}</td>
+        <td>${mark||''}</td>
+        <td class="${upnl>=0?'ok':'err'}">${upnl.toFixed(2)}</td>
+        <td>${(cs.rpnlSess||0).toFixed(2)}</td>
+        <td>~maker</td>
+        <td>${cs.lastFillTs||''}</td>
+        <td>${longP? (longP.id+` @`+longP.price+` x`+longP.size):'-'} / ${shortP? (shortP.id+` @`+shortP.price+` x`+shortP.size):'-'}</td>
+        <td>${stopP? (stopP.id+` @`+stopP.price):'-'}</td>`;
+      body.appendChild(tr);
     }
+    el.totUpnl.textContent = totU.toFixed(2);
+    el.totRpnl.textContent = totR.toFixed(2);
+    el.totOpen.textContent = String(totOpen);
+    // rps zaten üstte güncelleniyor
   }
 
-  async function ensureReduceOnlyStop(c, posSize, priceMid){
-    // Pozisyon yönüne göre karşı yöne reduce_only limit
-    const wantBuy  = posSize < 0; // short poz -> BUY stop
-    const wantSell = posSize > 0; // long poz -> SELL stop
+  // === Eventler ===
+  el.start.onclick = ()=> start();
+  el.stop.onclick = ()=> stop();
+  el.pnlBtn.onclick = ()=> openModal();
+  el.closeModal.onclick = ()=> closeModal();
+  window.addEventListener('keydown', (ev)=>{ if(ev.key==='Escape') closeModal(); });
 
-    const needNew = (!c.ids.stop) || (c.lastPlaced.mid !== priceMid);
-    if(!needNew) return; // güncel
+  el.btnLev.onclick = async()=>{
+    saveUserCfg();
+    const lev = Number(el.leverage.value||10);
+    const syms = coinsFromInput();
+    for(const s of syms){ await setLeverage(s, lev); await sleep(100); }
+  };
 
-    // önce var ise iptal et
-    if(c.ids.stop){ await API.cancelById(state.cfg, state.settle, c.ids.stop); c.ids.stop=null; }
+  el.cancelSel.onclick = async()=>{
+    saveUserCfg();
+    const syms = coinsFromInput();
+    for(const s of syms){ await cancelAll(s); await sleep(80); }
+  };
 
-    const bodyBase = {
-      contract: c.contract,
-      size: wantBuy ? Math.abs(posSize) : -Math.abs(posSize),
-      price: String(priceMid),
-      tif: 'gtc',
-      reduce_only: true,
-      text: `stop-${Date.now()}`,
-    };
-    const res = await API.createOrder(state.cfg, state.settle, bodyBase);
-    if(!res.dryRun) c.ids.stop = res.id || res.order_id || res.client_id || null;
-    c.lastPlaced.mid = priceMid;
-  }
+  // Değişikliklerde ayarları kaydet
+  ['settle','leverage','usdt','hz','dry','roStop','coins'].forEach(id=>{
+    document.getElementById(id).addEventListener('change', saveUserCfg);
+  });
 
-  async function cancelPairIfAny(c){
-    if(c.ids.long){ try{ await API.cancelById(state.cfg, state.settle, c.ids.long); }catch(e){ log('İptal (long) hata', String(e)); }
-      c.ids.long=null; }
-    if(c.ids.short){ try{ await API.cancelById(state.cfg, state.settle, c.ids.short); }catch(e){ log('İptal (short) hata', String(e)); }
-      c.ids.short=null; }
-  }
+  // === Başlangıç ===
+  (async function init(){
+    loadUserCfg();
+    state.baseUrl = baseUrl();
+    await syncTime();
+    log('Hazır. Başlat için düğmeye basın.', 'acc');
+  })();
 
-  async function cancelAllSelected(){
-    const s = collectSettings();
-    const symbols = s.symbols.split(',').map(x=>x.trim()).filter(Boolean);
-    for(const sym of symbols){
-      const contract = symToContract(sym);
-      try{
-        await API.cancelByContract(state.cfg||getCfg(), s.settle||'usdt', contract);
-        const c = state.coins[contract]; if(c){ c.ids.long=c.ids.short=c.ids.stop=null; }
-      }catch(e){ log(`İptal (tümü) hata ${contract}`, String(e)); }
-    }
-  }
-
-  async function setLeverageAll(){
-    const s = collectSettings();
-    const symbols = s.symbols.split(',').map(x=>x.trim()).filter(Boolean);
-    for(const sym of symbols){
-      const contract = symToContract(sym);
-      try{
-        const res = await API.setLeverage(getCfg(), s.settle||'usdt', contract, Number(s.leverage)||0);
-        log('Kaldıraç ayarlandı', {contract, res});
-      }catch(e){ log(`Kaldıraç hata ${contract}`, String(e)); }
-    }
-  }
-
-  // ============ Durum Tablosu ============
-  function renderStatus(){
-    const tbody = $('#statusBody');
-    const rows = [];
-    for(const [contract,c] of Object.entries(state.coins)){
-      const L = c.last||{};
-      const inside = (L.lower < L.close && L.close < L.upper);
-      rows.push(`<tr>
-        <td class="mono">${contract}</td>
-        <td>${fmtNum(L.close)}</td>
-        <td>${fmtNum(L.lower)}</td>
-        <td>${fmtNum(L.mid)}</td>
-        <td>${fmtNum(L.upper)}</td>
-        <td>${inside? '<span class="badge ok">İÇERİDE</span>' : '<span class="badge warn">DIŞARIDA</span>'}</td>
-        <td class="mono">${c.ids.long||'-'}</td>
-        <td class="mono">${c.ids.short||'-'}</td>
-        <td class="mono">${c.ids.stop||'-'}</td>
-        <td class="mono">${c.posSize??0}</td>
-        <td class="mono">${L.ts? new Date(L.ts).toLocaleTimeString():'-'}</td>
-      </tr>`);
-    }
-    tbody.innerHTML = rows.join('');
-  }
-  function fmtNum(x){ return (x===undefined||x===null||isNaN(x))? '-' : Number(x).toLocaleString(undefined,{maximumFractionDigits:8}); }
-
-  // ============ İlk yükleme ============
-  loadSettings();
-})();
-</script>
+  </script>
 </body>
 </html>
