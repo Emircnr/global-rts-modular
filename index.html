@@ -132,13 +132,26 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 
 <script>
-/* =================== Yardımcılar =================== */
+/* =================== Yardımcılar & UI =================== */
 const qs = id => document.getElementById(id);
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 const fmt = n => (n==null||isNaN(n))?'-':(+n).toLocaleString(undefined,{maximumFractionDigits:8});
 const bpsToMult = bps => 1 + (bps/10000);
 const saveLS = (k,v)=> localStorage.setItem(k, JSON.stringify(v));
 const loadLS = (k,d)=> { try{ const v=JSON.parse(localStorage.getItem(k)); return v??d; }catch{ return d; } };
+
+function markProxy(ok){ const d=qs('dotProxy'); d.classList.remove('on','off'); d.classList.add(ok?'on':'off'); }
+function markFS(ok){ const d=qs('dotFS'); d.classList.remove('on','off'); d.classList.add(ok?'on':'off'); }
+function uiSetErr(m){ qs('err').textContent = m || '-'; }
+function uiTick(){ qs('lastTick').textContent = new Date().toLocaleTimeString(); }
+
+function normalizeBaseUrl(raw){
+  let b = (raw||'').trim();
+  if(!b) throw new Error('Proxy Base URL boş');
+  if(!/^https?:\/\//i.test(b)) b = 'http://' + b; // otomatik prefix
+  try{ new URL(b); }catch(e){ throw new Error('Proxy Base URL geçersiz: ' + b); }
+  return b.replace(/\/+$/,''); // sondaki slashları kaldır
+}
 
 const toFsSymbol = (gateContract, fmtMode='auto')=>{
   if(fmtMode==='same') return (gateContract||'').toUpperCase();
@@ -154,36 +167,11 @@ const toGateContract = (symLike)=>{
   return symLike.toUpperCase();
 };
 
-/* =================== UI State =================== */
-function markProxy(ok){ const d=qs('dotProxy'); d.classList.remove('on','off'); d.classList.add(ok?'on':'off'); }
-function markFS(ok){ const d=qs('dotFS'); d.classList.remove('on','off'); d.classList.add(ok?'on':'off'); }
-
-function renderRows(){
-  const list = qs('symList'); list.innerHTML='';
-  for(const sym of Object.keys(ST)){
-    const S = ST[sym] || {};
-    const G = SIG[sym] || {};
-    const el = document.createElement('div'); el.className='sym';
-    el.innerHTML = `
-      <div class="s">${sym}</div>
-      <div><span class="badge">Fiyat</span><div>${fmt(G.close)}</div></div>
-      <div><span class="badge">U</span><div>${fmt(G.upper)}</div></div>
-      <div><span class="badge">M</span><div>${fmt(G.mid)}</div></div>
-      <div><span class="badge">L</span><div>${fmt(G.lower)}</div></div>
-      <div><span class="badge">Poz</span><div>${S.position||'-'}</div></div>
-      <div><span class="badge">Çalışan</span><div>${S.working||'-'}</div></div>
-      <div><span class="badge">Stop</span><div>${fmt(S.stopPrice)}</div></div>
-      <div><button class="ghost" onclick="flatten('${sym}')">Flatten</button></div>
-    `;
-    list.appendChild(el);
-  }
-}
-function uiSetErr(m){ qs('err').textContent = m || '-'; }
-function uiTick(){ qs('lastTick').textContent = new Date().toLocaleTimeString(); }
-
 /* =================== Firestore =================== */
 let FS=null, FS_OK=false, FS_MODE='-';
 const SIG = {}; // symbol -> latest doc
+const FS_UNSUB = {}; // sym->unsub
+let POLL_TMR=null;
 
 async function fsInit(){
   try{
@@ -195,14 +183,12 @@ async function fsInit(){
     };
     const app = firebase.initializeApp(cfg, 'mac-fire-'+Math.random());
     FS = firebase.firestore(app);
-    FS_OK=true; markFS(true); qs('fs_stat').textContent='Bağlı'; qs('fsMode').textContent='listen/poll';
+    FS_OK=true; markFS(true); qs('fs_stat').textContent='Bağlı';
   }catch(e){
     FS_OK=false; markFS(false); qs('fs_stat').textContent='Hata: '+e.message; uiSetErr(e.message);
   }
 }
 
-// onSnapshot (index gerekebilir), yoksa poll fallback
-const FS_UNSUB = {}; // sym->unsub
 function attachListenerFor(sym){
   const col = qs('fs_col').value.trim();
   const fsSym = toFsSymbol(sym, qs('fs_sym_fmt').value);
@@ -212,7 +198,7 @@ function attachListenerFor(sym){
       FS_MODE='listen'; qs('fsMode').textContent='listen';
       if(!snap.empty){ SIG[sym] = snap.docs[0].data(); }
     }, err=>{
-      FS_MODE='poll'; qs('fsMode').textContent='poll'; // index yoksa
+      FS_MODE='poll'; qs('fsMode').textContent='poll';
     });
     FS_UNSUB[sym]=unsub;
   }catch(e){
@@ -234,37 +220,67 @@ async function pollLatest(sym){
 }
 
 /* =================== Proxy =================== */
-async function proxyCall(path, body){
-  const base = qs('proxy').value.trim();
-  if(!base) throw new Error('Proxy Base URL boş');
-  const url = base.replace(/\/+$/,'') + path;
-  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-  const j = await r.json().catch(()=>({ok:false,error:'invalid json'}));
-  if(!r.ok || j.ok===false) throw new Error((j && j.error) ? (typeof j.error==='string'? j.error : JSON.stringify(j.error)) : (r.status+' '+r.statusText));
-  return j;
-}
+let PROXY_BASE = null;
 async function pingProxy(){
   try{
-    const j = await fetch(qs('proxy').value.replace(/\/+$/,'')+'/healthz').then(r=>r.json());
-    markProxy(j?.ok===true);
-  }catch{ markProxy(false); }
+    PROXY_BASE = normalizeBaseUrl(qs('proxy').value);
+    const r = await fetch(PROXY_BASE + '/healthz');
+    const j = await r.json().catch(()=>null);
+    const ok = r.ok && j && j.ok===true;
+    markProxy(ok);
+    if(!ok) throw new Error((j&&j.base)?('Sağlık hatası: '+JSON.stringify(j)):('Proxy healthz başarısız: '+r.status));
+    return true;
+  }catch(e){
+    markProxy(false);
+    uiSetErr(e.message||String(e));
+    return false;
+  }
+}
+
+async function proxyCall(path, body){
+  if(!PROXY_BASE) PROXY_BASE = normalizeBaseUrl(qs('proxy').value);
+  const url = PROXY_BASE + path;
+  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body||{}) });
+  const text = await r.text(); // hata durumunda da içeriği görelim
+  let j = null; try{ j = JSON.parse(text); }catch{ j = null; }
+  if(!r.ok || (j && j.ok===false)){
+    const err = (j && j.error) ? (typeof j.error==='string'? j.error : JSON.stringify(j.error)) : (r.status+' '+r.statusText + ' '+ text);
+    throw new Error(err);
+  }
+  return j ?? {};
 }
 
 /* =================== Bot Mantığı =================== */
-let LOOP=false, POLL_TMR=null, LEV_SET=false;
+let LOOP=false, LEV_SET=false;
 const ST = {}; // symbol -> { position, working, orderLong:{id,price}, orderShort:{id,price}, stopId, stopPrice, entry }
 
+function renderRows(){
+  const list = qs('symList'); list.innerHTML='';
+  for(const sym of Object.keys(ST)){
+    const S = ST[sym] || {};
+    const G = SIG[sym] || {};
+    const el = document.createElement('div'); el.className='sym';
+    el.innerHTML = `
+      <div class="s">${sym}</div>
+      <div><span class="badge">Fiyat</span><div>${fmt(G.close)}</div></div>
+      <div><span class="badge">U</span><div>${fmt(G.upper)}</div></div>
+      <div><span class="badge">M</span><div>${fmt(G.mid)}</div></div>
+      <div><span class="badge">L</span><div>${fmt(G.lower)}</div></div>
+      <div><span class="badge">Poz</span><div>${S.position||'-'}</div></div>
+      <div><span class="badge">Çalışan</span><div>${S.working||'-'}</div></div>
+      <div><span class="badge">Stop</span><div>${fmt(S.stopPrice)}</div></div>
+      <div><button class="ghost" onclick="flatten('${sym}')">Flatten</button></div>
+    `;
+    list.appendChild(el);
+  }
+}
 async function cancelOrder(apiKey, apiSecret, market, orderId){
   if(!orderId) return;
   try{ await proxyCall('/gate/cancelOrder', { apiKey, apiSecret, market, orderId }); }catch{}
 }
-
 async function ensureLeverage(apiKey, apiSecret, market, contract, lev){
-  try{
-    await proxyCall('/gate/setLeverage', { apiKey, apiSecret, market, contract, leverage: lev });
-  }catch(e){ /* bazı borsalarda pozisyon açılınca da set edilebilir; hatayı yutuyoruz */ }
+  try{ await proxyCall('/gate/setLeverage', { apiKey, apiSecret, market, contract, leverage: lev }); }catch{}
 }
-
 async function manageOne(sym){
   const apiKey = qs('apiKey').value.trim();
   const apiSecret = qs('apiSecret').value.trim();
@@ -272,7 +288,6 @@ async function manageOne(sym){
   const lev = +qs('lev').value || 10;
   const usd = +qs('usd').value || 50;
   const bps = +qs('bps').value || 0;
-
   const sig = SIG[sym];
   if(!sig || sig.upper==null || sig.lower==null || sig.close==null) return;
 
@@ -283,14 +298,13 @@ async function manageOne(sym){
   if(qs('setLevOnStart').value==='yes' && !LEV_SET){
     try{ await ensureLeverage(apiKey, apiSecret, market, contract, lev); }catch{} 
   }
-
-  const sizeAbs = Math.max(0.0001, usd / (+sig.close || 1)); // short için negatif göndereceğiz
+  const sizeAbs = Math.max(0.0001, (+usd) / (+sig.close || 1)); // short için negatif
   const inside = !!sig.in_channel;
   const longPx  = +(sig.upper * bpsToMult(bps)).toFixed(8);
   const shortPx = +(sig.lower / bpsToMult(bps)).toFixed(8);
 
   if(inside){
-    // LONG bekleyen (size>0)
+    // LONG bekleyen
     if(!S.orderLong || Math.abs(S.orderLong.price - longPx)/longPx > 0.0001){
       await cancelOrder(apiKey, apiSecret, market, S.orderLong?.id);
       const pl = await proxyCall('/gate/placeOrder', {
@@ -300,7 +314,7 @@ async function manageOne(sym){
       });
       S.orderLong = { id: pl.data?.id, price: longPx };
     }
-    // SHORT bekleyen (size<0)
+    // SHORT bekleyen
     if(!S.orderShort || Math.abs(S.orderShort.price - shortPx)/shortPx > 0.0001){
       await cancelOrder(apiKey, apiSecret, market, S.orderShort?.id);
       const ps = await proxyCall('/gate/placeOrder', {
@@ -312,7 +326,6 @@ async function manageOne(sym){
     }
     S.working = `L@${S.orderLong?.price ?? '-'} / S@${S.orderShort?.price ?? '-'}`;
   }else{
-    // kanal dışı → bekleyenleri kapat
     if(S.orderLong?.id){ await cancelOrder(apiKey, apiSecret, market, S.orderLong.id); S.orderLong=null; }
     if(S.orderShort?.id){ await cancelOrder(apiKey, apiSecret, market, S.orderShort.id); S.orderShort=null; }
     S.working='-';
@@ -327,7 +340,7 @@ async function manageOne(sym){
     if(stopPx){
       const st = await proxyCall('/gate/placeOrder', {
         apiKey, apiSecret, market, contract, side:'sell',
-        price: stopPx, size: 0, leverage: lev, // 0 => full close
+        price: stopPx, size: 0, leverage: lev, // 0 => pozisyonu tamamen kapat
         type:'stop', stopPrice: stopPx, stopType:'down', reduceOnly:true, tif:'gtc'
       });
       S.stopId = st.data?.id; S.stopPrice = stopPx;
@@ -339,14 +352,14 @@ async function manageOne(sym){
     if(stopPx){
       const st = await proxyCall('/gate/placeOrder', {
         apiKey, apiSecret, market, contract, side:'buy',
-        price: stopPx, size: 0, leverage: lev, // 0 => full close
+        price: stopPx, size: 0, leverage: lev,
         type:'stop', stopPrice: stopPx, stopType:'up', reduceOnly:true, tif:'gtc'
       });
       S.stopId = st.data?.id; S.stopPrice = stopPx;
     }
   }
 
-  // Trailing STOP (band hareket ederse)
+  // Trailing STOP
   if(S.position==='LONG' && S.stopId && sig.lower && Math.abs(sig.lower-(S.stopPrice||0))/Math.max(S.stopPrice||1,1)>0.0005){
     await cancelOrder(apiKey, apiSecret, market, S.stopId);
     const st2 = await proxyCall('/gate/placeOrder', {
@@ -367,7 +380,6 @@ async function manageOne(sym){
   }
 }
 
-/* Flatten: pozisyonu kapatmaya çalış */
 async function flatten(sym){
   const apiKey = qs('apiKey').value.trim();
   const apiSecret = qs('apiSecret').value.trim();
@@ -378,12 +390,10 @@ async function flatten(sym){
   const lev = +qs('lev').value || 10;
   const sizeAbs = Math.max(0.0001, (+qs('usd').value || 50) / (+sig.close || 1));
 
-  // bekleyenleri ve stopu iptal
   await cancelOrder(apiKey, apiSecret, market, S.orderLong?.id);  S.orderLong=null;
   await cancelOrder(apiKey, apiSecret, market, S.orderShort?.id); S.orderShort=null;
   await cancelOrder(apiKey, apiSecret, market, S.stopId); S.stopId=null; S.stopPrice=null;
 
-  // market-ioc (price:"0", tif:"ioc") reduce_only
   if(S.position==='LONG'){
     await proxyCall('/gate/placeOrder', { apiKey, apiSecret, market, contract, side:'sell',
       price:"0", size:+sizeAbs, leverage:lev, type:'limit', reduceOnly:true, tif:'ioc' });
@@ -396,17 +406,24 @@ async function flatten(sym){
 
 /* =================== Döngü & Olaylar =================== */
 async function start(){
-  // proxy ping
-  await pingProxy();
+  // Ayarları kaydet
+  saveSettings();
 
+  // Proxy kontrol
+  const okProxy = await pingProxy();
+  if(!okProxy){ uiSetErr('Proxy bağlantısı başarısız. URL’yi kontrol et.'); return; }
+
+  // Firestore bağlan
   if(!FS) await fsInit();
   if(!FS_OK){ uiSetErr('Firestore bağlanamadı'); return; }
+  qs('fsMode').textContent='listen/poll';
 
-  // semboller
+  // Semboller
   const symbols = qs('symbols').value.split(',').map(s=>s.trim()).filter(Boolean).map(toGateContract);
+  if(symbols.length===0){ uiSetErr('En az bir sembol giriniz (örn. BTC_USDT)'); return; }
   symbols.forEach(s=>{ if(!ST[s]) ST[s]={}; });
 
-  // FS dinleyici
+  // Dinleyici
   for(const s of symbols){
     if(FS_UNSUB[s]){ try{FS_UNSUB[s]();}catch{} delete FS_UNSUB[s]; }
     attachListenerFor(s);
@@ -418,10 +435,9 @@ async function start(){
     if(FS_MODE==='poll'){ for(const s of symbols) await pollLatest(s); }
   }, 2000);
 
-  // döngü
-  LOOP=true; qs('loop').textContent='RUNNING'; uiSetErr('-'); renderRows();
+  // Döngü
+  LOOP=true; LEV_SET=false; qs('loop').textContent='RUNNING'; uiSetErr('-'); renderRows();
   const tickSec = Math.max(1, +qs('tick').value || 3);
-  LEV_SET=false;
 
   (async function loop(){
     while(LOOP){
@@ -447,20 +463,16 @@ function stop(){
 
 function saveSettings(){
   const keys=['proxy','market','apiKey','apiSecret','fs_projectId','fs_apiKey','fs_appId','fs_authDomain','fs_col','fs_sym_fmt','symbols','lev','usd','bps','tick','setLevOnStart'];
-  const obj={}; keys.forEach(k=>obj[k]=qs(k).value);
-  saveLS('mac_fire_cfg',obj);
-  qs('status').textContent='Ayarlar kaydedildi ✔';
-  setTimeout(()=>qs('status').textContent='',2000);
+  const obj={}; keys.forEach(k=>obj[k]=qs(k).value); localStorage.setItem('mac_fire_cfg', JSON.stringify(obj));
+  qs('status').textContent='Ayarlar kaydedildi ✔'; setTimeout(()=>qs('status').textContent='',2000);
 }
+(function loadSettings(){
+  try{
+    const obj=JSON.parse(localStorage.getItem('mac_fire_cfg')||'null'); if(!obj) return;
+    Object.keys(obj).forEach(k=>{ if(qs(k)) qs(k).value=obj[k]; });
+  }catch{}
+})();
 
-function loadSettings(){
-  const obj=loadLS('mac_fire_cfg',null);
-  if(!obj) return;
-  Object.keys(obj).forEach(k=>{ if(qs(k)) qs(k).value=obj[k]; });
-}
-
-/* init */
-loadSettings();
 qs('start').addEventListener('click', start);
 qs('stop').addEventListener('click', stop);
 qs('save').addEventListener('click', saveSettings);
