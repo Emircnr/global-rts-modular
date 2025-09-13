@@ -536,7 +536,34 @@
     return {
       upper: $('#f_upper').value.trim(),
       lower: $('#f_lower').value.trim(),
-      mid: $('#f_mid'
+      mid: $('#f_mid').value.trim(),
+      close: $('#f_close').value.trim(),
+      symbol: $('#f_symbol').value.trim(),
+      ts: $('#f_ts').value.trim(),
+    };
+  }
+  function getFirebaseSrc(){
+    const useDoc = $('#srcDoc').checked; const path = $('#fb_path').value.trim();
+    return {useDoc, path};
+  }
+  function attachListenerFor(sym, f, useDoc, path){
+    const contract = symbolToContract(sym);
+    ensureCoin(contract);
+    if(state.listeners[sym]){ try{ state.listeners[sym](); }catch(e){} }
+    if(useDoc){
+      const realPath = path.replace('{symbol}', sym);
+      state.listeners[sym] = fbDb.doc(realPath).onSnapshot(snap => {
+        if(!snap.exists){ log({warn:`Doc yok: ${realPath}`}); return; }
+        const d = snap.data();
+        applySignal(sym, contract, d, f);
+      });
+      log({msg:'Doc dinleniyor', sym, path: realPath});
+    } else {
+      const q = fbDb.collection(path).where(f.symbol,'==', sym).orderBy(f.ts,'desc').limit(1);
+      state.listeners[sym] = q.onSnapshot(s => { s.forEach(doc=>{ const d = doc.data(); applySignal(sym, contract, d, f); }); });
+      log({msg:'Collection latest dinleniyor', sym, path});
+    }
+  }
   async function connectFirebase(){
     if(fbApp){ log('Firestore zaten bağlı'); return; }
     const cfg = {
@@ -837,8 +864,12 @@
   // Bootstrap — initialize coins from input now (table rows), but listeners will start on connect
   // =============================
   function bootstrapCoins(){
-    const coins = ($('#coins').value||'').split(',').map(s=>s.trim()).filter(Boolean);
-    for(const sym of coins){ ensureCoin(symbolToContract(sym)); }
+    const hidden = ($('#coins').value||'').split(',').map(s=>s.trim()).filter(Boolean);
+    state.coinSymbols = Array.from(new Set(hidden.map(s=>s.toUpperCase())));
+    state.coinSymbols.forEach(sym=> ensureCoin(symbolToContract(sym)) );
+    renderCoinChips();
+    renderTable();
+  }
     renderTable();
   }
   bootstrapCoins();
