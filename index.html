@@ -58,6 +58,10 @@
     .row .grow{flex:1}
     .sep{height:1px;background:var(--border);margin:10px 0}
     .tag{font-size:11px;border:1px solid var(--border);padding:2px 6px;border-radius:8px;color:#9fb0c9}
+      .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+    .chip{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;background:#0e162b;border:1px solid var(--border);border-radius:999px}
+    .chip .x{background:transparent;border:none;color:#9fb0c9;font-size:14px;cursor:pointer}
+    .chip .x:hover{color:#ff9b9b}
   </style>
 </head>
 <body>
@@ -167,8 +171,11 @@
             <option value="1.5">1.5 Hz</option>
             <option value="2">2 Hz</option>
           </select>
-          <label>Coin listesi</label>
-          <input id="coins" class="grow" value="BTCUSDT,ETHUSDT"/>
+          <label>Coinler</label>
+          <input id="coins" type="hidden" value="BTCUSDT,ETHUSDT"/>
+          <input id="coinInput" placeholder="BTCUSDT" style="width:160px"/>
+          <button class="btn" id="btnAddCoin">Ekle</button>
+          <div id="coinChips" class="chips"></div>
           <label class="switch"><input id="optReduce" type="checkbox" checked/><span>Reduce‑only STOP</span></label>
           <label class="switch"><input id="dryRun" type="checkbox"/><span>Dry‑run</span></label>
         </div>
@@ -448,6 +455,7 @@
     db: null,
     listeners: {}, // symbol -> unsubscribe
     coins: {},     // contract -> per-coin state
+        coinSymbols: [],
     running: false,
     loopTimer: null,
     gate: new Gate(() => {
@@ -510,10 +518,25 @@
   }
   function fmtNum(x){ return (x===null || x===undefined) ? '-' : Number(x).toString(); }
 
+  // === Coin chips UI ===
+  const coinChipsEl = document.getElementById('coinChips');
+  function normalizeSym(s){ return (s||'').toUpperCase().replace(/[^A-Z0-9_]/g,''); }
+  function updateHiddenCoins(){ document.getElementById('coins').value = state.coinSymbols.join(','); }
+  function renderCoinChips(){ if(!coinChipsEl) return; coinChipsEl.innerHTML=''; state.coinSymbols.forEach(sym=>{ const chip=document.createElement('span'); chip.className='chip'; chip.innerHTML = '<span class="mono">'+sym+'</span> <button class="x" title="Kaldır">×</button>'; chip.querySelector('.x').onclick=()=> removeCoinSymbol(sym); coinChipsEl.appendChild(chip); }); updateHiddenCoins(); }
+  function addCoinSymbol(sym){ sym=normalizeSym(sym); if(!sym) return; if(state.coinSymbols.includes(sym)) { log({msg:'Coin zaten listede', sym}); return; } state.coinSymbols.push(sym); ensureCoin(symbolToContract(sym)); renderCoinChips(); renderTable(); if(fbDb){ const f = getFieldsConfig(); const {useDoc, path} = getFirebaseSrc(); attachListenerFor(sym, f, useDoc, path); } }
+  function removeCoinSymbol(sym){ const i = state.coinSymbols.indexOf(sym); if(i>=0){ state.coinSymbols.splice(i,1); } if(state.listeners[sym]){ try{ state.listeners[sym](); }catch(e){} delete state.listeners[sym]; } const cName = symbolToContract(sym); delete state.coins[cName]; renderCoinChips(); renderTable(); }
+  document.getElementById('btnAddCoin').onclick = ()=> { const inp = document.getElementById('coinInput'); addCoinSymbol(inp.value.trim()); inp.value=''; inp.focus(); };
+  document.getElementById('coinInput').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); document.getElementById('btnAddCoin').click(); }});
+
   // =============================
   // Firestore — connect & listeners
   // =============================
   let fbApp = null; let fbDb = null;
+  function getFieldsConfig(){
+    return {
+      upper: $('#f_upper').value.trim(),
+      lower: $('#f_lower').value.trim(),
+      mid: $('#f_mid'
   async function connectFirebase(){
     if(fbApp){ log('Firestore zaten bağlı'); return; }
     const cfg = {
