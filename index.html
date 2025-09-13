@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Gate.io Futures — Tek Dosya Emir Botu (Proxy’li)</title>
+<title>Gate.io Futures — Tek Dosya Emir Botu (Mainnet/Testnet + Proxy)</title>
 <style>
   :root{
     --bg:#0b0f19; --fg:#e8eef7; --muted:#9fb0c9;
@@ -20,10 +20,9 @@
   .row{display:grid;gap:var(--gap);grid-template-columns:repeat(12,1fr)}
   .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:var(--radius);padding:var(--padY) var(--padX);box-shadow:0 6px 20px rgba(0,0,0,.25)}
   label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
-  input,select,button,textarea{
+  input,select,button{
     width:100%;border:1px solid var(--border);background:var(--glass);color:var(--fg);
-    border-radius:12px;padding:10px 12px;font:500 14px/1.3 ui-sans-serif,system-ui;
-    outline:none
+    border-radius:12px;padding:10px 12px;font:500 14px/1.3 ui-sans-serif,system-ui;outline:none
   }
   input::placeholder{color:#7f92b7}
   button{cursor:pointer;background:linear-gradient(180deg,#3a6ef6,#2551c9);border:none}
@@ -35,7 +34,7 @@
   .stack{display:flex;gap:10px}
   .pill{display:inline-flex;gap:8px;background:var(--glass);border:1px solid var(--border);padding:6px 8px;border-radius:999px;align-items:center}
   .muted{color:var(--muted)}
-  .log{white-space:pre-wrap;max-height:360px;overflow:auto;background:#0b1222;border:1px dashed var(--border);border-radius:12px;padding:12px}
+  .log{white-space:pre-wrap;max-height:380px;overflow:auto;background:#0b1222;border:1px dashed var(--border);border-radius:12px;padding:12px}
   .col-6{grid-column:span 6} .col-4{grid-column:span 4} .col-3{grid-column:span 3} .col-8{grid-column:span 8} .col-12{grid-column:span 12}
   @media (max-width:900px){.row>[class^="col-"]{grid-column:span 12}}
 </style>
@@ -43,58 +42,68 @@
 <body>
 <div class="wrap">
   <h1>Gate.io Futures — Emir Botu</h1>
-  <p class="sub">API & Proxy bilgilerini gir → <b>Kaldıraç</b> ayarla → <b>LONG/SHORT</b> seç → <b>Emir Gönder</b>. Tümü tarayıcıda, tek dosyada.</p>
+  <p class="sub">Proxy & API gir → <b>Testnet/Mainnet</b> seç → <b>Kaldıraç</b> ayarla → <b>LONG/SHORT</b> → <b>Emir Gönder</b>.</p>
 
-  <!-- Bağlantı / Kimlik -->
+  <!-- Bağlantı -->
   <div class="card grid">
     <div class="row">
+      <div class="col-4">
+        <label>Çevre</label>
+        <select id="env">
+          <option value="mainnet" selected>Mainnet</option>
+          <option value="testnet">Testnet</option>
+        </select>
+        <div class="hint">Testnet seçersen URL otomatik <code>/testnet</code> ile gider.</div>
+      </div>
+      <div class="col-4">
+        <label>Proxy Base URL (önerilir)</label>
+        <input id="proxy" placeholder="örn. http://localhost:8787"/>
+        <div class="hint">Mainnet: <code>http://localhost:8787</code> — Testnet: <code>http://localhost:8787/testnet</code></div>
+      </div>
+      <div class="col-4">
+        <label>Doğrudan API Host (proxy yoksa)</label>
+        <input id="host" value="https://api.gateio.ws" placeholder="https://api.gateio.ws"/>
+        <div class="hint">Alternatif: <code>https://api.gateeu.com</code></div>
+      </div>
+
       <div class="col-6">
         <label>API Key</label>
-        <input id="apiKey" type="password" placeholder="gateio api v4 key"/>
-        <div class="hint">Anahtarın en az: <b>Futures Read/Write</b> izni olmalı.</div>
+        <input id="apiKey" type="password" placeholder="api v4 key"/>
       </div>
       <div class="col-6">
         <label>API Secret</label>
-        <input id="apiSecret" type="password" placeholder="gateio api v4 secret"/>
+        <input id="apiSecret" type="password" placeholder="api v4 secret"/>
       </div>
-      <div class="col-6">
-        <label>API Host</label>
-        <input id="host" placeholder="https://api.gateio.ws" value="https://api.gateio.ws"/>
-        <div class="hint">TestNet: <code>https://api-testnet.gateapi.io</code></div>
-      </div>
-      <div class="col-6">
-        <label>Proxy Base URL (opsiyonel ama önerilir)</label>
-        <input id="proxy" placeholder="ör. https://senin-proxy.example.com"/>
-        <div class="hint">Proxy, <code>/api/v4/...</code> yolunu hedefe aynen yönlendirmeli ve CORS'ı açmalı.</div>
-      </div>
+
       <div class="col-12 switch">
-        <label class="pill"><input id="remember" type="checkbox"/> Bilgileri bu tarayıcıda hatırla (LocalStorage)</label>
-        <button class="secondary" id="saveConn">Kaydet</button>
+        <label class="pill"><input id="remember" type="checkbox"/> Bu tarayıcıda hatırla</label>
+        <button id="saveConn" class="secondary">Kaydet</button>
+        <button id="btnTime" class="secondary">Sunucu Saati Test</button>
       </div>
     </div>
   </div>
 
-  <!-- Sözleşme / Kaldıraç -->
+  <!-- Sözleşme -->
   <div class="card grid">
     <div class="row">
-      <div class="col-4">
+      <div class="col-3">
         <label>Settle</label>
         <select id="settle">
-          <option value="usdt" selected>USDT (Perp)</option>
-          <option value="btc">BTC (Perp)</option>
+          <option value="usdt" selected>USDT</option>
+          <option value="btc">BTC</option>
         </select>
       </div>
-      <div class="col-4">
-        <label>Contract (Sembol)</label>
-        <input id="contract" placeholder="BTC_USDT" value="BTC_USDT"/>
+      <div class="col-5">
+        <label>Contract</label>
+        <input id="contract" value="BTC_USDT" placeholder="örn. BTC_USDT"/>
       </div>
       <div class="col-4">
         <label>Kaldıraç</label>
         <div class="stack">
           <input id="leverage" type="number" min="0" max="125" step="1" value="10"/>
-          <button id="setLev" class="good" title="0 = Cross, >0 = Isolated">Kaldıracı Ayarla</button>
+          <button id="setLev" class="good" title="0=cross, >0=isolated">Ayarla</button>
         </div>
-        <div class="hint">Cross için <b>0</b> gir. İzole için pozitif sayı.</div>
+        <div class="hint">Cross için <b>0</b>, izole için pozitif.</div>
       </div>
     </div>
   </div>
@@ -111,34 +120,34 @@
       </div>
       <div class="col-3">
         <label>Fiyat (Limit için)</label>
-        <input id="price" type="number" step="0.0001" placeholder="örn. 65000.0" disabled/>
+        <input id="price" type="number" step="0.0001" placeholder="65000.0" disabled/>
       </div>
       <div class="col-3">
-        <label>Miktar (size, kontrat)</label>
+        <label>Miktar (size)</label>
         <input id="size" type="number" step="1" value="1"/>
-        <div class="hint">Gate futures’ta <b>size > 0 = BUY (LONG)</b>, <b>size &lt; 0 = SELL (SHORT)</b>.</div>
+        <div class="hint">Pozitif = LONG, Negatif = SHORT.</div>
       </div>
       <div class="col-3">
-        <label>Zaman (TIF)</label>
+        <label>TIF</label>
         <select id="tif">
-          <option value="gtc" selected>GTC</option>
-          <option value="ioc">IOC</option>
-          <option value="poc">POC</option>
+          <option value="gtc">GTC</option>
+          <option value="ioc" selected>IOC</option>
           <option value="fok">FOK</option>
         </select>
       </div>
 
       <div class="col-6">
-        <label>Yön</label>
+        <label>Yön (Hızlı)</label>
         <div class="stack">
           <button id="btnLong" class="good">LONG</button>
           <button id="btnShort" class="bad">SHORT</button>
-          <label class="pill"><input id="reduceOnly" type="checkbox"/> Reduce-Only</label>
+          <label class="pill"><input id="reduceOnly" type="checkbox"/> Reduce-only</label>
         </div>
       </div>
       <div class="col-6 stack">
         <button id="sendOrder">Emir Gönder</button>
-        <button id="cancelOpen" class="secondary">Açık Emirleri İptal (Bu kontrat)</button>
+        <button id="cancelOpen" class="secondary">Açık Emirleri İptal</button>
+        <button id="checkContract" class="secondary">Kontrat Kontrol</button>
       </div>
     </div>
   </div>
@@ -147,159 +156,185 @@
   <div class="card">
     <label>Log</label>
     <div id="log" class="log"></div>
-    <div class="hint">CORS hatası alırsan bir reverse proxy kuracağız (sonraki adımında “SA proxy” dersen bash ile kurulum tarif edeceğim).</div>
+    <div class="hint">404 alırsan logtaki <b>URL</b> & <b>PATH</b> değerini kontrol et. Testnet’te Proxy URL <code>/testnet</code> içermeli.</div>
   </div>
 </div>
 
 <script>
-/* ========= Yardımcılar ========= */
-const els = id => document.getElementById(id);
+const $ = id => document.getElementById(id);
 const enc = new TextEncoder();
 
-function appendLog(msg, obj){
-  const el = els('log');
-  const time = new Date().toLocaleTimeString();
-  el.textContent = `[${time}] ${msg}\n` + (obj? JSON.stringify(obj,null,2)+'\n':'') + el.textContent;
+/* ---------- Utils ---------- */
+function log(msg, obj){
+  const el = $('log'); const t = new Date().toLocaleTimeString();
+  el.textContent = `[${t}] ${msg}\n` + (obj? JSON.stringify(obj,null,2)+'\n':'') + el.textContent;
 }
-
-async function sha512Hex(str){
-  const buf = await crypto.subtle.digest('SHA-512', enc.encode(str));
+function qs(obj){
+  const p = new URLSearchParams();
+  Object.entries(obj||{}).forEach(([k,v])=>{
+    if(v===undefined || v===null || v==='') return;
+    p.append(k, String(v));
+  });
+  return p.toString(); // gönderdiğimiz string = imzaladığımız string
+}
+async function sha512Hex(s){
+  const buf = await crypto.subtle.digest('SHA-512', enc.encode(s||''));
   return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
 }
-async function hmacSha512Hex(secret, message){
+async function hmac512Hex(secret, message){
   const key = await crypto.subtle.importKey('raw', enc.encode(secret), {name:'HMAC', hash:'SHA-512'}, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message));
   return [...new Uint8Array(sig)].map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
-// İmza başlıkları — Gate API v4
+function buildBase(){
+  const env = $('env').value;          // mainnet | testnet
+  const proxy = $('proxy').value.trim().replace(/\/+$/,'');
+  const host = $('host').value.trim().replace(/\/+$/,'') || 'https://api.gateio.ws';
+  // Öncelik Proxy
+  if(proxy){
+    if(env==='testnet' && !/\/testnet$/.test(proxy)) return proxy + '/testnet';
+    return proxy;
+  }
+  // Proxy yoksa direkt host
+  return host;
+}
+
+/* ---------- Sign + Request ---------- */
 async function signHeaders({method, urlPath, queryString, bodyString, apiKey, apiSecret}){
   const ts = Math.floor(Date.now()/1000).toString(); // saniye
   const bodyHash = await sha512Hex(bodyString || "");
-  const sigStr = `${method.toUpperCase()}\n${urlPath}\n${queryString || ""}\n${bodyHash}\n${ts}`;
-  const sign = await hmacSha512Hex(apiSecret, sigStr);
-  return { 'KEY': apiKey, 'Timestamp': ts, 'SIGN': sign };
+  const sigStr = `${method.toUpperCase()}\n${urlPath}\n${queryString||""}\n${bodyHash}\n${ts}`;
+  const SIGN = await hmac512Hex(apiSecret, sigStr);
+  return { KEY: apiKey, Timestamp: ts, SIGN, __sig_debug: {sigStr, bodyHash} };
 }
 
-// Temel istek
-async function apiRequest({method='GET', endpoint='', query='', body=null}){
-  const apiKey = els('apiKey').value.trim();
-  const apiSecret = els('apiSecret').value.trim();
-  const host = (els('host').value.trim().replace(/\/+$/,'') || 'https://api.gateio.ws');
-  const proxy = els('proxy').value.trim().replace(/\/+$/,'');
-  if(!apiKey || !apiSecret){ throw new Error('API Key/Secret eksik'); }
+async function apiV4({method='GET', endpoint='', queryObj=null, bodyObj=null}){
+  const base = buildBase();
+  const prefix = '/api/v4';
+  const path = `${prefix}${endpoint}`;                         // imza PATH'i
+  const queryString = qs(queryObj||{});
+  const url = `${base}${path}${queryString?`?${queryString}`:''}`;
+  const apiKey = $('apiKey').value.trim();
+  const apiSecret = $('apiSecret').value.trim();
+  if(!apiKey || !apiSecret) throw new Error('API Key/Secret eksik');
 
-  const path = `/api/v4${endpoint}`;
-  const full = `${(proxy || host)}${path}${query ? `?${query}`:''}`;
-  const bodyString = body ? JSON.stringify(body) : '';
-  const headers = {
-    'Accept':'application/json',
-    'Content-Type':'application/json',
-    ...(await signHeaders({method, urlPath: path, queryString: query, bodyString, apiKey, apiSecret}))
-  };
+  const bodyString = bodyObj ? JSON.stringify(bodyObj) : '';
+  const sig = await signHeaders({method, urlPath:path, queryString, bodyString, apiKey, apiSecret});
 
-  const res = await fetch(full, { method, headers, body: bodyString || undefined });
+  const headers = {'Accept':'application/json','Content-Type':'application/json','KEY':sig.KEY,'Timestamp':sig.Timestamp,'SIGN':sig.SIGN};
+  log('REQ', { method, url, path, queryString, body: bodyObj||null, sign_debug: sig.__sig_debug });
+
+  const res = await fetch(url, { method, headers, body: bodyString || undefined });
   const text = await res.text();
-  let data;
-  try{ data = text ? JSON.parse(text) : {}; } catch(e){ data = { raw:text }; }
+  let data; try{ data = text? JSON.parse(text):{} }catch(e){ data = { raw:text } }
   if(!res.ok){
-    const msg = (data && (data.label || data.message)) ? `${data.label||''} ${data.message||''}`.trim() : `HTTP ${res.status}`;
-    throw new Error(msg || 'İstek başarısız');
+    const label = (data && (data.label||data.message)) ? `${data.label||''} ${data.message||''}`.trim() : `HTTP ${res.status}`;
+    throw new Error(`${label} (status ${res.status})`);
   }
   return data;
 }
 
-/* ========= UI Mantığı ========= */
+/* ---------- UI ---------- */
 (function init(){
-  // localStorage yükle
+  // yerel ayarları yükle
   try{
-    const saved = JSON.parse(localStorage.getItem('gateio_bot_cfg')||'{}');
-    if(saved.remember){
-      ['apiKey','apiSecret','host','proxy'].forEach(k=>{ if(saved[k]) els(k).value = saved[k]; });
-      els('remember').checked = true;
-    }else{
-      if(saved.host) els('host').value = saved.host;
-      if(saved.proxy) els('proxy').value = saved.proxy;
+    const s = JSON.parse(localStorage.getItem('gateio_bot_cfg')||'{}');
+    if(s){
+      ['env','proxy','host'].forEach(k=>{ if(s[k]) $(k).value = s[k] });
+      if(s.remember){ $('remember').checked = true; ['apiKey','apiSecret'].forEach(k=>{ if(s[k]) $(k).value=s[k] }); }
     }
   }catch{}
 
-  els('orderType').addEventListener('change', e=>{
-    const isLimit = e.target.value === 'limit';
-    els('price').disabled = !isLimit;
-    if(!isLimit){ els('tif').value = 'ioc'; } // market için öneri
+  $('orderType').addEventListener('change', e=>{
+    const isLimit = e.target.value==='limit';
+    $('price').disabled = !isLimit;
+    if(!isLimit) $('tif').value = 'ioc';
   });
 
-  els('saveConn').addEventListener('click', ()=>{
-    const remember = els('remember').checked;
+  $('saveConn').addEventListener('click', ()=>{
+    const remember = $('remember').checked;
     const cfg = {
+      env: $('env').value,
+      proxy: $('proxy').value,
+      host: $('host').value,
       remember,
-      apiKey: remember ? els('apiKey').value : '',
-      apiSecret: remember ? els('apiSecret').value : '',
-      host: els('host').value,
-      proxy: els('proxy').value
+      apiKey: remember ? $('apiKey').value : '',
+      apiSecret: remember ? $('apiSecret').value : '',
     };
     localStorage.setItem('gateio_bot_cfg', JSON.stringify(cfg));
-    appendLog('Bağlantı ayarları kaydedildi (localStorage).');
+    log('Bağlantı ayarları kaydedildi.');
   });
 
-  els('setLev').addEventListener('click', async ()=>{
+  $('btnTime').addEventListener('click', async ()=>{
     try{
-      const settle = els('settle').value;
-      const contract = els('contract').value.trim();
-      const lev = Number(els('leverage').value);
-      if(!contract) throw new Error('Contract boş olamaz');
-      const q = new URLSearchParams({ leverage: String(lev) }).toString();
-      const endpoint = `/futures/${settle}/positions/${encodeURIComponent(contract)}/leverage`;
-      appendLog(`Kaldıraç ayarlanıyor: ${contract} → ${lev}x`);
-      const out = await apiRequest({ method:'POST', endpoint, query:q });
-      appendLog('Kaldıraç sonucu:', out);
-    }catch(err){ appendLog('Hata (Kaldıraç): '+err.message); }
+      const out = await apiV4({ method:'GET', endpoint:'/spot/time' });
+      const serverMs = out.server_time ? Number(out.server_time) : 0;
+      const diff = serverMs ? (serverMs - Date.now()) : null;
+      log('Sunucu saati', { server_time_ms: serverMs, local_time_ms: Date.now(), diff_ms: diff });
+    }catch(e){ log('Hata (spot/time): '+e.message); }
   });
 
-  // Long/Short hızlı butonları
-  els('btnLong').addEventListener('click', ()=>{ const s=els('size'); s.value = Math.abs(Number(s.value)||1); });
-  els('btnShort').addEventListener('click', ()=>{ const s=els('size'); s.value = -Math.abs(Number(s.value)||1); });
-
-  els('sendOrder').addEventListener('click', async ()=>{
+  $('setLev').addEventListener('click', async ()=>{
     try{
-      const settle = els('settle').value;
-      const contract = els('contract').value.trim();
-      if(!contract) throw new Error('Contract boş olamaz');
-      let size = Number(els('size').value);
+      const settle = $('settle').value;
+      const contract = $('contract').value.trim();
+      const lev = Number($('leverage').value);
+      if(!contract) throw new Error('Contract boş');
+      const out = await apiV4({ method:'POST', endpoint:`/futures/${settle}/positions/${encodeURIComponent(contract)}/leverage`, queryObj:{ leverage: String(lev) }});
+      log('Kaldıraç sonucu', out);
+    }catch(e){ log('Hata (kaldıraç): '+e.message); }
+  });
+
+  $('btnLong').addEventListener('click', ()=>{ const s=$('size'); s.value = Math.abs(Number(s.value)||1); });
+  $('btnShort').addEventListener('click', ()=>{ const s=$('size'); s.value = -Math.abs(Number(s.value)||1); });
+
+  $('checkContract').addEventListener('click', async ()=>{
+    try{
+      const settle = $('settle').value;
+      const contract = $('contract').value.trim();
+      if(!contract) throw new Error('Contract boş');
+      const out = await apiV4({ method:'GET', endpoint:`/futures/${settle}/contracts/${encodeURIComponent(contract)}` });
+      log('Kontrat bulundu', out);
+    }catch(e){ log('Hata (kontrat): '+e.message); }
+  });
+
+  $('sendOrder').addEventListener('click', async ()=>{
+    try{
+      const settle = $('settle').value;
+      const contract = $('contract').value.trim();
+      if(!contract) throw new Error('Contract boş');
+
+      const type = $('orderType').value;
+      const tif = $('tif').value;
+      const reduceOnly = $('reduceOnly').checked;
+      let size = Number($('size').value);
       if(!size || !Number.isFinite(size)) throw new Error('Geçersiz size');
 
-      const type = els('orderType').value;
-      const tif = els('tif').value;
-      const reduceOnly = els('reduceOnly').checked;
-
-      let body = { contract, size, tif, text:'t-web-bot' };
-      if(type === 'market'){
-        // Gate: price=0 + tif=IOC => Market
-        body.price = "0";
-        if(tif !== 'ioc'){ body.tif = 'ioc'; }
+      const body = { contract, size, tif, text:`t-web-bot-${Date.now()}` };
+      if(type==='market'){
+        body.price = "0";                 // Market = price 0 + IOC
+        if(tif!=='ioc') body.tif = 'ioc';
       }else{
-        const px = els('price').value;
-        if(!px) throw new Error('Limit emri için fiyat gerekli');
+        const px = $('price').value;
+        if(!px) throw new Error('Limit için fiyat gir');
         body.price = String(px);
       }
       if(reduceOnly) body.reduce_only = true;
 
-      appendLog('Emir gönderiliyor:', body);
-      const out = await apiRequest({ method:'POST', endpoint:`/futures/${settle}/orders`, body });
-      appendLog('Emir yanıtı:', out);
-    }catch(err){ appendLog('Hata (Emir): '+err.message); }
+      const out = await apiV4({ method:'POST', endpoint:`/futures/${settle}/orders`, bodyObj: body });
+      log('Emir yanıtı', out);
+    }catch(e){ log('Hata (emir): '+e.message); }
   });
 
-  els('cancelOpen').addEventListener('click', async ()=>{
+  $('cancelOpen').addEventListener('click', async ()=>{
     try{
-      const settle = els('settle').value;
-      const contract = els('contract').value.trim();
-      if(!contract) throw new Error('Contract boş olamaz');
-      appendLog(`Açık emirler iptal ediliyor: ${contract}`);
-      const q = new URLSearchParams({ contract }).toString();
-      const out = await apiRequest({ method:'DELETE', endpoint:`/futures/${settle}/orders`, query:q });
-      appendLog('İptal sonucu:', out);
-    }catch(err){ appendLog('Hata (İptal): '+err.message); }
+      const settle = $('settle').value;
+      const contract = $('contract').value.trim();
+      if(!contract) throw new Error('Contract boş');
+      const out = await apiV4({ method:'DELETE', endpoint:`/futures/${settle}/orders`, queryObj:{ contract }});
+      log('İptal sonucu', out);
+    }catch(e){ log('Hata (iptal): '+e.message); }
   });
 })();
 </script>
