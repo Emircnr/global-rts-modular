@@ -1,832 +1,896 @@
 import React, { useState, useEffect } from 'react';
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js';
-import { getAuth, signInWithPopup, GoogleAuthProvider, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';
-import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit, updateDoc, doc, increment, arrayUnion, getDoc } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js';
-import { Star, Search, TrendingUp, User, LogOut, Shield, Plus, Home, Filter, X } from 'lucide-react';
+import { Star, Search, TrendingUp, User, LogIn, LogOut, Plus, Edit, Trash2, Menu, X, Home, Filter, Award, Clock } from 'lucide-react';
 
-// Firebase yapılandırması
-const firebaseConfig = {
-  apiKey: "AIzaSyAh6JbnjsZtD-d0g3iSb2maSerPntUP6To",
-  authDomain: "macbot-b7b45.firebaseapp.com",
-  databaseURL: "https://macbot-b7b45-default-rtdb.firebaseio.com",
-  projectId: "macbot-b7b45",
-  storageBucket: "macbot-b7b45.firebasestorage.app",
-  messagingSenderId: "88494187419",
-  appId: "1:88494187419:web:9e0fd1a37e51332203373e",
-  measurementId: "G-SVG851WK7Y"
-};
+const OolidoPlatform = () => {
+  // State yönetimi
+  const [currentPage, setCurrentPage] = useState('home');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('Tümü');
+  const [selectedContent, setSelectedContent] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [authMode, setAuthMode] = useState('login');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+  // Kategoriler
+  const categories = [
+    'Tümü', 'Ünlüler', 'Markalar', 'Şirketler', 'Hisse Senetleri', 
+    'Fonlar', 'Spor Kulüpleri', 'Siyasiler', 'YouTube Kanalları', 
+    'Filmler & Diziler', 'Ürünler'
+  ];
 
-const CATEGORIES = [
-  'Ünlüler', 'Markalar', 'Şirketler', 'Hisseler/Fonlar', 'Spor Kulüpleri',
-  'Siyasiler', 'YouTube Kanalları', 'Filmler/Diziler', 'Müzik', 'Teknoloji'
-];
+  // Örnek veri - gerçek uygulamada backend'den gelecek
+  const [contents, setContents] = useState([
+    {
+      id: 1,
+      name: 'Tesla',
+      category: 'Şirketler',
+      description: 'Elektrikli araç ve enerji depolama çözümleri sunan yenilikçi teknoloji şirketi.',
+      image: 'https://images.unsplash.com/photo-1560958089-b8a1929cea89?w=400',
+      tags: ['teknoloji', 'elektrikli araç', 'sürdürülebilirlik'],
+      ratings: [5, 4, 5, 5, 4],
+      comments: [
+        { user: 'Ahmet Y.', rating: 5, comment: 'Geleceğin otomotiv devi!', date: '2025-10-05' }
+      ],
+      views: 1250,
+      lastActive: new Date('2025-10-08')
+    },
+    {
+      id: 2,
+      name: 'Cristiano Ronaldo',
+      category: 'Ünlüler',
+      description: 'Dünyanın en iyi futbolcularından biri, çok sayıda rekor sahibi.',
+      image: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=400',
+      tags: ['futbol', 'spor', 'başarı'],
+      ratings: [5, 5, 4, 5, 5],
+      comments: [
+        { user: 'Mehmet K.', rating: 5, comment: 'Efsane bir sporcu!', date: '2025-10-07' }
+      ],
+      views: 2340,
+      lastActive: new Date('2025-10-08')
+    },
+    {
+      id: 3,
+      name: 'Apple',
+      category: 'Markalar',
+      description: 'Dünya çapında tanınan teknoloji ve elektronik ürünleri markası.',
+      image: 'https://images.unsplash.com/photo-1611532736579-6b16e2b50449?w=400',
+      tags: ['teknoloji', 'elektronik', 'premium'],
+      ratings: [5, 4, 5, 4, 5],
+      comments: [],
+      views: 1890,
+      lastActive: new Date('2025-10-07')
+    },
+    {
+      id: 4,
+      name: 'MrBeast',
+      category: 'YouTube Kanalları',
+      description: 'Dünya çapında milyonlarca takipçisi olan içerik üreticisi.',
+      image: 'https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?w=400',
+      tags: ['youtube', 'eğlence', 'hayırseverlik'],
+      ratings: [5, 5, 5, 4, 5],
+      comments: [
+        { user: 'Zeynep A.', rating: 5, comment: 'İçerikleri muhteşem!', date: '2025-10-06' }
+      ],
+      views: 3120,
+      lastActive: new Date('2025-10-08')
+    },
+    {
+      id: 5,
+      name: 'Galatasaray',
+      category: 'Spor Kulüpleri',
+      description: 'Türkiye\'nin en başarılı ve köklü spor kulüplerinden biri.',
+      image: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400',
+      tags: ['futbol', 'spor', 'türkiye'],
+      ratings: [5, 5, 4, 5, 5],
+      comments: [
+        { user: 'Can T.', rating: 5, comment: 'Şampiyon Galatasaray!', date: '2025-10-08' }
+      ],
+      views: 2890,
+      lastActive: new Date('2025-10-08')
+    },
+    {
+      id: 6,
+      name: 'Netflix',
+      category: 'Filmler & Diziler',
+      description: 'Global streaming platformu, binlerce film ve dizi içeriği.',
+      image: 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=400',
+      tags: ['eğlence', 'streaming', 'dizi'],
+      ratings: [4, 5, 4, 4, 5],
+      comments: [],
+      views: 1560,
+      lastActive: new Date('2025-10-07')
+    }
+  ]);
 
-// Başlangıç içerikleri
-const INITIAL_ITEMS = [
-  {
-    name: 'Tarkan',
+  const [users, setUsers] = useState([
+    { id: 1, username: 'admin', password: 'admin123', isAdmin: true, ratings: [], comments: [] },
+    { id: 2, username: 'demo', password: 'demo123', isAdmin: false, ratings: [], comments: [] }
+  ]);
+
+  // Yeni içerik formu
+  const [newContent, setNewContent] = useState({
+    name: '',
     category: 'Ünlüler',
-    description: 'Türk pop müziğinin efsanevi ismi, dünya çapında tanınan sanatçı',
-    imageUrl: 'https://images.unsplash.com/photo-1511367461989-f85a21fda167?w=400',
-    tags: ['müzik', 'pop', 'sanatçı', 'türk']
-  },
-  {
-    name: 'Apple',
-    category: 'Markalar',
-    description: 'Teknoloji dünyasının öncü markası, inovasyon ve tasarım ikonu',
-    imageUrl: 'https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=400',
-    tags: ['teknoloji', 'telefon', 'bilgisayar', 'inovasyon']
-  },
-  {
-    name: 'Galatasaray',
-    category: 'Spor Kulüpleri',
-    description: 'Türkiye\'nin en köklü spor kulüplerinden biri, UEFA Kupası şampiyonu',
-    imageUrl: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400',
-    tags: ['futbol', 'spor', 'türkiye', 'sarı-kırmızı']
-  },
-  {
-    name: 'Tesla',
-    category: 'Şirketler',
-    description: 'Elektrikli araç devrimini başlatan, sürdürülebilir enerji şirketi',
-    imageUrl: 'https://images.unsplash.com/photo-1560958089-b8a1929cea89?w=400',
-    tags: ['elektrikli araç', 'teknoloji', 'sürdürülebilirlik', 'otonom']
-  },
-  {
-    name: 'MrBeast',
-    category: 'YouTube Kanalları',
-    description: 'Dünyanın en çok abone sayısına sahip YouTube kanallarından biri',
-    imageUrl: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=400',
-    tags: ['youtube', 'içerik', 'eğlence', 'hayırseverlik']
-  }
-];
+    description: '',
+    image: '',
+    tags: ''
+  });
 
-function StarRating({ rating, onRate, readonly = false }) {
-  const [hover, setHover] = useState(0);
-  
-  return (
-    <div className="flex gap-1">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <Star
-          key={star}
-          className={`w-6 h-6 ${readonly ? '' : 'cursor-pointer'} transition-all`}
-          fill={star <= (hover || rating) ? '#fbbf24' : 'none'}
-          stroke={star <= (hover || rating) ? '#fbbf24' : '#9ca3af'}
-          onMouseEnter={() => !readonly && setHover(star)}
-          onMouseLeave={() => !readonly && setHover(0)}
-          onClick={() => !readonly && onRate && onRate(star)}
-        />
-      ))}
+  // Yorum formu
+  const [newComment, setNewComment] = useState({
+    rating: 5,
+    comment: ''
+  });
+
+  // Ortalama puan hesaplama
+  const getAverageRating = (ratings) => {
+    if (!ratings || ratings.length === 0) return 0;
+    return (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1);
+  };
+
+  // Gündem içerikleri (en aktif)
+  const getTrendingContents = () => {
+    return [...contents]
+      .sort((a, b) => {
+        const scoreA = (a.views * 0.3) + (a.comments.length * 0.4) + (a.ratings.length * 0.3);
+        const scoreB = (b.views * 0.3) + (b.comments.length * 0.4) + (b.ratings.length * 0.3);
+        return scoreB - scoreA;
+      })
+      .slice(0, 10);
+  };
+
+  // İçerik filtreleme
+  const getFilteredContents = () => {
+    return contents.filter(content => {
+      const matchesSearch = content.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           content.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           content.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesCategory = selectedCategory === 'Tümü' || content.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  };
+
+  // İlgili içerikler
+  const getRelatedContents = (content) => {
+    return contents
+      .filter(c => c.id !== content.id && 
+              (c.category === content.category || 
+               c.tags.some(tag => content.tags.includes(tag))))
+      .slice(0, 4);
+  };
+
+  // Giriş işlemi
+  const handleLogin = (username, password, isAnonymous = false) => {
+    if (isAnonymous) {
+      setCurrentUser({ id: Date.now(), username: 'Anonim Kullanıcı', isAdmin: false, ratings: [], comments: [] });
+      setShowAuthModal(false);
+      return;
+    }
+
+    const user = users.find(u => u.username === username && u.password === password);
+    if (user) {
+      setCurrentUser(user);
+      setShowAuthModal(false);
+    } else {
+      alert('Kullanıcı adı veya şifre hatalı!');
+    }
+  };
+
+  // Kayıt işlemi
+  const handleRegister = (username, password) => {
+    if (users.find(u => u.username === username)) {
+      alert('Bu kullanıcı adı zaten kullanılıyor!');
+      return;
+    }
+    const newUser = { 
+      id: users.length + 1, 
+      username, 
+      password, 
+      isAdmin: false,
+      ratings: [],
+      comments: []
+    };
+    setUsers([...users, newUser]);
+    setCurrentUser(newUser);
+    setShowAuthModal(false);
+  };
+
+  // Yorum ekleme
+  const handleAddComment = () => {
+    if (!currentUser) {
+      alert('Yorum yapmak için giriş yapmalısınız!');
+      return;
+    }
+
+    const updatedContents = contents.map(c => {
+      if (c.id === selectedContent.id) {
+        const comment = {
+          user: currentUser.username,
+          rating: newComment.rating,
+          comment: newComment.comment,
+          date: new Date().toISOString().split('T')[0]
+        };
+        return {
+          ...c,
+          comments: [...c.comments, comment],
+          ratings: [...c.ratings, newComment.rating],
+          views: c.views + 1,
+          lastActive: new Date()
+        };
+      }
+      return c;
+    });
+
+    setContents(updatedContents);
+    setSelectedContent(updatedContents.find(c => c.id === selectedContent.id));
+    setNewComment({ rating: 5, comment: '' });
+  };
+
+  // İçerik ekleme (Admin)
+  const handleAddContent = () => {
+    const content = {
+      id: contents.length + 1,
+      name: newContent.name,
+      category: newContent.category,
+      description: newContent.description,
+      image: newContent.image || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=400',
+      tags: newContent.tags.split(',').map(t => t.trim()),
+      ratings: [],
+      comments: [],
+      views: 0,
+      lastActive: new Date()
+    };
+
+    setContents([...contents, content]);
+    setNewContent({ name: '', category: 'Ünlüler', description: '', image: '', tags: '' });
+    setShowAdminModal(false);
+  };
+
+  // İçerik silme (Admin)
+  const handleDeleteContent = (id) => {
+    if (window.confirm('Bu içeriği silmek istediğinizden emin misiniz?')) {
+      setContents(contents.filter(c => c.id !== id));
+    }
+  };
+
+  // Auth Modal Component
+  const AuthModal = () => {
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl max-w-md w-full p-8 shadow-2xl">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-800">
+              {authMode === 'login' ? 'Giriş Yap' : 'Kayıt Ol'}
+            </h2>
+            <button onClick={() => setShowAuthModal(false)} className="text-gray-500 hover:text-gray-700">
+              <X size={24} />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <input
+              type="text"
+              placeholder="Kullanıcı Adı"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+            <input
+              type="password"
+              placeholder="Şifre"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+
+            <button
+              onClick={() => authMode === 'login' ? handleLogin(username, password) : handleRegister(username, password)}
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition"
+            >
+              {authMode === 'login' ? 'Giriş Yap' : 'Kayıt Ol'}
+            </button>
+
+            <button
+              onClick={() => handleLogin('', '', true)}
+              className="w-full bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition"
+            >
+              Anonim Giriş
+            </button>
+
+            <p className="text-center text-sm text-gray-600">
+              {authMode === 'login' ? "Hesabınız yok mu? " : "Zaten hesabınız var mı? "}
+              <button
+                onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+                className="text-purple-600 font-semibold hover:underline"
+              >
+                {authMode === 'login' ? 'Kayıt Ol' : 'Giriş Yap'}
+              </button>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Admin Modal Component
+  const AdminModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-2xl w-full p-8 shadow-2xl my-8">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-800">Admin Paneli - Yeni İçerik Ekle</h2>
+          <button onClick={() => setShowAdminModal(false)} className="text-gray-500 hover:text-gray-700">
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <input
+            type="text"
+            placeholder="İçerik Adı"
+            value={newContent.name}
+            onChange={(e) => setNewContent({...newContent, name: e.target.value})}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+          />
+
+          <select
+            value={newContent.category}
+            onChange={(e) => setNewContent({...newContent, category: e.target.value})}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+          >
+            {categories.filter(c => c !== 'Tümü').map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+
+          <textarea
+            placeholder="Açıklama"
+            value={newContent.description}
+            onChange={(e) => setNewContent({...newContent, description: e.target.value})}
+            rows="4"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+          />
+
+          <input
+            type="text"
+            placeholder="Fotoğraf Linki (URL)"
+            value={newContent.image}
+            onChange={(e) => setNewContent({...newContent, image: e.target.value})}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+          />
+
+          <input
+            type="text"
+            placeholder="Etiketler (virgülle ayırın)"
+            value={newContent.tags}
+            onChange={(e) => setNewContent({...newContent, tags: e.target.value})}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+          />
+
+          <button
+            onClick={handleAddContent}
+            className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-emerald-700 transition"
+          >
+            İçeriği Yayınla
+          </button>
+        </div>
+
+        <div className="mt-8 border-t pt-6">
+          <h3 className="text-xl font-bold mb-4 text-gray-800">Mevcut İçerikler</h3>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {contents.map(content => (
+              <div key={content.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-semibold text-gray-800">{content.name}</p>
+                  <p className="text-sm text-gray-600">{content.category}</p>
+                </div>
+                <button
+                  onClick={() => handleDeleteContent(content.id)}
+                  className="text-red-600 hover:text-red-800"
+                >
+                  <Trash2 size={20} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
-}
 
-function ItemCard({ item, onClick }) {
-  return (
+  // Header Component
+  const Header = () => (
+    <header className="bg-gradient-to-r from-purple-700 via-pink-600 to-red-600 text-white shadow-lg sticky top-0 z-40">
+      <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden">
+              <Menu size={24} />
+            </button>
+            <h1 
+              className="text-3xl font-bold cursor-pointer hover:scale-105 transition"
+              onClick={() => setCurrentPage('home')}
+            >
+              Oolido
+            </h1>
+          </div>
+
+          <nav className="hidden md:flex space-x-6">
+            <button 
+              onClick={() => setCurrentPage('home')}
+              className="flex items-center space-x-2 hover:text-yellow-300 transition"
+            >
+              <Home size={20} />
+              <span>Ana Sayfa</span>
+            </button>
+            <button 
+              onClick={() => setCurrentPage('trending')}
+              className="flex items-center space-x-2 hover:text-yellow-300 transition"
+            >
+              <TrendingUp size={20} />
+              <span>Gündem</span>
+            </button>
+            {currentUser && (
+              <button 
+                onClick={() => setCurrentPage('profile')}
+                className="flex items-center space-x-2 hover:text-yellow-300 transition"
+              >
+                <User size={20} />
+                <span>Profil</span>
+              </button>
+            )}
+          </nav>
+
+          <div className="flex items-center space-x-3">
+            {currentUser?.isAdmin && (
+              <button
+                onClick={() => setShowAdminModal(true)}
+                className="hidden md:flex items-center space-x-2 bg-yellow-500 text-gray-900 px-4 py-2 rounded-lg font-semibold hover:bg-yellow-400 transition"
+              >
+                <Plus size={20} />
+                <span>Admin</span>
+              </button>
+            )}
+            {currentUser ? (
+              <button
+                onClick={() => setCurrentUser(null)}
+                className="flex items-center space-x-2 bg-white text-purple-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition"
+              >
+                <LogOut size={20} />
+                <span className="hidden md:inline">{currentUser.username}</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="flex items-center space-x-2 bg-white text-purple-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition"
+              >
+                <LogIn size={20} />
+                <span>Giriş</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden mt-4 space-y-2 pb-2">
+            <button 
+              onClick={() => { setCurrentPage('home'); setMobileMenuOpen(false); }}
+              className="block w-full text-left px-4 py-2 hover:bg-purple-800 rounded transition"
+            >
+              Ana Sayfa
+            </button>
+            <button 
+              onClick={() => { setCurrentPage('trending'); setMobileMenuOpen(false); }}
+              className="block w-full text-left px-4 py-2 hover:bg-purple-800 rounded transition"
+            >
+              Gündem
+            </button>
+            {currentUser && (
+              <button 
+                onClick={() => { setCurrentPage('profile'); setMobileMenuOpen(false); }}
+                className="block w-full text-left px-4 py-2 hover:bg-purple-800 rounded transition"
+              >
+                Profil
+              </button>
+            )}
+            {currentUser?.isAdmin && (
+              <button
+                onClick={() => { setShowAdminModal(true); setMobileMenuOpen(false); }}
+                className="block w-full text-left px-4 py-2 bg-yellow-500 text-gray-900 rounded font-semibold"
+              >
+                Admin Paneli
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </header>
+  );
+
+  // Content Card Component
+  const ContentCard = ({ content }) => (
     <div
-      onClick={onClick}
-      className="group cursor-pointer bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2"
+      onClick={() => { setSelectedContent(content); setCurrentPage('detail'); }}
+      className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition transform hover:-translate-y-2 cursor-pointer overflow-hidden group"
     >
       <div className="relative h-48 overflow-hidden">
         <img
-          src={item.imageUrl}
-          alt={item.name}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          src={content.image}
+          alt={content.name}
+          className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
         />
-        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-medium text-purple-600">
-          {item.category}
+        <div className="absolute top-3 right-3 bg-white px-3 py-1 rounded-full text-sm font-semibold text-purple-700">
+          {content.category}
         </div>
       </div>
+
       <div className="p-5">
-        <h3 className="text-xl font-bold text-gray-800 mb-2">{item.name}</h3>
-        <p className="text-gray-600 text-sm mb-3 line-clamp-2">{item.description}</p>
-        <div className="flex items-center justify-between">
-          <StarRating rating={item.averageRating || 0} readonly />
-          <span className="text-sm text-gray-500">
-            {item.reviewCount || 0} değerlendirme
-          </span>
+        <h3 className="text-xl font-bold text-gray-800 mb-2">{content.name}</h3>
+        <p className="text-gray-600 text-sm mb-4 line-clamp-2">{content.description}</p>
+
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-1">
+            {[...Array(5)].map((_, i) => (
+              <Star
+                key={i}
+                size={18}
+                className={i < Math.round(getAverageRating(content.ratings)) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
+              />
+            ))}
+            <span className="ml-2 text-sm font-semibold text-gray-700">
+              {getAverageRating(content.ratings)}
+            </span>
+          </div>
+          <span className="text-sm text-gray-500">{content.ratings.length} değerlendirme</span>
         </div>
-        <div className="flex flex-wrap gap-2 mt-3">
-          {item.tags?.slice(0, 3).map((tag, i) => (
-            <span key={i} className="text-xs px-2 py-1 bg-purple-100 text-purple-600 rounded-full">
+
+        <div className="flex flex-wrap gap-2 mb-3">
+          {content.tags.slice(0, 3).map((tag, idx) => (
+            <span key={idx} className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-medium">
               #{tag}
             </span>
           ))}
         </div>
+
+        <div className="flex items-center justify-between text-sm text-gray-500 pt-3 border-t">
+          <span className="flex items-center space-x-1">
+            <Award size={16} />
+            <span>{content.comments.length} yorum</span>
+          </span>
+          <span className="flex items-center space-x-1">
+            <Clock size={16} />
+            <span>{content.views} görüntülenme</span>
+          </span>
+        </div>
       </div>
     </div>
   );
-}
 
-export default function OolidoPlatform() {
-  const [user, setUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [page, setPage] = useState('home');
-  const [items, setItems] = useState([]);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [reviews, setReviews] = useState([]);
-  const [userReviews, setUserReviews] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('Tümü');
-  const [showAdminLogin, setShowAdminLogin] = useState(false);
-  const [adminUsername, setAdminUsername] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
-  const [newRating, setNewRating] = useState(0);
-  const [newComment, setNewComment] = useState('');
-  
-  // Admin Panel States
-  const [newItem, setNewItem] = useState({
-    name: '',
-    category: CATEGORIES[0],
-    description: '',
-    imageUrl: '',
-    tags: ''
-  });
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        loadUserReviews(currentUser.uid);
-      }
-    });
-    
-    initializeItems();
-    loadItems();
-    
-    return () => unsubscribe();
-  }, []);
-
-  const initializeItems = async () => {
-    try {
-      const q = query(collection(db, 'items'), limit(1));
-      const snapshot = await getDocs(q);
-      
-      if (snapshot.empty) {
-        for (const item of INITIAL_ITEMS) {
-          await addDoc(collection(db, 'items'), {
-            ...item,
-            averageRating: 0,
-            reviewCount: 0,
-            createdAt: new Date()
-          });
-        }
-      }
-    } catch (error) {
-      console.error('İçerikler yüklenirken hata:', error);
-    }
-  };
-
-  const loadItems = async () => {
-    try {
-      const q = query(collection(db, 'items'), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      const itemsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setItems(itemsData);
-    } catch (error) {
-      console.error('İçerikler yüklenirken hata:', error);
-    }
-  };
-
-  const loadReviews = async (itemId) => {
-    try {
-      const q = query(
-        collection(db, 'reviews'),
-        where('itemId', '==', itemId),
-        orderBy('createdAt', 'desc')
-      );
-      const snapshot = await getDocs(q);
-      const reviewsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setReviews(reviewsData);
-    } catch (error) {
-      console.error('Yorumlar yüklenirken hata:', error);
-    }
-  };
-
-  const loadUserReviews = async (userId) => {
-    try {
-      const q = query(
-        collection(db, 'reviews'),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc')
-      );
-      const snapshot = await getDocs(q);
-      const reviewsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setUserReviews(reviewsData);
-    } catch (error) {
-      console.error('Kullanıcı yorumları yüklenirken hata:', error);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error('Google girişi hatası:', error);
-    }
-  };
-
-  const handleAnonymousLogin = async () => {
-    try {
-      await signInAnonymously(auth);
-    } catch (error) {
-      console.error('Anonim giriş hatası:', error);
-    }
-  };
-
-  const handleAdminLogin = () => {
-    if (adminUsername === 'admin' && adminPassword === '123') {
-      setIsAdmin(true);
-      setShowAdminLogin(false);
-      setPage('admin');
-      setAdminUsername('');
-      setAdminPassword('');
-    } else {
-      alert('Hatalı kullanıcı adı veya şifre!');
-    }
-  };
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    setIsAdmin(false);
-    setPage('home');
-  };
-
-  const handleAddItem = async () => {
-    if (!newItem.name || !newItem.description || !newItem.imageUrl) {
-      alert('Lütfen tüm alanları doldurun!');
-      return;
-    }
-
-    try {
-      const tags = newItem.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
-      await addDoc(collection(db, 'items'), {
-        name: newItem.name,
-        category: newItem.category,
-        description: newItem.description,
-        imageUrl: newItem.imageUrl,
-        tags: tags,
-        averageRating: 0,
-        reviewCount: 0,
-        createdAt: new Date()
-      });
-      
-      setNewItem({ name: '', category: CATEGORIES[0], description: '', imageUrl: '', tags: '' });
-      loadItems();
-      alert('İçerik başarıyla eklendi!');
-    } catch (error) {
-      console.error('İçerik eklenirken hata:', error);
-    }
-  };
-
-  const handleSubmitReview = async () => {
-    if (!user) {
-      alert('Yorum yapmak için giriş yapmalısınız!');
-      return;
-    }
-    
-    if (newRating === 0) {
-      alert('Lütfen yıldız verin!');
-      return;
-    }
-
-    try {
-      await addDoc(collection(db, 'reviews'), {
-        itemId: selectedItem.id,
-        itemName: selectedItem.name,
-        userId: user.uid,
-        userName: user.displayName || 'Anonim Kullanıcı',
-        rating: newRating,
-        comment: newComment,
-        createdAt: new Date()
-      });
-
-      const itemRef = doc(db, 'items', selectedItem.id);
-      const itemDoc = await getDoc(itemRef);
-      const itemData = itemDoc.data();
-      const newReviewCount = (itemData.reviewCount || 0) + 1;
-      const newAverageRating = ((itemData.averageRating || 0) * (itemData.reviewCount || 0) + newRating) / newReviewCount;
-
-      await updateDoc(itemRef, {
-        reviewCount: newReviewCount,
-        averageRating: newAverageRating
-      });
-
-      setNewRating(0);
-      setNewComment('');
-      loadReviews(selectedItem.id);
-      loadItems();
-      alert('Değerlendirmeniz eklendi!');
-    } catch (error) {
-      console.error('Yorum eklenirken hata:', error);
-    }
-  };
-
-  const filteredItems = items.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesCategory = selectedCategory === 'Tümü' || item.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
-
-  const trendingItems = [...items]
-    .sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0))
-    .slice(0, 10);
-
-  const relatedItems = selectedItem
-    ? items.filter(item => 
-        item.id !== selectedItem.id &&
-        (item.category === selectedItem.category ||
-         item.tags?.some(tag => selectedItem.tags?.includes(tag)))
-      ).slice(0, 4)
-    : [];
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center p-4">
-        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl max-w-md w-full border border-white/20">
-          <div className="text-center mb-8">
-            <h1 className="text-5xl font-black text-white mb-2">Oolido</h1>
-            <p className="text-white/80">Her Şeyi Değerlendir</p>
-          </div>
-          
-          <div className="space-y-4">
-            <button
-              onClick={handleGoogleLogin}
-              className="w-full bg-white text-gray-800 py-4 rounded-xl font-semibold hover:bg-gray-100 transition-all transform hover:scale-105 flex items-center justify-center gap-2"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-              Google ile Giriş Yap
-            </button>
-            
-            <button
-              onClick={handleAnonymousLogin}
-              className="w-full bg-white/20 text-white py-4 rounded-xl font-semibold hover:bg-white/30 transition-all border border-white/30"
-            >
-              Anonim Devam Et
-            </button>
-
-            <button
-              onClick={() => setShowAdminLogin(true)}
-              className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white py-4 rounded-xl font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-2"
-            >
-              <Shield className="w-5 h-5" />
-              Admin Girişi
-            </button>
-          </div>
+  // Home Page
+  const HomePage = () => (
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      {/* Search and Filter */}
+      <div className="mb-8 space-y-4">
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+          <input
+            type="text"
+            placeholder="İçerik, etiket veya kategori ara..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-lg"
+          />
         </div>
 
-        {showAdminLogin && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold">Admin Girişi</h3>
-                <button onClick={() => setShowAdminLogin(false)} className="text-gray-500 hover:text-gray-700">
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-              <input
-                type="text"
-                placeholder="Kullanıcı Adı"
-                value={adminUsername}
-                onChange={(e) => setAdminUsername(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-              />
-              <input
-                type="password"
-                placeholder="Şifre"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
-              />
-              <button
-                onClick={handleAdminLogin}
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all"
-              >
-                Giriş Yap
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="flex items-center space-x-2 overflow-x-auto pb-2">
+          <Filter size={20} className="text-gray-600 flex-shrink-0" />
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-4 py-2 rounded-full font-medium whitespace-nowrap transition ${
+                selectedCategory === cat
+                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
       </div>
-    );
-  }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-lg shadow-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-black bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              Oolido
-            </h1>
-            
-            <nav className="flex gap-2">
-              <button
-                onClick={() => setPage('home')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                  page === 'home' ? 'bg-purple-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <Home className="w-4 h-4" />
-                Ana Sayfa
-              </button>
-              <button
-                onClick={() => setPage('trending')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                  page === 'trending' ? 'bg-purple-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <TrendingUp className="w-4 h-4" />
-                Gündem
-              </button>
-              <button
-                onClick={() => setPage('profile')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                  page === 'profile' ? 'bg-purple-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <User className="w-4 h-4" />
-                Profil
-              </button>
-              {isAdmin && (
-                <button
-                  onClick={() => setPage('admin')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                    page === 'admin' ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                  }`}
-                >
-                  <Shield className="w-4 h-4" />
-                  Admin
-                </button>
-              )}
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 rounded-lg font-medium text-red-600 hover:bg-red-50 transition-all flex items-center gap-2"
-              >
-                <LogOut className="w-4 h-4" />
-                Çıkış
-              </button>
-            </nav>
-          </div>
+      {/* Content Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {getFilteredContents().map(content => (
+          <ContentCard key={content.id} content={content} />
+        ))}
+      </div>
+
+      {getFilteredContents().length === 0 && (
+        <div className="text-center py-20">
+          <p className="text-2xl text-gray-500">İçerik bulunamadı</p>
         </div>
-      </header>
+      )}
+    </div>
+  );
 
+  // Trending Page
+  const TrendingPage = () => (
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold text-gray-800 mb-2 flex items-center space-x-3">
+          <TrendingUp size={32} className="text-pink-600" />
+          <span>Gündemdekiler</span>
+        </h2>
+        <p className="text-gray-600">En aktif ve popüler içerikler</p>
+      </div>
+
+      <div className="space-y-4">
+        {getTrendingContents().map((content, index) => (
+          <div
+            key={content.id}
+            onClick={() => { setSelectedContent(content); setCurrentPage('detail'); }}
+            className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition cursor-pointer p-6 flex items-center space-x-6"
+          >
+            <div className="text-4xl font-bold text-purple-600 w-16 text-center">
+              #{index + 1}
+            </div>
+            <img
+              src={content.image}
+              alt={content.name}
+              className="w-24 h-24 rounded-xl object-cover"
+            />
+            <div className="flex-1">
+              <h3 className="text-xl font-bold text-gray-800 mb-1">{content.name}</h3>
+              <p className="text-gray-600 text-sm mb-2">{content.category}</p>
+              <div className="flex items-center space-x-4 text-sm text-gray-500">
+                <span className="flex items-center space-x-1">
+                  <Star size={16} className="text-yellow-400" />
+                  <span>{getAverageRating(content.ratings)}</span>
+                </span>
+                <span>{content.views} görüntülenme</span>
+                <span>{content.comments.length} yorum</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Detail Page
+  const DetailPage = () => {
+    if (!selectedContent) return null;
+
+    return (
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Ana Sayfa */}
-        {page === 'home' && !selectedItem && (
-          <>
-            {/* Arama ve Filtreler */}
-            <div className="mb-8 space-y-4">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="İsim, açıklama veya etiket ile ara..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl shadow-lg focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                />
-              </div>
-              
-              <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                <Filter className="w-5 h-5 text-gray-500 flex-shrink-0" />
-                {['Tümü', ...CATEGORIES].map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-4 py-2 rounded-full font-medium whitespace-nowrap transition-all ${
-                      selectedCategory === cat
-                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
-                        : 'bg-white text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
+        <button
+          onClick={() => setCurrentPage('home')}
+          className="mb-6 text-purple-600 hover:text-purple-800 font-semibold flex items-center space-x-2"
+        >
+          <span>←</span>
+          <span>Geri Dön</span>
+        </button>
 
-            {/* İçerikler Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredItems.map(item => (
-                <ItemCard
-                  key={item.id}
-                  item={item}
-                  onClick={() => {
-                    setSelectedItem(item);
-                    loadReviews(item.id);
-                  }}
-                />
-              ))}
-            </div>
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-8">
+          <img
+            src={selectedContent.image}
+            alt={selectedContent.name}
+            className="w-full h-96 object-cover"
+          />
 
-            {filteredItems.length === 0 && (
-              <div className="text-center py-20">
-                <p className="text-gray-500 text-lg">Sonuç bulunamadı</p>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* İçerik Detay */}
-        {page === 'home' && selectedItem && (
-          <div className="space-y-6">
-            <button
-              onClick={() => setSelectedItem(null)}
-              className="text-purple-600 hover:text-purple-700 font-medium flex items-center gap-2"
-            >
-              ← Geri Dön
-            </button>
-
-            <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
-              <div className="relative h-96">
-                <img
-                  src={selectedItem.imageUrl}
-                  alt={selectedItem.name}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                <div className="absolute bottom-8 left-8 text-white">
-                  <span className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full text-sm mb-3 inline-block">
-                    {selectedItem.category}
-                  </span>
-                  <h1 className="text-5xl font-black mb-2">{selectedItem.name}</h1>
-                  <div className="flex items-center gap-4">
-                    <StarRating rating={selectedItem.averageRating || 0} readonly />
-                    <span className="text-lg">{selectedItem.reviewCount || 0} değerlendirme</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-8">
-                <p className="text-gray-700 text-lg mb-6">{selectedItem.description}</p>
-                
-                <div className="flex flex-wrap gap-2 mb-8">
-                  {selectedItem.tags?.map((tag, i) => (
-                    <span key={i} className="px-4 py-2 bg-purple-100 text-purple-600 rounded-full font-medium">
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Değerlendirme Formu */}
-                <div className="border-t pt-6 mb-6">
-                  <h3 className="text-2xl font-bold mb-4">Değerlendirmenizi Yapın</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Puanınız</label>
-                      <StarRating rating={newRating} onRate={setNewRating} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Yorumunuz</label>
-                      <textarea
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        placeholder="Düşüncelerinizi paylaşın..."
-                        rows="4"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                      />
-                    </div>
-                    <button
-                      onClick={handleSubmitReview}
-                      className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg transition-all"
-                    >
-                      Değerlendirmeyi Gönder
-                    </button>
-                  </div>
-                </div>
-
-                {/* Yorumlar */}
-                <div className="border-t pt-6">
-                  <h3 className="text-2xl font-bold mb-4">Değerlendirmeler ({reviews.length})</h3>
-                  <div className="space-y-4">
-                    {reviews.map(review => (
-                      <div key={review.id} className="bg-gray-50 rounded-xl p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-semibold">{review.userName}</span>
-                          <StarRating rating={review.rating} readonly />
-                        </div>
-                        {review.comment && <p className="text-gray-700">{review.comment}</p>}
-                        <p className="text-xs text-gray-500 mt-2">
-                          {review.createdAt?.toDate?.()?.toLocaleDateString('tr-TR') || 'Bugün'}
-                        </p>
-                      </div>
-                    ))}
-                    {reviews.length === 0 && (
-                      <p className="text-gray-500 text-center py-8">Henüz değerlendirme yok. İlk siz yapın!</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* İlgili İçerikler */}
-            {relatedItems.length > 0 && (
+          <div className="p-8">
+            <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-2xl font-bold mb-4">Benzer İçerikler</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {relatedItems.map(item => (
-                    <ItemCard
-                      key={item.id}
-                      item={item}
-                      onClick={() => {
-                        setSelectedItem(item);
-                        loadReviews(item.id);
-                        window.scrollTo(0, 0);
-                      }}
+                <h1 className="text-4xl font-bold text-gray-800 mb-2">{selectedContent.name}</h1>
+                <span className="bg-purple-100 text-purple-700 px-4 py-2 rounded-full text-sm font-semibold">
+                  {selectedContent.category}
+                </span>
+              </div>
+              <div className="text-right">
+                <div className="flex items-center space-x-2 mb-2">
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      size={24}
+                      className={i < Math.round(getAverageRating(selectedContent.ratings)) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
                     />
                   ))}
                 </div>
+                <p className="text-2xl font-bold text-gray-800">{getAverageRating(selectedContent.ratings)}/5.0</p>
+                <p className="text-sm text-gray-600">{selectedContent.ratings.length} değerlendirme</p>
               </div>
-            )}
-          </div>
-        )}
+            </div>
 
-        {/* Gündem Sayfası */}
-        {page === 'trending' && (
-          <div>
-            <h2 className="text-3xl font-bold mb-6 flex items-center gap-2">
-              <TrendingUp className="w-8 h-8 text-purple-600" />
-              Gündem - En Aktif İçerikler
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {trendingItems.map((item, index) => (
-                <div key={item.id} className="relative">
-                  <div className="absolute -top-3 -left-3 w-12 h-12 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg z-10">
-                    {index + 1}
-                  </div>
-                  <ItemCard
-                    item={item}
-                    onClick={() => {
-                      setSelectedItem(item);
-                      loadReviews(item.id);
-                      setPage('home');
-                    }}
-                  />
-                </div>
+            <p className="text-gray-700 text-lg mb-6">{selectedContent.description}</p>
+
+            <div className="flex flex-wrap gap-2 mb-6">
+              {selectedContent.tags.map((tag, idx) => (
+                <span key={idx} className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 px-4 py-2 rounded-full text-sm font-medium">
+                  #{tag}
+                </span>
               ))}
             </div>
-          </div>
-        )}
 
-        {/* Profil Sayfası */}
-        {page === 'profile' && (
-          <div className="max-w-4xl mx-auto">
-            <div className="bg-white rounded-3xl shadow-xl p-8">
-              <div className="flex items-center gap-6 mb-8">
-                <div className="w-24 h-24 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center text-white text-4xl font-bold">
-                  {user.displayName?.[0] || user.email?.[0] || 'A'}
-                </div>
-                <div>
-                  <h2 className="text-3xl font-bold">{user.displayName || 'Anonim Kullanıcı'}</h2>
-                  <p className="text-gray-600">{user.email || 'Anonim giriş yapıldı'}</p>
-                  <p className="text-purple-600 font-medium mt-1">{userReviews.length} değerlendirme</p>
-                </div>
-              </div>
-
-              <h3 className="text-2xl font-bold mb-4">Değerlendirmeleriniz</h3>
-              <div className="space-y-4">
-                {userReviews.map(review => (
-                  <div key={review.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-semibold text-lg">{review.itemName}</span>
-                      <StarRating rating={review.rating} readonly />
-                    </div>
-                    {review.comment && <p className="text-gray-700 mb-2">{review.comment}</p>}
-                    <p className="text-xs text-gray-500">
-                      {review.createdAt?.toDate?.()?.toLocaleDateString('tr-TR') || 'Bugün'}
-                    </p>
-                  </div>
-                ))}
-                {userReviews.length === 0 && (
-                  <p className="text-gray-500 text-center py-8">Henüz değerlendirme yapmadınız.</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Admin Panel */}
-        {page === 'admin' && isAdmin && (
-          <div className="max-w-4xl mx-auto">
-            <div className="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-3xl shadow-xl p-8 text-white mb-6">
-              <h2 className="text-3xl font-bold flex items-center gap-2">
-                <Shield className="w-8 h-8" />
-                Admin Paneli
-              </h2>
-              <p className="mt-2">İçerikleri buradan ekleyip yönetebilirsiniz.</p>
-            </div>
-
-            <div className="bg-white rounded-3xl shadow-xl p-8">
-              <h3 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                <Plus className="w-6 h-6" />
-                Yeni İçerik Ekle
-              </h3>
+            <div className="border-t pt-6">
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">Değerlendirme Yap</h3>
               
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">İsim</label>
-                  <input
-                    type="text"
-                    value={newItem.name}
-                    onChange={(e) => setNewItem({...newItem, name: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                    placeholder="Örn: iPhone 15 Pro"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
-                  <select
-                    value={newItem.category}
-                    onChange={(e) => setNewItem({...newItem, category: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                  >
-                    {CATEGORIES.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+              <div className="bg-gray-50 p-6 rounded-xl mb-6">
+                <div className="mb-4">
+                  <label className="block text-gray-700 font-semibold mb-2">Puanınız</label>
+                  <div className="flex items-center space-x-2">
+                    {[1, 2, 3, 4, 5].map(rating => (
+                      <button
+                        key={rating}
+                        onClick={() => setNewComment({...newComment, rating})}
+                        className="transition hover:scale-110"
+                      >
+                        <Star
+                          size={32}
+                          className={rating <= newComment.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
+                        />
+                      </button>
                     ))}
-                  </select>
+                    <span className="ml-4 text-xl font-bold text-gray-800">{newComment.rating}/5</span>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Açıklama</label>
+                <div className="mb-4">
+                  <label className="block text-gray-700 font-semibold mb-2">Yorumunuz</label>
                   <textarea
-                    value={newItem.description}
-                    onChange={(e) => setNewItem({...newItem, description: e.target.value})}
-                    rows="3"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                    placeholder="İçerik hakkında kısa bir açıklama yazın..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Fotoğraf URL</label>
-                  <input
-                    type="text"
-                    value={newItem.imageUrl}
-                    onChange={(e) => setNewItem({...newItem, imageUrl: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                    placeholder="https://example.com/image.jpg"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Etiketler (virgülle ayırın)</label>
-                  <input
-                    type="text"
-                    value={newItem.tags}
-                    onChange={(e) => setNewItem({...newItem, tags: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                    placeholder="teknoloji, telefon, apple"
+                    value={newComment.comment}
+                    onChange={(e) => setNewComment({...newComment, comment: e.target.value})}
+                    rows="4"
+                    placeholder="Düşüncelerinizi paylaşın..."
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
 
                 <button
-                  onClick={handleAddItem}
-                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-4 rounded-xl font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                  onClick={handleAddComment}
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition"
                 >
-                  <Plus className="w-5 h-5" />
-                  İçeriği Ekle
+                  Yorumu Gönder
                 </button>
               </div>
             </div>
 
-            <div className="bg-white rounded-3xl shadow-xl p-8 mt-6">
-              <h3 className="text-2xl font-bold mb-4">Tüm İçerikler ({items.length})</h3>
-              <div className="space-y-2">
-                {items.map(item => (
-                  <div key={item.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:bg-gray-50">
-                    <div className="flex items-center gap-4">
-                      <img src={item.imageUrl} alt={item.name} className="w-16 h-16 object-cover rounded-lg" />
-                      <div>
-                        <p className="font-semibold">{item.name}</p>
-                        <p className="text-sm text-gray-600">{item.category}</p>
+            {/* Comments */}
+            <div className="border-t pt-6">
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">
+                Yorumlar ({selectedContent.comments.length})
+              </h3>
+              <div className="space-y-4">
+                {selectedContent.comments.map((comment, idx) => (
+                  <div key={idx} className="bg-gray-50 p-4 rounded-xl">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold text-gray-800">{comment.user}</span>
+                      <div className="flex items-center space-x-1">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            size={16}
+                            className={i < comment.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
+                          />
+                        ))}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <StarRating rating={item.averageRating || 0} readonly />
-                      <span className="text-sm text-gray-600">({item.reviewCount || 0})</span>
-                    </div>
+                    <p className="text-gray-700 mb-1">{comment.comment}</p>
+                    <p className="text-sm text-gray-500">{comment.date}</p>
                   </div>
                 ))}
               </div>
             </div>
           </div>
-        )}
+        </div>
+
+        {/* Related Contents */}
+        <div>
+          <h3 className="text-2xl font-bold text-gray-800 mb-6">Benzer İçerikler</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {getRelatedContents(selectedContent).map(content => (
+              <ContentCard key={content.id} content={content} />
+            ))}
+          </div>
+        </div>
       </div>
+    );
+  };
+
+  // Profile Page
+  const ProfilePage = () => {
+    if (!currentUser) return null;
+
+    const userRatings = contents.filter(c => 
+      c.comments.some(comment => comment.user === currentUser.username)
+    );
+
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
+          <div className="flex items-center space-x-6 mb-6">
+            <div className="w-24 h-24 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center text-white text-4xl font-bold">
+              {currentUser.username[0].toUpperCase()}
+            </div>
+            <div>
+              <h2 className="text-3xl font-bold text-gray-800">{currentUser.username}</h2>
+              <p className="text-gray-600">{currentUser.isAdmin ? 'Yönetici' : 'Kullanıcı'}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="bg-purple-50 p-4 rounded-xl text-center">
+              <p className="text-3xl font-bold text-purple-600">{userRatings.length}</p>
+              <p className="text-gray-600">Değerlendirme</p>
+            </div>
+            <div className="bg-pink-50 p-4 rounded-xl text-center">
+              <p className="text-3xl font-bold text-pink-600">
+                {contents.reduce((acc, c) => acc + c.comments.filter(com => com.user === currentUser.username).length, 0)}
+              </p>
+              <p className="text-gray-600">Yorum</p>
+            </div>
+            <div className="bg-red-50 p-4 rounded-xl text-center">
+              <p className="text-3xl font-bold text-red-600">
+                {currentUser.isAdmin ? contents.length : '∞'}
+              </p>
+              <p className="text-gray-600">Aktivite</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          <h3 className="text-2xl font-bold text-gray-800 mb-6">Değerlendirmelerim</h3>
+          <div className="space-y-4">
+            {userRatings.map(content => {
+              const userComment = content.comments.find(c => c.user === currentUser.username);
+              return (
+                <div key={content.id} className="border-b pb-4">
+                  <div className="flex items-center space-x-4 mb-2">
+                    <img src={content.image} alt={content.name} className="w-16 h-16 rounded-lg object-cover" />
+                    <div className="flex-1">
+                      <h4 className="font-bold text-gray-800">{content.name}</h4>
+                      <div className="flex items-center space-x-1">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            size={14}
+                            className={i < userComment.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  {userComment && (
+                    <p className="text-gray-700 ml-20">{userComment.comment}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-red-50">
+      <Header />
+
+      {currentPage === 'home' && <HomePage />}
+      {currentPage === 'trending' && <TrendingPage />}
+      {currentPage === 'detail' && <DetailPage />}
+      {currentPage === 'profile' && <ProfilePage />}
+
+      {showAuthModal && <AuthModal />}
+      {showAdminModal && currentUser?.isAdmin && <AdminModal />}
     </div>
   );
-}
+};
+
+export default OolidoPlatform;
